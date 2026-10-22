@@ -69,6 +69,7 @@ export class Viewer {
   /** Modellens (och skisslinjernas) omslutande sfär. */
   readonly bounds = new THREE.Sphere(new THREE.Vector3(), 50);
   private insetRight = 0; // px som täcks av en panel till höger
+  private insetBottom = 0; // px som täcks av en panel nertill
   private gridHalf = 100;
 
   constructor(private host: HTMLElement) {
@@ -390,11 +391,19 @@ export class Viewer {
     this.requestRender();
   }
 
+  /** En panel täcker `px` nertill (stående läge): flytta upp modellen till mitten av det som syns. */
+  setBottomInset(px: number) {
+    this.insetBottom = Math.max(0, px);
+    this.applyInset();
+    this.requestRender();
+  }
+
   private applyInset() {
     const w = this.host.clientWidth, h = this.host.clientHeight;
     if (!w || !h) return;
-    const p = Math.min(this.insetRight, w * 0.6);
-    if (p > 0) this.camera.setViewOffset(w + p, h, p, 0, w, h);
+    const p = Math.min(this.insetRight, w * 0.6), b = Math.min(this.insetBottom, h * 0.6);
+    // En större tänkt bild där det synliga är nedre högra delen: mitten hamnar mitt i det fria.
+    if (p > 0 || b > 0) this.camera.setViewOffset(w + p, h + b, p, b, w, h);
     else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
   }

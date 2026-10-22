@@ -1,1 +1,1 @@
-{"name":"scadshape-browsertest","private":true,"type":"module","dependencies":{"playwright":"^1.64.1"}}
+{"name":"scadshape-browsertest","private":true,"type":"module","dependencies":{"playwright":"^1.64.1"},"devDependencies":{"gifenc":"^1.0.3","pngjs":"^7.0.0"}}

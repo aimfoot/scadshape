@@ -323,11 +323,11 @@ export class SketchEditor {
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
     const wMm = Math.max(x1 - x0, 10), hMm = Math.max(y1 - y0, 10);
-    this.view = {
-      cx: (x0 + x1) / 2,
-      cy: (y0 + y1) / 2,
-      scale: Math.min(Math.max(this.w, 100) / (wMm * 1.5), Math.max(this.h, 100) / (hMm * 1.6)),
-    };
+    const w = Math.max(this.w, 100), h = Math.max(this.h, 100);
+    // Minst 90 px på var sida i sidled: måttetiketter med variabelnamn ("width = 30") står utanför
+    // geometrin och klipptes annars på smala telefoner.
+    const scale = Math.min(w / (wMm * 1.5), Math.max(w - 180, w / 3) / wMm, h / (hMm * 1.6));
+    this.view = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, scale };
     this.requestDraw();
   }
 

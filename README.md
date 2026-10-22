@@ -8,8 +8,22 @@ offline: OpenSCAD (WebAssembly, Manifold backend) renders the model and FreeCAD'
 
 It runs as a web app (PWA) and as an Android app (a WebView wrapper with no permissions at all).
 
+<p align="center">
+  <img src="docs/media/sketch-to-part.gif" width="270" alt="Draw a rectangle with your finger, extrude it and turn the view">
+  &nbsp;
+  <img src="docs/media/variables.gif" width="270" alt="Change the length variable of the mounting plate example and the holes follow">
+</p>
+<p align="center"><em>Sketch → part in a few taps · change a variable and the model follows</em></p>
+
 > Status: early. The user interface is Swedish and English; the developer notes in `README.txt`
 > are in Swedish.
+
+## Screenshots
+
+| | | | | |
+|:-:|:-:|:-:|:-:|:-:|
+| <img src="docs/media/start.png" width="160" alt="Start card with four steps and example models"> | <img src="docs/media/sketch.png" width="160" alt="Fully defined sketch with dimensions tied to variables"> | <img src="docs/media/hole.png" width="160" alt="Hole feature panel with countersunk M4 holes"> | <img src="docs/media/model.png" width="160" alt="Box with a push-fit lid"> | <img src="docs/media/export.png" width="160" alt="Export to 3MF, STL or OpenSCAD"> |
+| Getting started | Sketch with constraints | Features | Ready to print | Export 3MF/STL |
 
 ## Install (Android)
 

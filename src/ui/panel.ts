@@ -195,8 +195,10 @@ export function openPanel(f: SolidFeature, existing: boolean) {
   $('#fpFields').replaceChildren(...fields);
 
   panelEl().hidden = false;
-  // Liggande: panelen täcker högerkanten – centrera modellen i resten.
-  viewer.setRightInset(innerWidth > innerHeight ? panelEl().offsetWidth + 16 : 0);
+  // Panelen täcker högerkanten (liggande) eller nederkanten (stående) – centrera modellen i resten.
+  const landscape = innerWidth > innerHeight;
+  viewer.setRightInset(landscape ? panelEl().offsetWidth + 16 : 0);
+  viewer.setBottomInset(landscape ? 0 : panelEl().offsetHeight + 8);
   if (app.source !== 'model') setSource('model');
   $('#tree').hidden = true;
   $('#btnTree').setAttribute('aria-pressed', 'false');
@@ -273,6 +275,7 @@ export function closePanel() {
   renderOpts.hideSketch = null;
   viewer.setOverlay(null);
   viewer.setRightInset(0);
+  viewer.setBottomInset(0);
 }
 
 /** Standardskiss för en ny feature: senaste användbara skissen, helst en som inte redan används. */

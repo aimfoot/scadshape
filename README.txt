@@ -153,6 +153,16 @@ Licens och "Om scadshape" (2026-10-22)
   och uppdatera src/licenses.ts. Test: tools/browser/about.mjs (alla texter öppnas).
   Bakåt/Esc i en licenstext går tillbaka till listan (Androids bakåt: knappar med data-back).
 
+Bilder i README.md (2026-10-23, docs/media/)
+  tools/browser/readme-media.mjs gör om dem mot staging (se skriptets huvud): två GIF:ar
+  (sketch-to-part, variables) och fem skärmbilder, engelska, 390 × 844. GIF:arna är bildserier med
+  bestämd visningstid per bild (gifenc + pngjs, utvecklingsberoenden i tools/browser); DUMP=<katalog>
+  sparar också bilderna som PNG för granskning. Kör om när gränssnittet ändras märkbart.
+  Två följdändringar i appen: featurepanelen i stående läge (nertill) flyttar upp modellen ovanför sig
+  (viewer.setBottomInset, som setRightInset i liggande) – förut låg modellen dold under panelen; och
+  skissvyn ger minst 90 px marginal i sidled (editor.fit), så att måttetiketter med variabelnamn inte
+  klipps på smala telefoner.
+
 Startkort och exempel (2026-10-22, ui/welcome.ts, examples/models.ts)
   När modellen är tom visas ett kort i 3D-ytan: fyra steg (Skiss → rita/Mått → Klar + Extrudera …
   → Exportera) och fyra exempel. Det blockerar inte verktygen och döljs när modellen får innehåll,
