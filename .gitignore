@@ -1,0 +1,19 @@
+# Beroenden och byggen
+node_modules/
+dist/
+dist-next/
+android/build/
+android/dist/
+tests/out/
+
+# Lokalt: signeringsnyckeln, loggar/mätningar från telefonen, egna testfiler, driftanteckningar
+android/signing/
+data/
+tests/private/
+*.local.txt
+
+# Testernas utdata (skärmbilder, exporterade filer) hamnar bredvid skripten om ingen utkatalog anges
+tools/browser/*
+!tools/browser/*.mjs
+!tools/browser/package.json
+!tools/browser/package-lock.json

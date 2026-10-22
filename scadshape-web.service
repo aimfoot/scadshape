@@ -1,0 +1,41 @@
+# systemd user service för scadshape (utvecklingsversion), bara över Tailscale:
+#   cp scadshape-web.service ~/.config/systemd/user/ && systemctl --user enable --now scadshape-web
+# Lyssnar på 127.0.0.1:8790. För att nå den från telefonen: en drop-in med Tailscale-IP:n, t.ex.
+#   ~/.config/systemd/user/scadshape-web.service.d/host.conf:  [Service]  Environment=SCADSHAPE_HOST=<ip>
+# Startar den innan Tailscale har sin IP så startar den om tills det går.
+[Unit]
+Description=scadshape webb (utveckling) på port 8790
+
+[Service]
+ExecStart=/usr/bin/python3 %h/opt/scadshape/serve.py
+Restart=always
+RestartSec=5
+
+# Skydd: processen ser bara serve.py, dist/ (skrivskyddat) och data/ (mätresultat) av hemkatalogen.
+ProtectHome=tmpfs
+BindReadOnlyPaths=%h/opt/scadshape/serve.py %h/opt/scadshape/dist
+BindPaths=%h/opt/scadshape/data
+ProtectSystem=strict
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=0077
+
+[Install]
+WantedBy=default.target

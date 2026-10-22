@@ -1,0 +1,16 @@
+{
+  "name": "scadshape",
+  "short_name": "scadshape",
+  "description": "CAD i mobilen: skissa, extrudera, borra hål och gänga – OpenSCAD körs direkt i telefonen.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef1f4",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

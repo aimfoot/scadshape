@@ -1,0 +1,18 @@
+Hämtat 2026-10-22. SPDX-texterna (GPL, LGPL, MPL, Apache, BSL) från /usr/share/licenses/spdx.
+openscad             https://raw.githubusercontent.com/openscad/openscad/04834adb1ba3c9a6e4160747c91cbadbce9c37b3/COPYING
+manifold             https://raw.githubusercontent.com/elalish/manifold/master/LICENSE
+clipper2             https://raw.githubusercontent.com/AngusJohnson/Clipper2/main/LICENSE
+cgal                 https://raw.githubusercontent.com/CGAL/cgal/v6.0.3/Installation/LICENSE
+freetype             https://raw.githubusercontent.com/freetype/freetype/VER-2-14-3/docs/FTL.TXT
+harfbuzz             https://raw.githubusercontent.com/harfbuzz/harfbuzz/14.3.0/COPYING
+fontconfig           https://gitlab.freedesktop.org/fontconfig/fontconfig/-/raw/2.18.2/COPYING
+libffi               https://raw.githubusercontent.com/libffi/libffi/v3.7.1/LICENSE
+cairo                https://gitlab.freedesktop.org/cairo/cairo/-/raw/master/COPYING
+expat                https://raw.githubusercontent.com/libexpat/libexpat/R_2_8_2/expat/COPYING
+liblzma              https://raw.githubusercontent.com/kobolabs/liblzma/87b7682ce4b1c849504e2b3641cebaad62aaef87/COPYING
+libzip               https://raw.githubusercontent.com/nih-at/libzip/v1.11.4/LICENSE
+zlib                 https://raw.githubusercontent.com/madler/zlib/v1.3.2/LICENSE
+libxml2              https://gitlab.gnome.org/GNOME/libxml2/-/raw/v2.15.3/Copyright
+double-conversion    https://raw.githubusercontent.com/google/double-conversion/v3.4.0/LICENSE
+lib3mf               https://raw.githubusercontent.com/3MFConsortium/lib3mf/v2.3.2/LICENSE
+nlohmann-json        https://raw.githubusercontent.com/nlohmann/json/develop/LICENSE.MIT

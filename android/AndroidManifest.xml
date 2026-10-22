@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.archserver.scadshape">
+
+    <!-- Ingen nätbehörighet (sedan 2026-10-22): appens filer serveras ur APK:n via
+         shouldInterceptRequest, och allt annat blockeras där ändå. -->
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/AppTheme"
+        android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Öppna/dela modeller, STL, SVG och OpenSCAD-kod till appen. Filhanterare skickar ofta
+                 .scad och .stl som octet-stream eller text/plain. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="model/stl" />
+                <data android:mimeType="application/sla" />
+                <data android:mimeType="application/vnd.ms-pki.stl" />
+                <data android:mimeType="image/svg+xml" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/x-openscad" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name=".Files"
+            android:authorities="dev.archserver.scadshape.files"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+    </application>
+</manifest>

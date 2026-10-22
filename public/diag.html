@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>scadshape diagnos</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light dark; --text: #1d2833; --muted: #5f6d7a; --accent: #1a6fc4; --bg: #fff; --on-accent: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --text: #e3e9ef; --muted: #9aa8b5; --accent: #5ea4ec; --bg: #11161b; --on-accent: #0b1520; } }
+  body { margin: 0; padding: 16px; font: 15px/1.45 system-ui, sans-serif; color: var(--text); background: var(--bg); }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  p { color: var(--muted); margin: 0 0 12px; }
+  button { font: inherit; min-height: 44px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-weight: 600; }
+  button:disabled { opacity: .5; }
+  pre { white-space: pre-wrap; font: 13px/1.5 ui-monospace, monospace; }
+</style>
+<script type="module" src="diag.js"></script>
+</head>
+<body>
+<h1>scadshape – diagnos</h1>
+<p>Jämför samma arbete på huvudtråden och i en worker. Tar ungefär en halv minut; ha fliken öppen tills det står Klart.</p>
+<button id="run">Kör diagnos</button>
+<pre id="out"></pre>
+</body>
+</html>
