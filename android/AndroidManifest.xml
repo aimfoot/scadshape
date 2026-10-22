@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="dev.archserver.scadshape">
+    package="io.github.aimfoot.scadshape">
 
     <!-- Ingen nätbehörighet (sedan 2026-10-22): appens filer serveras ur APK:n via
          shouldInterceptRequest, och allt annat blockeras där ändå. -->
@@ -42,7 +42,7 @@
 
         <provider
             android:name=".Files"
-            android:authorities="dev.archserver.scadshape.files"
+            android:authorities="io.github.aimfoot.scadshape.files"
             android:exported="false"
             android:grantUriPermissions="true" />
     </application>

@@ -23,15 +23,16 @@ Play App Signing (väljs när appen skapas i Play Console):
 
 Version: VERSION_CODE/VERSION_NAME i build.sh – höj VERSION_CODE för varje utskick.
 signing/ = nyckeln. Tappas den går uppdateringar inte att installera över appen (behåll en kopia).
-Paketnamn dev.archserver.scadshape är tillfälligt: bestäm det slutliga (följer namnet) innan
-appen laddas upp till Play – det går inte att byta efteråt.
+Paketnamn io.github.aimfoot.scadshape (slutligt sedan 0.3.1, 2026-10-22, första publika
+releasen). Det går inte att byta: ett annat paketnamn är en annan app.
+Releaser: ../tools/release.sh (GitHub-release med APK och SHA-256, se skriptets huvud).
 
 Inga behörigheter alls, inte ens INTERNET (0.2.0, fungerar på telefonen 2026-10-22).
 Modellerna ligger i IndexedDB (src/kv.ts, sedan 2026-10-22) i WebViews data, som Androids
 automatiska säkerhetskopiering tar med (allowBackup="true"). Uppdateras appen över en äldre version
 flyttas modellerna från localStorage vid första starten.
 
-Så fungerar det (src/dev/archserver/scadshape/)
+Så fungerar det (src/io/github/aimfoot/scadshape/)
   MainActivity  Filerna serveras från https://appassets.androidplatform.net/ ur assets/www
                 (säkert ursprung: WASM, workers, IndexedDB som på webben). Alla andra adresser
                 får 403 – appen använder aldrig nätet. Länkar ut öppnas i webbläsaren.

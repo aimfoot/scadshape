@@ -1,4 +1,4 @@
-package dev.archserver.scadshape;
+package io.github.aimfoot.scadshape;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -16,7 +16,7 @@ import java.io.FileNotFoundException;
  * Läsrätten ges per delning (FLAG_GRANT_READ_URI_PERMISSION); providern är inte exporterad.
  */
 public class Files extends ContentProvider {
-    static final String AUTHORITY = "dev.archserver.scadshape.files";
+    static final String AUTHORITY = "io.github.aimfoot.scadshape.files";
 
     static File dir(android.content.Context c) {
         return new File(c.getCacheDir(), "share");

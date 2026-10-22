@@ -11,6 +11,19 @@ It runs as a web app (PWA) and as an Android app (a WebView wrapper with no perm
 > Status: early. The user interface is Swedish and English; the developer notes in `README.txt`
 > are in Swedish.
 
+## Install (Android)
+
+Download the APK from [Releases](https://github.com/aimfoot/scadshape/releases), or add
+`https://github.com/aimfoot/scadshape` in [Obtainium](https://github.com/ImranR98/Obtainium) to
+get updates automatically. Android 10 or newer. The app asks for no permissions and works fully
+offline.
+
+Package `io.github.aimfoot.scadshape`, signing certificate SHA-256:
+
+```
+80:C3:89:C6:B3:1B:12:5A:E2:F3:4D:82:B3:32:98:0B:F9:39:B5:AB:E4:96:27:96:13:54:44:7A:79:E3:EA:37
+```
+
 ## Building
 
 Requirements: Node.js 20+.

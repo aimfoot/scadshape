@@ -1,4 +1,4 @@
-package dev.archserver.scadshape;
+package io.github.aimfoot.scadshape;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
