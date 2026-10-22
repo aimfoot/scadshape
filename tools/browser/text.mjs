@@ -36,6 +36,13 @@ let st = await waitRendered();
 assert.equal(st.errors.length, 0, st.errors.join()); assert.match(st.status, /trianglar/);
 assert.ok(fontRequests.includes('AllertaStencil-Regular.ttf'), fontRequests.join());
 await page.screenshot({ path: `${out}/x-text.png` });
+// Orbitron Black: hela familjen hämtas (fontconfig väljer vikten).
+await page.selectOption('#fp-font', 'orbitron-black');
+st = await waitRendered();
+assert.equal(st.errors.length, 0, st.errors.join());
+for (const f of ['Orbitron-Medium.ttf', 'Orbitron-Bold.ttf', 'Orbitron-Black.ttf']) assert.ok(fontRequests.includes(f), `${f}: ${fontRequests.join()}`);
+assert.deepEqual(await page.$$eval('#fp-font option', os => os.map(o => o.textContent).filter(t => t.startsWith('Orbitron'))), ['Orbitron', 'Orbitron Bold', 'Orbitron Black']);
+await page.screenshot({ path: `${out}/x-text-orbitron.png` });
 await page.click('#fp-op [data-value="remove"]'); await page.fill('#fp-start', '2'); // in i lådans botten
 assert.equal(await page.getAttribute('#fp-direction [data-value="reverse"]', 'aria-pressed'), 'true');
 await page.click('#fpOk'); st = await waitRendered();

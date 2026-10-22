@@ -16,12 +16,23 @@ export const FONTS: FontInfo[] = [
   { id: 'stencil', label: 'Allerta Stencil', family: 'Allerta Stencil', file: 'AllertaStencil-Regular.ttf' },
   { id: 'bebas', label: 'Bebas Neue', family: 'Bebas Neue', file: 'BebasNeue-Regular.ttf' },
   { id: 'script', label: 'Pacifico', family: 'Pacifico', file: 'Pacifico-Regular.ttf' },
+  // Orbitron-projektets egna statiska filer (v1.000), omodifierade: namnet är reserverat (OFL RFN),
+  // så egna instanser ur Google-versionens variabla fil får inte heta Orbitron. Ingen Regular – Medium
+  // heter "Orbitron" (stil Regular) i filen.
+  { id: 'orbitron', label: 'Orbitron', family: 'Orbitron', file: 'Orbitron-Medium.ttf' },
+  { id: 'orbitron-bold', label: 'Orbitron Bold', family: 'Orbitron:style=Bold', file: 'Orbitron-Bold.ttf' },
+  { id: 'orbitron-black', label: 'Orbitron Black', family: 'Orbitron:style=Black', file: 'Orbitron-Black.ttf' },
 ];
 
 export const fontById = (id: string) => FONTS.find(f => f.id === id) ?? FONTS[0];
 
-/** Typsnittsfiler som koden behöver: de som nämns, plus OpenSCADs standard (Liberation Sans) som reserv. */
+const familyOf = (f: FontInfo) => f.family.split(':')[0];
+
+/**
+ * Typsnittsfiler som koden behöver: hela familjen när koden nämner den (t.ex. "Orbitron:style=Medium"
+ * eller bara "Orbitron" – fontconfig väljer sedan vikten), plus OpenSCADs standard (Liberation Sans).
+ */
 export function fontsFor(src: string): string[] {
   if (!/\btext\s*\(/.test(src)) return [];
-  return [...new Set([FONTS[0].file, ...FONTS.filter(f => src.includes(`"${f.family}"`)).map(f => f.file)])];
+  return [...new Set([FONTS[0].file, ...FONTS.filter(f => src.includes(`"${familyOf(f)}`)).map(f => f.file)])];
 }

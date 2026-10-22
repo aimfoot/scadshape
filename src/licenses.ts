@@ -71,7 +71,7 @@ export const PARTS: { group: Key; parts: Part[] }[] = [
   {
     group: 'about.group.fonts',
     parts: [
-      { name: 'Liberation Sans, Allerta Stencil, Bebas Neue, Pacifico', license: 'OFL-1.1', url: 'https://openfontlicense.org', files: ['fonts/LICENSE.txt'] },
+      { name: 'Liberation Sans, Allerta Stencil, Bebas Neue, Pacifico, Orbitron', license: 'OFL-1.1', url: 'https://openfontlicense.org', files: ['fonts/LICENSE.txt'] },
     ],
   },
 ];

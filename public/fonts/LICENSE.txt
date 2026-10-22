@@ -9,6 +9,9 @@ All fonts here are licensed under the SIL Open Font License 1.1 (full text below
   AllertaStencil-Regular.ttf   Copyright (c) 2010 Matt McInerney
   BebasNeue-Regular.ttf        Copyright (c) 2010 Dharma Type
   Pacifico-Regular.ttf         Copyright (c) 2018 The Pacifico Project Authors
+  Orbitron-Medium.ttf, Orbitron-Bold.ttf, Orbitron-Black.ttf
+      Copyright (c) 2009, Matt McInerney <matt@pixelspread.com>, with Reserved Font Name "Orbitron".
+      Unmodified version 1.000 files from https://github.com/theleagueof/orbitron.
 
 ----------------------------------------------------------------------------------------------------
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007

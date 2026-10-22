@@ -12,7 +12,7 @@ Status: fas 0–3 klara 2026-10-16 (spike, skissverktyg, villkor/mått, features
 förskjutna skissplan; sedan behållare (fack, insticks-/skruvlock), export 3MF/STL/.scad
 (fas 4), upprepa (linjärt/rutnät/runt axel/spegla) och kanter (hörnradie, avrunda/fasa)
 (fas 5), PWA (offline, installerbar) + publik server klar för Cloudflare-tunneln,
-modeller (flera projekt, fil in/ut), text (5 typsnitt), ångra i delläget, skissverktygen
+modeller (flera projekt, fil in/ut), text (8 typsnitt), ångra i delläget, skissverktygen
 polygon och avlångt hål, avrunda/fasa skisshörn (sketch/fillet.ts), mätverktyg i 3D (measure.ts), import av STL/SVG (Importera), mörkt tema (☰ → Tema), snäpplås (snäpphake/urtag, snäpplock). Kvar: publik adress,
 Android-appen inför Play (android/README.txt), fler features (se Idéer).
 
@@ -62,9 +62,13 @@ Modeller (projects.ts, ui/projects.ts, kv.ts)
 Text (features/text.ts, fonts.ts)
   Upphöjd/ingraverad text vid valda punkter (annars skissens origo), start (mm från planet).
   Typsnitt i public/fonts/ (OFL, LICENSE.txt): Liberation Sans (+ fet), Allerta Stencil, Bebas
-  Neue, Pacifico. Motorn får bara de typsnitt koden nämner (fontsFor); workern hämtar och
-  cachar dem och sätter FONTCONFIG_FILE i preRun. Variabla typsnitt (t.ex. Orbitron[wght])
-  kraschar WASM-bygget – använd statiska .ttf.
+  Neue, Pacifico, Orbitron (Medium = "Orbitron", Bold, Black; 2026-10-23). Motorn får hela familjen
+  när koden nämner den (fontsFor: "Orbitron:style=Medium" eller bara "Orbitron" räcker); workern
+  hämtar och cachar dem och sätter FONTCONFIG_FILE i preRun. Variabla typsnitt (t.ex. Googles
+  Orbitron[wght]) kraschar WASM-bygget – använd statiska .ttf. Orbitron har reserverat namn (OFL
+  RFN): egna instanser ur den variabla filen (fontTools) får inte heta Orbitron, därför projektets
+  egna omodifierade statiska filer (v1.000, github.com/theleagueof/orbitron) – originalritningen,
+  något annorlunda än Googles 2.001 på servern. Test: model.test "Orbitron, Bold och Black väljs".
 
 Bibliotek (libs.ts, vendor/libraries/)
   Samma bibliotek som på servern, kopierade 2026-10-17 (bara *.scad + LICENSE, se VERSION):

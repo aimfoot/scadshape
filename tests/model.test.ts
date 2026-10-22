@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { applyHoleSize, emptyDoc, holeCandidates, insertFeature, migrate, newExtrude, newFeature, newHole, newRevolve, newSketch, removeFeature, type Doc } from '../src/doc';
 import { minorDiameter } from '../src/features/threads';
-import { fontsFor } from '../src/fonts';
+import { fontById, fontsFor } from '../src/fonts';
 import { buildModel } from '../src/model3d';
 import { parseBinaryStl } from '../src/stl';
 import { emptySketch, newId, type SketchData } from '../src/sketch/model';
@@ -515,6 +515,15 @@ await test('text: upphöjd vid en punkt, ingraverad i en platta, svenska tecken 
   tx.sketch = s.id; tx.points = null; tx.start = '5'; tx.font = 'bold';
   r = await render(buildModel(doc).code); near(r.max[2], 5, 1e-3); assert.ok(r.vol < 80 * 30 * 5 - 20, `${r.vol}`);
   tx.text = '  '; assert.match(buildModel(doc).errors.get(tx.id)!, /Skriv en text/);
+});
+await test('Orbitron, Bold och Black väljs (inte reservtypsnittet) och hela familjen följer med', async () => {
+  const vol: Record<string, number> = {};
+  for (const id of ['sans', 'orbitron', 'orbitron-bold', 'orbitron-black'])
+    vol[id] = (await render(`linear_extrude(1) text("ORBIT 42", size = 10, font = "${fontById(id).family}");`)).vol;
+  // Tjockare vikt = mer material. Ett typsnitt som saknas blir Liberation Sans – samma volym som 'sans'.
+  assert.ok(vol.orbitron < vol['orbitron-bold'] && vol['orbitron-bold'] < vol['orbitron-black'], JSON.stringify(vol));
+  for (const id of ['orbitron', 'orbitron-bold', 'orbitron-black']) assert.ok(Math.abs(vol[id] - vol.sans) > 1, `${id} ser ut som reserven: ${JSON.stringify(vol)}`);
+  assert.deepEqual(fontsFor('text("x", font = "Orbitron:style=Medium");').sort(), ['LiberationSans-Regular.ttf', 'Orbitron-Black.ttf', 'Orbitron-Bold.ttf', 'Orbitron-Medium.ttf']);
 });
 await test('skissa på en yta: plan, förskjutning som följer måttet, kontur och riktning', async () => {
   const doc = emptyDoc(); doc.params = [{ name: 'tjocklek', expr: '5' }];
