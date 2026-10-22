@@ -5,8 +5,8 @@
 # Webbappen byggs till build/assets/www (inte ../dist, så webbversionen påverkas inte).
 set -eu
 cd "$(dirname "$0")"
-VERSION_CODE=2
-VERSION_NAME=0.2.0
+VERSION_CODE=3
+VERSION_NAME=0.2.1
 
 B=$HOME/opt/android-build
 export JAVA_HOME=$B/jdk PATH=$B/jdk/bin:$PATH

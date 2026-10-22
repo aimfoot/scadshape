@@ -7,7 +7,7 @@ import type { Key } from './i18n';
 export type Part = { name: string; version?: string; license: string; url: string; files: string[] };
 
 /** Var scadshapes källkod finns (tom = inte publicerad än, länken visas inte). */
-export const SOURCE_URL = '';
+export const SOURCE_URL = 'https://github.com/aimfoot/scadshape';
 
 const L = (f: string) => `licenses/${f}.txt`;
 const GPL3 = L('GPL-3.0-or-later'), LGPL3 = L('LGPL-3.0-or-later'), LGPL21 = L('LGPL-2.1-or-later');

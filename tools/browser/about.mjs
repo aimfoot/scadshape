@@ -17,6 +17,8 @@ if (await page.isHidden('#tree')) await page.click('#btnTree');
 await page.click('#btnAbout');
 assert.ok(await page.evaluate(() => document.querySelector('#aboutDlg').open));
 console.log('version:', await page.textContent('#aboutVersion'));
+assert.equal(await page.getAttribute('#aboutSource', 'href'), 'https://github.com/aimfoot/scadshape');
+assert.ok(await page.isVisible('#aboutSource'), 'källkodslänken ska synas');
 const rows = await page.$$eval('#aboutParts li', lis => lis.length);
 console.log('delar:', rows);
 await page.screenshot({ path: `${out}/about.png` });

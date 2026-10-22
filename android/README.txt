@@ -57,7 +57,7 @@ Test
 
 Kvar inför Play
   Välja Play App Signing a/b (se ovan).
-  Källkoden publik (GPL-3): ett publikt förråd, sedan SOURCE_URL i src/licenses.ts (då visas
-  länken i "Om"). GPL kräver också att källkoden till OpenSCAD-motorn finns att få: "Om" pekar på
+  GPL kräver att källkoden till OpenSCAD-motorn finns att få: "Om" pekar på
   github.com/openscad/openscad + openscad-wasm; spara gärna en egen kopia av källkoden för den
   snapshot som ligger i vendor/openscad (2026.10.15) när appen släpps.
+Källkoden: https://github.com/aimfoot/scadshape (publik 2026-10-22, länken i "Om").
