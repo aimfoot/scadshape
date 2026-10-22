@@ -153,6 +153,21 @@ Licens och "Om scadshape" (2026-10-22)
   och uppdatera src/licenses.ts. Test: tools/browser/about.mjs (alla texter öppnas).
   Bakåt/Esc i en licenstext går tillbaka till listan (Androids bakåt: knappar med data-back).
 
+Startkort och exempel (2026-10-22, ui/welcome.ts, examples/models.ts)
+  När modellen är tom visas ett kort i 3D-ytan: fyra steg (Skiss → rita/Mått → Klar + Extrudera …
+  → Exportera) och fyra exempel. Det blockerar inte verktygen och döljs när modellen får innehåll,
+  en featurepanel öppnas eller man går in i en skiss; × döljer det för sessionen, ☰ → Kom igång
+  visar det igen. Exemplen byggs när de öppnas (nya modeller i nuvarande format) med mått som hänger
+  på variabler (namnen följer språket): Låda med lock (behållare), Monteringsplatta (extrudering +
+  försänkta M4-hål på ovansidan, outward 'normal' så att de borrar nedåt), Skylt (text), Kopp
+  (revolve). En burk med skruvlock var med först men tog ~3 s och 357k trianglar (gängorna) – för
+  tungt som första intryck. Tester: tests/examples.test.ts (fullt bestämda skisser, renderar,
+  variabel ×1,5 → större modell, hålen går igenom), tools/browser/welcome.mjs.
+  Verktygsraden tonas i kanten där den fortsätter (ui/scrollhint.ts). Mät prestanda finns bara på
+  utvecklingsservern (isDevHost).
+  Svag telefon: tools/browser/lowend.mjs (360 × 640, CPU strypt 1/4/6×): start 0,18/0,46/0,69 s,
+  exemplen 0,1–0,4 s. Obs: CDP-strypningen gäller inte workern, så motortiderna är serverns.
+
 Android-app (android/, påbörjad 2026-10-22)
   WebView-omslag, helt offline: android/build.sh → android/dist/scadshape.apk. Spara/dela filer,
   öppna filer från andra appar och bakåtknappen går via bryggan i src/android.ts + src/ui/android.ts

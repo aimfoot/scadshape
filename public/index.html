@@ -46,6 +46,7 @@
     <ul id="featureList"></ul>
     <p id="treeEmpty" class="muted" data-i18n="tree.empty"></p>
     <span class="spacer"></span>
+    <button id="btnStart" data-i18n="ui.start">Kom igång</button>
     <label class="field">
       <span data-i18n="ui.language">Språk</span>
       <select id="lang"></select>
@@ -133,6 +134,22 @@
         <span data-i18n="plane.pickFaceHint">Tryck på en plan yta på modellen</span>
         <button id="faceCancel" data-i18n="ui.cancel">Avbryt</button>
       </div>
+      <section id="startCard" class="startcard" hidden>
+        <button type="button" id="startClose" class="icon startclose" data-i18n-aria="ui.close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 data-i18n="start.title">Välkommen till scadshape</h2>
+        <p data-i18n="start.intro"></p>
+        <ol class="steps">
+          <li data-i18n="start.step1"></li>
+          <li data-i18n="start.step2"></li>
+          <li data-i18n="start.step3"></li>
+          <li data-i18n="start.step4"></li>
+        </ol>
+        <h3 data-i18n="start.examples">Eller börja med ett exempel</h3>
+        <div id="startExamples" class="examples"></div>
+        <p class="muted small" data-i18n="start.tip"></p>
+      </section>
 
       <div id="featPanel" class="featpanel" hidden>
         <div class="fp-head"><b id="fpTitle"></b><span id="fpBusy" class="spinner" hidden></span></div>

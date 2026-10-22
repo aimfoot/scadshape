@@ -325,6 +325,47 @@ button.feature small { color: var(--muted); }
 }
 .hintbar button { pointer-events: auto; min-height: 30px; padding: 0 10px; font-size: 13px; border-color: var(--accent); color: var(--accent); }
 .loopinfo { position: absolute; z-index: 2; right: 10px; bottom: 10px; font-size: 12px; color: var(--muted); pointer-events: none; }
+
+/* Tonad kant där verktygsraden fortsätter (src/ui/scrollhint.ts). */
+.toolbar { --fade: 28px; }
+.toolbar.more-end { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent); }
+.toolbar.more-start { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fade)); mask-image: linear-gradient(to bottom, transparent, #000 var(--fade)); }
+.toolbar.more-start.more-end { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); mask-image: linear-gradient(to bottom, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); }
+.toolbar.scroll-x.more-end { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--fade)), transparent); mask-image: linear-gradient(to right, #000 calc(100% - var(--fade)), transparent); }
+.toolbar.scroll-x.more-start { -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade)); mask-image: linear-gradient(to right, transparent, #000 var(--fade)); }
+.toolbar.scroll-x.more-start.more-end { -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); }
+
+/* Startkortet (src/ui/welcome.ts): i 3D-ytan när modellen är tom. */
+.startcard {
+  position: absolute;
+  z-index: 3;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  max-height: calc(100% - 112px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: 14px 16px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.15);
+}
+.startcard h2 { margin: 0 32px 6px 0; font-size: 18px; }
+.startcard h3 { margin: 12px 0 6px; font-size: 14px; }
+.startcard p { margin: 4px 0; font-size: 14px; line-height: 1.4; }
+.startcard .steps { margin: 8px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.45; }
+.startcard .steps li { margin: 3px 0; }
+.startclose { position: absolute; top: 8px; right: 8px; min-height: 36px; width: 36px; border-color: transparent; }
+.startcard .examples { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
+.startcard .example { flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; text-align: left; white-space: normal; }
+.startcard .example b { font-size: 14px; }
+.startcard .example small { color: var(--muted); font-size: 12px; line-height: 1.3; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .startcard { top: 8px; max-height: calc(100% - 56px); }
+}
 @media (orientation: portrait) {
   #sketchArea { flex-direction: column-reverse; }
   .toolbar { flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; border-right: 0; border-top: 1px solid var(--line); padding: 4px 4px max(4px, env(safe-area-inset-bottom)); }

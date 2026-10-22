@@ -4,7 +4,9 @@
 import { localizeDefaultNames, type Feature } from './doc';
 import { KINDS } from './features';
 import { allLangs, applyI18n, getLang, LANGS, onLangChange, setLang, t, type Lang } from './i18n';
-import { installErrorReporting, remoteLog } from './remote';
+import { installErrorReporting, isDevHost, remoteLog } from './remote';
+import { initStart } from './ui/welcome';
+import { initScrollHints } from './ui/scrollhint';
 import { loadSolver } from './sketch/solver';
 import type { ViewName } from './viewer';
 import { runBench } from './ui/bench';
@@ -136,6 +138,8 @@ initImport();
 projectHooks.renamed = fillSources;
 initPwa();
 initAbout();
+initStart();
+initScrollHints();
 initParams();
 initSketchMode();
 syncCodePanel();
@@ -153,7 +157,8 @@ $('#source').addEventListener('change', e => {
 $('#btnCode').addEventListener('click', () => togglePanel($('#codePanel'), $('#btnCode'), 'codeOpen'));
 $('#btnTree').addEventListener('click', () => togglePanel($('#tree'), $('#btnTree'), 'treeOpen'));
 // Mätknappen är ett utvecklarverktyg: finns inte i appen (och runBench följer då inte med).
-if (__DEV_TOOLS__) $('#btnBench').addEventListener('click', runBench);
+// Bara på utvecklingsservern: där hamnar mätningen (den publika webben och appen har ingen nytta av den).
+if (__DEV_TOOLS__ && isDevHost) $('#btnBench').addEventListener('click', runBench);
 else $('#btnBench').remove();
 $('#btnParams').addEventListener('click', openParams);
 $('#btnExtrude').addEventListener('click', () => startFeature('extrude'));

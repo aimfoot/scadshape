@@ -1,5 +1,5 @@
 # Beroenden och byggen
-node_modules/
+node_modules
 dist/
 dist-next/
 android/build/
@@ -7,7 +7,7 @@ android/dist/
 tests/out/
 
 # Lokalt: signeringsnyckeln, loggar/mätningar från telefonen, egna testfiler, driftanteckningar
-android/signing/
+android/signing
 data/
 tests/private/
 *.local.txt
@@ -17,3 +17,6 @@ tools/browser/*
 !tools/browser/*.mjs
 !tools/browser/package.json
 !tools/browser/package-lock.json
+
+# Claude Codes worktrees
+.claude/

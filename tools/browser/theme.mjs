@@ -104,7 +104,7 @@ await page.selectOption('#theme', 'auto');
 assert.equal(await theme(page), 'light');
 // Engelska texter finns.
 await page.selectOption('#lang', 'en');
-assert.deepEqual(await page.$$eval('#theme option', os => os.map(o => o.textContent)), ['Like the phone', 'Light', 'Dark']);
+assert.deepEqual(await page.$$eval('#theme option', os => os.map(o => o.textContent)), ['Same as the phone', 'Light', 'Dark']);
 await page.selectOption('#lang', 'sv');
 await browser.close();
 console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga konsolfel. Alla kontroller ok.');
