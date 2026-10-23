@@ -39,7 +39,7 @@ export function clearFace() {
 function selectAt(p: { x: number; y: number }): boolean {
   if (app.source !== 'model' || !viewer.meshPositions) return false;
   const hit = viewer.pickFace(p);
-  const tris = hit && faceTriangles(viewer.meshPositions, hit.point, hit.normal);
+  const tris = hit && faceTriangles(viewer.meshPositions, hit.point, hit.normal, viewer.meshNormals);
   if (!hit || !tris) {
     clearFace();
     return false;

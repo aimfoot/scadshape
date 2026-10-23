@@ -17,12 +17,20 @@ export function parseBinaryStl(buf: ArrayBuffer): Mesh {
     const o = 84 + t * 50 + 12;
     const p = t * 9;
     for (let k = 0; k < 9; k++) pos[p + k] = dv.getFloat32(o + k * 4, true);
-    // The normal is computed from the corners (tolerates files with zeroed normals).
+    // The normal is computed from the corners (tolerates files with zeroed normals) – except for
+    // needle triangles (nearly collinear corners, common where Manifold joins faces in one plane):
+    // after rounding to float32 their computed normal is zero or points anywhere, so the file's own
+    // normal (computed in double precision) is used when it is a unit vector.
     const ax = pos[p + 3] - pos[p], ay = pos[p + 4] - pos[p + 1], az = pos[p + 5] - pos[p + 2];
     const bx = pos[p + 6] - pos[p], by = pos[p + 7] - pos[p + 1], bz = pos[p + 8] - pos[p + 2];
     let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
-    const len = Math.hypot(nx, ny, nz) || 1;
-    nx /= len; ny /= len; nz /= len;
+    const len = Math.hypot(nx, ny, nz);
+    const sx = dv.getFloat32(o - 12, true), sy = dv.getFloat32(o - 8, true), sz = dv.getFloat32(o - 4, true);
+    if (len <= 1e-3 * Math.hypot(ax, ay, az) * Math.hypot(bx, by, bz) && Math.abs(Math.hypot(sx, sy, sz) - 1) < 1e-3) {
+      nx = sx; ny = sy; nz = sz;
+    } else {
+      nx /= len || 1; ny /= len || 1; nz /= len || 1;
+    }
     for (let k = 0; k < 9; k += 3) {
       nrm[p + k] = nx;
       nrm[p + k + 1] = ny;

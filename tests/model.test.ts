@@ -15,7 +15,8 @@ import { facePlane, findCurveRef, findFaceRef, offsetExpr, planeReference, sketc
 import { planeFrame, sketchFrame, toWorld } from '../src/frame';
 import { KINDS } from '../src/features';
 import { repeatCircles } from '../src/features/pattern';
-import { addFaceLoops, faceLoops, smoothFace } from '../src/faceoutline';
+import { addFaceLoops, faceLoops, faceTriangles, smoothFace } from '../src/faceoutline';
+import { featureEdges } from '../src/edges';
 import { WORLD_SKETCH } from '../src/features/code';
 setLang('en'); // the tests expect English names and errors
 
@@ -749,5 +750,33 @@ await test('snap hook and catch: volumes, direction and strain', async () => {
   near((await render(m.code)).vol, 30 * 20 * 3 - (1.5 + 1 + 0.4) * (6 + 0.4) * 2, 0.01);
   // Too short a hook.
   h.kind = 'hook'; h.length = '2'; assert.match(buildModel(doc).errors.get(h.id)!, /too short/);
+});
+await test('needle triangles in flat faces: no edges across the face, clean outlines', async () => {
+  // A disc with rings and a slightly different circle on top (106- and 110-gons meeting in one plane):
+  // Manifold leaves needle triangles there, whose normal cannot be computed from float32 corners.
+  const code = `
+    difference() { linear_extrude(10) square([50, 45], center = true); linear_extrude(10) difference() { square([50, 70], center = true); circle(r = 22.3607, $fn = 106); } }
+    translate([0, 0, 10]) linear_extrude(10) circle(r = 22.3607, $fn = 106);
+    rotate_extrude($fn = 106) translate([22.34068, 0]) square([2.02, 10]);
+    translate([0, 0, 10]) rotate_extrude($fn = 106) translate([22.3407, 0]) square([2.02, 10]);
+    translate([0, 0, 20]) linear_extrude(10) circle(r = 24.3607, $fn = 110);`;
+  const log: string[] = [];
+  const inst = await OpenSCAD({ noInitialRun: true, wasmBinary, print: (t: string) => log.push(t), printErr: (t: string) => log.push(t) });
+  inst.FS.writeFile('/in.scad', code);
+  assert.equal(inst.callMain(['/in.scad', '-o', '/out.stl', '--export-format=binstl', '--backend=manifold']), 0, log.join('\n'));
+  const m = parseBinaryStl(inst.FS.readFile('/out.stl').slice().buffer);
+  const e = featureEdges(m.positions, m.normals, 25);
+  let inside = 0;
+  for (let i = 0; i < e.length; i += 6) if (Math.hypot((e[i] + e[i + 3]) / 2, (e[i + 1] + e[i + 4]) / 2) < 21) inside++;
+  assert.equal(inside, 0, 'edges inside the flat faces');
+  for (const z of [0, 30]) {
+    const loops = faceLoops(m.positions, planeFrame('XY', z), [5, 5, z]);
+    assert.deepEqual(loops.map(l => l.kind), ['circle'], `z = ${z}: ${JSON.stringify(loops.map(l => (l.kind === 'poly' ? l.pts.length : l.r)))}`);
+  }
+  // The highlight covers the whole bottom disc (the needles do not split it).
+  const tris = faceTriangles(m.positions, [5, 5, 0], [0, 0, -1], m.normals)!;
+  let area = 0;
+  for (let i = 0; i < tris.length; i += 9) area += Math.abs((tris[i + 3] - tris[i]) * (tris[i + 7] - tris[i + 1]) - (tris[i + 6] - tris[i]) * (tris[i + 4] - tris[i + 1])) / 2;
+  assert.ok(area > Math.PI * 24 * 24 * 0.95, `highlighted ${area.toFixed(1)} mm²`);
 });
 console.log(`${n} model tests ok`);

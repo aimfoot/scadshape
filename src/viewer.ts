@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { Bed } from './bed';
 import type { Mesh } from './stl';
+import { featureEdges } from './edges';
 import type { Vec } from './sketch/geom';
 import type { Plane } from './sketch/model';
 import { planeFrame, toPlane, toWorld, type Frame, type V3 } from './frame';
@@ -64,6 +65,8 @@ export class Viewer {
   onLongPress?: (p: { x: number; y: number }) => void;
   /** The shown model's triangles (9 numbers per triangle), or null. */
   meshPositions: Float32Array | null = null;
+  /** Their normals (one per corner, the same for a triangle's three), or null. */
+  meshNormals: Float32Array | null = null;
   /** The model's CAD edges (6 numbers per segment), for the measure tool. */
   edgePositions: Float32Array | null = null;
   private cornerPositions: Float32Array | null = null;
@@ -545,6 +548,7 @@ export class Viewer {
   setMesh(mesh: Mesh | null) {
     Viewer.disposeGroup(this.part);
     this.meshPositions = mesh && mesh.triangles ? mesh.positions : null;
+    this.meshNormals = mesh && mesh.triangles ? mesh.normals : null;
     this.edgePositions = this.cornerPositions = null;
     this.setHighlight(null);
     for (const f of this.meshChanged) f();
@@ -568,7 +572,8 @@ export class Viewer {
     );
     // Edges like in a CAD program. If the model has very many (e.g. threads) they are faded,
     // otherwise such faces turn black with lines.
-    const edgeGeo = new THREE.EdgesGeometry(geo, 25);
+    const edgeGeo = new THREE.BufferGeometry();
+    edgeGeo.setAttribute('position', new THREE.BufferAttribute(featureEdges(mesh.positions, mesh.normals, 25), 3));
     this.edgePositions = edgeGeo.getAttribute('position').array as Float32Array;
     this.cornerPositions = cornerVertices(this.edgePositions);
     const segments = edgeGeo.getAttribute('position').count / 2;

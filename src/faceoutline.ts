@@ -29,8 +29,8 @@ export function faceLoops(positions: Float32Array, frame: Frame, at: V3): FaceLo
   for (let t = 0; t < nTri; t++) {
     const q = [0, 1, 2].map(k => uvOf(t, k));
     if (q.some(p => Math.abs(p.w) > tol)) continue;
-    const area = (q[1].x - q[0].x) * (q[2].y - q[0].y) - (q[2].x - q[0].x) * (q[1].y - q[0].y);
-    if (Math.abs(area) < 1e-12) continue;
+    // Needle triangles (no area) are kept: their edges pair up with the neighbours'; left out, they
+    // would show as edges across the face.
     tris.set(t, q.map(p => ({ x: p.x, y: p.y })));
   }
   if (!tris.size) return [];
@@ -77,7 +77,7 @@ export function faceLoops(positions: Float32Array, frame: Frame, at: V3): FaceLo
     const q = tris.get(t)!;
     for (let i = 0; i < 3; i++) {
       const a = q[i], b = q[(i + 1) % 3];
-      if ((byEdge.get(edgeId(a, b)) ?? []).filter(u => face.has(u)).length !== 1) continue;
+      if (key(a) === key(b) || (byEdge.get(edgeId(a, b)) ?? []).filter(u => face.has(u)).length !== 1) continue;
       const l = next.get(key(a));
       if (l) l.push(b);
       else next.set(key(a), [b]);
@@ -149,26 +149,28 @@ export function addFaceLoops(sk: SketchData, loops: FaceLoop[]) {
  * of less than 30°. The triangles in the world (9 numbers per triangle), or null if the face is
  * flat.
  */
-export function smoothFace(positions: Float32Array, at: V3, normal: V3): number[] | null {
-  return growFace(positions, at, normal, Math.cos((30 * Math.PI) / 180), true);
+export function smoothFace(positions: Float32Array, at: V3, normal: V3, normals?: Float32Array | null): number[] | null {
+  return growFace(positions, at, normal, Math.cos((30 * Math.PI) / 180), true, normals);
 }
 
 /**
  * The whole face around the tapped point, flat or curved, as triangles in the world (9 numbers per
  * triangle) – what a picked face is highlighted with. Null if no facet has the normal.
  */
-export function faceTriangles(positions: Float32Array, at: V3, normal: V3): number[] | null {
-  return smoothFace(positions, at, normal) ?? growFace(positions, at, normal, 0.9999, false);
+export function faceTriangles(positions: Float32Array, at: V3, normal: V3, normals?: Float32Array | null): number[] | null {
+  return smoothFace(positions, at, normal, normals) ?? growFace(positions, at, normal, 0.9999, false, normals);
 }
 
 /**
  * Facets connected to the one under `at` across edges whose normals differ by less than `minDot`
- * (cosine). With `curvedOnly` the result is null unless the face is curved.
+ * (cosine). With `curvedOnly` the result is null unless the face is curved. `meshNormals` (stl.ts)
+ * are trusted over normals computed from the corners, which fail for needle triangles.
  */
-function growFace(positions: Float32Array, at: V3, normal: V3, minDot: number, curvedOnly: boolean): number[] | null {
+function growFace(positions: Float32Array, at: V3, normal: V3, minDot: number, curvedOnly: boolean, meshNormals?: Float32Array | null): number[] | null {
   const nTri = positions.length / 9;
   const P = (t: number, k: number): V3 => [positions[t * 9 + k * 3], positions[t * 9 + k * 3 + 1], positions[t * 9 + k * 3 + 2]];
   const nrm = (t: number): V3 => {
+    if (meshNormals) return [meshNormals[t * 9], meshNormals[t * 9 + 1], meshNormals[t * 9 + 2]];
     const [a, b, c] = [P(t, 0), P(t, 1), P(t, 2)];
     const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
     const n: V3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];

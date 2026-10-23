@@ -299,7 +299,7 @@ export function extrudeFace() {
 /** Extrude (or, with 'remove', cut into) the face hit in the 3D view – see extrudeFace. */
 function extrudeHit(hit: FaceHit, op: 'add' | 'remove') {
   // Round face: thicken/cut along the surface (its own feature) instead of a sketch.
-  const tris = smoothFace(viewer.meshPositions!, hit.point, hit.normal);
+  const tris = smoothFace(viewer.meshPositions!, hit.point, hit.normal, viewer.meshNormals);
   if (tris) {
     if (panel && !panel.existing) {
       const tpl = panel.template;

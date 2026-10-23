@@ -398,7 +398,10 @@ Files
   src/scad.ts          client for the worker: render(src) → STL + log, cancel()
   src/scad.worker.ts   runs OpenSCAD; the wasm is compiled once, a new instance per render
   src/viewer.ts        three.js, Z up, OrbitControls (1 finger rotates, 2 zoom/pan)
-  src/stl.ts           binary STL → positions/normals
+  src/stl.ts           binary STL → positions/normals (the file's normal for needle triangles)
+  src/edges.ts         the model's edges (angle > 25°); needles and slivers that Manifold leaves where
+                       faces join in one plane are left out of the angle test – with three.js's
+                       EdgesGeometry they showed as lines across flat faces (test: model.test "needle …")
   src/examples/*.scad  examples (packaged as text)
   public/              index.html, style.css (copied to dist/)
   vendor/openscad/     OpenSCAD-WASM (web build), see VERSION

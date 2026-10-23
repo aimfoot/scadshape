@@ -7,7 +7,7 @@ import { onLangChange, t, type Key } from '../i18n';
 import { createProject } from '../projects';
 import { $, el } from './dom';
 import { switchProject } from './projects';
-import { view } from './render';
+import { renderOpts, view } from './render';
 import { app, on } from './state';
 import { showToast } from './toast';
 
@@ -58,6 +58,7 @@ export function initStart() {
   on('docChanged', update);
   on('render', update);
   $('#source').addEventListener('change', update);
+  renderOpts.onRendered.push(update); // typing in the code panel switches to Custom code without a change event
   const watch = new MutationObserver(update);
   watch.observe(document.body, { attributes: true, attributeFilter: ['data-mode'] });
   watch.observe($('#featPanel'), { attributes: true, attributeFilter: ['hidden'] });
