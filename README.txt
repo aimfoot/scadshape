@@ -109,7 +109,11 @@ Gör om till skisser (convert/csg.ts, convert/scad2doc.ts, ui/convert.ts, featur
 Export (ui/export.ts)
   3MF (zip, enhet mm), STL (binär), OpenSCAD-kod. Filen tas fram när dialogen öppnas så att
   knapptrycket kan ladda ner/dela direkt. Chrome på Android delar inte .3mf/.stl via Web Share
-  – därför nedladdning (Hämtade filer → öppna med Bambu Handy). Filnamn = modellens namn.
+  – därför nedladdning (i appen: Hämtade filer och dela-menyn). Filnamn = modellens namn.
+  Filerna behöver en slicer (Bambu Studio, OrcaSlicer, PrusaSlicer …). Bambu Handy slicar inte:
+  den startar bara färdiga utskriftsfiler (MakerWorld/Bambu Studio) – testat 2026-10-23 på en
+  Xiaomi 11T Pro, 3MF gick inte att öppna. Att slica i telefonen (t.ex. Kiri:Moto) och skicka till
+  en Bambu-skrivare skulle kräva nät och Bambus .gcode.3mf-format – inte gjort.
 
 Gängor (features/threads.ts, thread.ts, hole.ts)
   ISO-metrisk profil (60°, topp P/8, botten P/4), tvärsnitt r(θ) extruderat med −360°/
@@ -195,7 +199,7 @@ Faser
   1 skissverktyg  linje, rektangel, cirkel, polygon, slits, bågar, snäpp       ✔
   2 constraints   planegcs (FreeCADs lösare, WASM), mått med sifferinmatning   ✔
   3 features      extrudera (+/−), revolve, hål, gänga, behållare, text, träd   ✔
-  4 utskrift      export 3MF/STL/.scad (nedladdning; 3MF → Bambu Handy/Studio)   ✔
+  4 utskrift      export 3MF/STL/.scad (nedladdning/dela; vidare till en slicer)  ✔
   5 extra         förskjutna plan, upprepa/spegla, hörnradie, avrunda/fasa kant  ✔
 Begränsning: OpenSCAD är CSG/mesh utan B-rep – ingen "klicka på 3D-kant och runda";
 kanterna rundas/fasas därför per extrudering (lager om ~0,2 mm, ett per utskriftslager).

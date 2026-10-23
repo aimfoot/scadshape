@@ -7,6 +7,8 @@ offline: OpenSCAD (WebAssembly, Manifold backend) renders the model and FreeCAD'
 (planegcs) solves the constraints.
 
 It runs as a web app (PWA) and as an Android app (a WebView wrapper with no permissions at all).
+To print, open the exported 3MF/STL in a slicer (Bambu Studio, OrcaSlicer, PrusaSlicer, …) – phone
+printer apps such as Bambu Handy can't slice files themselves.
 
 <p align="center">
   <img src="docs/media/sketch-to-part.gif" width="270" alt="Draw a rectangle with your finger, extrude it and turn the view">
