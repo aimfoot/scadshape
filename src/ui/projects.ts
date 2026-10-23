@@ -1,5 +1,5 @@
-// Modeller (projekt): lista, öppna, ny, byt namn, duplicera, ta bort, importera/spara som fil.
-// Aktuell modell visas överst i ☰ och som källa ("Min låda") i rullistan.
+// Models (projects): list, open, new, rename, duplicate, delete, import/save as file. The current
+// model is shown at the top of ☰ and as the source ("My box") in the drop-down.
 
 import { emptyDoc } from '../doc';
 import { getLang, t } from '../i18n';
@@ -19,7 +19,7 @@ import { embedBlobs, storeEmbedded } from '../blobs';
 import { android, saveViaApp } from '../android';
 
 const dlg = () => $<HTMLDialogElement>('#projDlg');
-/** Anropas när modellens namn ändrats (källistan visar namnet). */
+/** Called when the model's name has changed (the source list shows the name). */
 export const projectHooks = { renamed: () => {} };
 
 export const currentProjectName = () => projectInfo(app.projectId)?.name ?? 'scadshape';
@@ -30,7 +30,7 @@ export function switchProject(id: string) {
   app.projectId = setCurrentProject(id);
   app.doc = loadProject(id);
   app.previewDoc = null;
-  resetHistory(); // ångra gäller bara inom en modell
+  resetHistory(); // undo only applies within one model
   view.fitNext = true;
   if (app.source !== 'model') setSource('model');
   refreshProjectName();
@@ -108,24 +108,24 @@ async function download(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
 }
 
-/** Ser texten ut som OpenSCAD (och inte som något helt annat)? */
+/** Does the text look like OpenSCAD (and not like something else entirely)? */
 const looksLikeScad = (text: string) =>
   !text.includes('\0') &&
   (/\b(cube|cylinder|sphere|polygon|polyhedron|circle|square|linear_extrude|rotate_extrude|translate|rotate|difference|union|intersection|hull|minkowski|text)\s*\(/.test(text) ||
     /\b(module|function)\s+\w+\s*\(/.test(text) ||
     /^\s*(include|use)\s*</m.test(text));
 
-/** Visa OpenSCAD-kod som Egen kod, med kodpanelen öppen. */
+/** Show OpenSCAD code as Custom code, with the code panel open. */
 function openScadCode(text: string, name: string) {
   store.set('codeName', name.replace(/\.scad$/i, ''));
   if (currentPanel()) closePanel();
   if (document.body.dataset.mode === 'sketch') exitSketch();
-  store.set('code', text); // först – setSource läser den sparade koden
-  setSource('egen');
+  store.set('code', text); // first – setSource reads the saved code
+  setSource('custom');
   $('#codePanel').hidden = false;
   $('#btnCode').setAttribute('aria-pressed', 'true');
   store.set('codeOpen', '1');
-  // ☰ stängs så att koden syns (lådan ligger annars över kodpanelen).
+  // ☰ is closed so the code is visible (the drawer would otherwise cover the code panel).
   $('#tree').hidden = true;
   $('#btnTree').setAttribute('aria-pressed', 'false');
   store.set('treeOpen', '0');
@@ -161,12 +161,12 @@ export function initProjects() {
   });
 }
 
-/** Öppnar en modellfil (.scadshape.json) som ny modell, eller OpenSCAD-kod som Egen kod. */
+/** Opens a model file (.scadshape.json) as a new model, or OpenSCAD code as Custom code. */
 export async function openProjectFile(f: File) {
   const text = await f.text();
   const parsed = parseProjectFile(text);
   if (!parsed) {
-    // .scad (eller annan OpenSCAD-kod): öppnas som Egen kod och renderas direkt.
+    // .scad (or other OpenSCAD code): opened as Custom code and rendered right away.
     if (!/\.scad$/i.test(f.name) && !looksLikeScad(text)) return showToast(t('project.badFile'), 'error');
     dlg().close();
     openScadCode(text, f.name);
@@ -174,7 +174,7 @@ export async function openProjectFile(f: File) {
     return showToast(t('project.openedScad', { name: f.name }));
   }
   dlg().close();
-  await storeEmbedded(text); // importerade STL-filer som följer med modellen
+  await storeEmbedded(text); // imported STL files that come with the model
   switchProject(createProject(parsed.name, parsed.doc));
   showToast(t('project.imported', { name: currentProjectName() }));
 }

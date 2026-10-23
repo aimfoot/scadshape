@@ -1,5 +1,5 @@
-// Behållare: en sluten profil blir en låda/burk med vägg och botten, och om man vill ett lock
-// som läggs bredvid (för utskrift). Insticks­lock passar alla profiler; skruvlock kräver en cirkel.
+// Container: a closed profile becomes a box/jar with wall and floor, and optionally a lid placed
+// beside it (for printing). Push-fit lids fit any profile; screw lids need a circle.
 
 import { t, type Key } from '../i18n';
 import { selectedRegionsScad } from '../sketch/codegen';
@@ -14,32 +14,32 @@ export interface ContainerFeature extends FeatureBase {
   type: 'container';
   sketch: string;
   regions: Vec[] | null;
-  height: string; // total höjd (mm)
+  height: string; // total height (mm)
   wall: string;
-  floor: string; // bottentjocklek (också lockets tjocklek)
-  radius: string; // avrundning av de lodräta ytterhörnen (0 = skarpa)
+  floor: string; // floor thickness (also the lid's thickness)
+  radius: string; // rounding of the vertical outer corners (0 = sharp)
   lid: LidKind;
-  lipHeight: string; // insticks-/snäpplock: kantens höjd
-  /** Snäpplock: vulstens utstick på lockets kant (spåret i väggen följer). */
+  lipHeight: string; // push-fit/snap lid: the lip's height
+  /** Snap lid: how far the bead sticks out on the lid's lip (the groove in the wall follows). */
   snapDepth?: string;
-  threadLength: string; // skruvlock: gängans längd
-  pitch: string; // skruvlock: stigning
-  clearance: string; // spel per sida mellan lock och behållare
-  /** Antal fack i skissens X- och Y-led (avdelare med väggens tjocklek); 1 = inga avdelare. */
+  threadLength: string; // screw lid: the thread's length
+  pitch: string; // screw lid: pitch
+  clearance: string; // clearance per side between lid and container
+  /** Number of compartments in the sketch's X and Y directions (dividers as thick as the wall); 1 = no dividers. */
   cellsX?: string;
   cellsY?: string;
 }
 
-/** Minsta godstjocklek innanför gängan. */
+/** Minimum wall thickness inside the thread. */
 const MIN_NECK_WALL = 1.2;
 const DEFAULT_CLEARANCE: Record<LidKind, string> = { none: '0,2', lip: '0,2', snap: '0,2', screw: '0,3' };
-/** Snäpplock: spårets extra djup och höjd utöver vulsten, och minsta gods bakom spåret. */
+/** Snap lid: the groove's extra depth and height beyond the bead, and the minimum wall behind the groove. */
 const GROOVE_EXTRA = 0.15;
 const MIN_GROOVE_WALL = 0.8;
-/** Skikt för vulst och spår = utskriftens lagerhöjd (45°-flanker byggs som trappor, som utskriften). */
+/** Layers for bead and groove = the print's layer height (45° flanks are built as steps, like the print). */
 const SNAP_STEP = 0.2;
 
-/** Fyll en tom skiss med en centrerad rektangel 80 × 60 med mått (när det inte finns någon skiss). */
+/** Fill an empty sketch with a centered 80 × 60 rectangle with dimensions (when there is no sketch). */
 export function containerTemplate(sk: SketchData) {
   sk.points[ORIGIN] ??= { x: 0, y: 0 };
   const p = [[-40, -30], [40, -30], [40, 30], [-40, 30]].map(([x, y]) => {
@@ -108,7 +108,7 @@ export const container: FeatureKind<ContainerFeature> = {
   usable: sk => findLoops(sk).loops.length > 0,
 
   changed(f, key) {
-    // Byte av lock: byt till det lockets standardspel om man inte skrivit ett eget.
+    // Lid change: switch to that lid's default clearance unless a custom one was typed.
     if (key === 'lid' && Object.values(DEFAULT_CLEARANCE).includes(f.clearance)) f.clearance = DEFAULT_CLEARANCE[f.lid];
   },
 
@@ -136,7 +136,7 @@ export const container: FeatureKind<ContainerFeature> = {
     const profile = rad.v > 0 ? `  offset(r = ${rad.code}, $fn = ${fnFor(2 * rad.v)}) offset(delta = -${rad.code}) {\n${shape}\n  }` : `  union() {\n${shape}\n  }`;
     const xs = sel.flatMap(i => loops[regions[i].loop].pts.map(p => p.x));
     const ys = sel.flatMap(i => loops[regions[i].loop].pts.map(p => p.y));
-    // Snäpplock: en vulst nära lockkantens spets och ett spår på samma höjd i väggen.
+    // Snap lid: a bead near the tip of the lid's lip and a groove at the same height in the wall.
     const snapGeo = sd && lipH ? snapGeometry({ H: H.v, w: w.v, c: c.v, d: sd.v, fl: fl.v, lipH: lipH.v, rad: rad.v, m }) : null;
     if (snapGeo && 'error' in snapGeo) return snapGeo;
     const shell =
@@ -145,7 +145,7 @@ export const container: FeatureKind<ContainerFeature> = {
       (snapGeo ? `    ${snapGeo.groove}\n` : '') +
       `  }`;
     const walls = dividers(nx, ny, { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }, w.v);
-    // Avdelarna slutar under lockets kant så att locket går på.
+    // The dividers end below the lid's lip so the lid fits.
     const divTop = H.v - (lipH ? lipH.v + 0.5 : 0);
     const body = walls.length
       ? `union() {\n  ${shell}\n  intersection() {\n    translate([0, 0, ${fl.code} - 0.01]) linear_extrude(height = ${num(divTop)} - ${fl.code} + 0.01) offset(delta = -${w.code} + 0.01) ${m}_profile();\n` +
@@ -154,7 +154,7 @@ export const container: FeatureKind<ContainerFeature> = {
     const lines = [`module ${m}_profile() {\n${profile}\n}`, `module ${m}() {\n  ${ctx.place(sk)}${body}\n}`];
     const tools = [{ op: 'add' as const, call: `${m}();` }];
     if (lipH) {
-      // Locket ligger bredvid, med kanten uppåt: platta + en ring som passar innanför väggen.
+      // The lid lies beside it, lip up: a plate + a ring that fits inside the wall.
       const dx = num(Math.max(...xs) - Math.min(...xs) + 10);
       lines.push(
         `module ${m}_lid() {\n  ${ctx.place(sk)}translate([${dx}, 0, 0]) {\n    linear_extrude(height = ${fl.code}) ${m}_profile();\n` +
@@ -170,25 +170,26 @@ export const container: FeatureKind<ContainerFeature> = {
 };
 
 /**
- * Vulst på lockets kant och spår i väggen (snäpplock), som skikt med 45°-flanker.
- * Kanten går in lipH i lådan från överkanten; vulsten sitter nära spetsen. Lockets kant är
- * offset −(w + c) från profilen; vulsten sticker ut d, alltså d − c in i väggen (= snäppet).
- * Skikten är utskriftslagren (0,2 mm, räknat från plattan för både lock och låda): skikt som
- * delar ett lager ger trappsteg som slicern inte kan skriva ut.
+ * Bead on the lid's lip and groove in the wall (snap lid), as layers with 45° flanks. The lip goes
+ * lipH into the box from the top edge; the bead sits near the tip. The lid's lip is offset −(w + c)
+ * from the profile; the bead sticks out d, i.e. d − c into the wall (= the snap). The layers are
+ * the print layers (0.2 mm, counted from the plate for both lid and box): layers that share a print
+ * layer give steps the slicer cannot print.
  */
 function snapGeometry(o: { H: number; w: number; c: number; d: number; fl: number; lipH: number; rad: number; m: string }): { bead: string; groove: string } | { error: string } {
   const { H, w, c, d, fl, lipH, rad, m } = o;
   if (d - c < 0.1) return { error: t('err.snapTooSmall') };
-  const G = d + GROOVE_EXTRA; // spårets spets, räknat från lockkantens yta
+  const G = d + GROOVE_EXTRA; // the groove's tip, measured from the surface of the lid's lip
   if (w - (G - c) < MIN_GROOVE_WALL) return { error: t('err.snapWallThin') };
   const L = SNAP_STEP;
   const floorL = (v: number) => Math.floor(v / L + 1e-6) * L, ceilL = (v: number) => Math.ceil(v / L - 1e-6) * L;
-  const bh = Math.ceil((2 * d + 0.4) / L - 1e-9) * L; // vulstens höjd, hela lager
-  // Vulstens underkant i lockets utskrift (kanten uppåt), nära kantens spets, på ett lager.
+  const bh = Math.ceil((2 * d + 0.4) / L - 1e-9) * L; // the bead's height, whole layers
+  // The bead's lower edge in the lid's print (lip up), near the lip's tip, on a layer.
   const zb = Math.round((fl + lipH - bh - 0.6) / L) * L;
-  const s = zb - fl + bh / 2; // vulstens mitt, från kantens rot
+  const s = zb - fl + bh / 2; // the bead's middle, from the root of the lip
   if (s - bh / 2 < 0.4) return { error: t('err.snapLipLow') };
-  // I lådan ligger vulsten mellan H − s ∓ bh/2; spåret rundas utåt till lagren, med marginal.
+  // In the box the bead lies between H − s ∓ bh/2; the groove is rounded outwards to the layers,
+  // with a margin.
   const g0 = floorL(H - s - bh / 2 - GROOVE_EXTRA), g1 = ceilL(H - s + bh / 2 + GROOVE_EXTRA);
   const fn = fnFor(2 * rad);
   const band = (z0: number, h: number, peak: number, slice: (off: string) => string) => {
@@ -198,27 +199,27 @@ function snapGeometry(o: { H: number; w: number; c: number; d: number; fl: numbe
       `translate([0, 0, z]) linear_extrude(height = ${num(L + 0.001)}) ${slice('e')}`
     );
   };
-  // Vulsten: kantväggen buktar ut med samma tjocklek (en tjockare vägg lämnar en glipa mellan
-  // slingorna som slicern inte fyller, och fjädrar sämre). Koordinater från lockets platta.
+  // The bead: the lip wall bulges out with the same thickness (a thicker wall leaves a gap between
+  // the loops that the slicer does not fill, and springs worse). Coordinates from the lid's plate.
   const bead = band(zb, bh, d, e =>
     `difference() { offset(r = -(${num(w + c)}) + ${e}, $fn = ${fn}) ${m}_profile(); offset(r = -(${num(2 * w + c)}) + ${e}, $fn = ${fn}) ${m}_profile(); }`);
-  // Spåret (i lådans koordinater): hela ytan innanför spårets spets skärs bort i varje skikt
-  // (där inne är det ändå hålrum; avdelarna slutar under kanten).
+  // The groove (in the box's coordinates): the whole area inside the groove's tip is cut away in
+  // every layer (it is hollow in there anyway; the dividers end below the lip).
   const groove = band(g0, g1 - g0, G, e => `offset(r = -(${num(w + c)}) + ${e}, $fn = ${fn}) ${m}_profile();`);
   return { bead, groove };
 }
 
-/** Avdelare för nx × ny fack inom profilens yttermått (klipps sedan mot insidan). */
+/** Dividers for nx × ny compartments within the profile's outer size (then clipped to the inside). */
 function dividers(nx: number, ny: number, b: { x0: number; x1: number; y0: number; y1: number }, w: number): string[] {
   const out: string[] = [];
-  const H = 1000; // klipps av intersection
-  const ix0 = b.x0 + w, ix1 = b.x1 - w, iy0 = b.y0 + w, iy1 = b.y1 - w; // innermått
+  const H = 1000; // clipped by intersection
+  const ix0 = b.x0 + w, ix1 = b.x1 - w, iy0 = b.y0 + w, iy1 = b.y1 - w; // inner size
   for (let i = 1; i < nx; i++) out.push(`translate([${num(ix0 + ((ix1 - ix0) * i) / nx - w / 2)}, ${num(b.y0)}, 0]) cube([${num(w)}, ${num(b.y1 - b.y0)}, ${H}]);`);
   for (let j = 1; j < ny; j++) out.push(`translate([${num(b.x0)}, ${num(iy0 + ((iy1 - iy0) * j) / ny - w / 2)}, 0]) cube([${num(b.x1 - b.x0)}, ${num(w)}, ${H}]);`);
   return out;
 }
 
-/** Burk med utvändig gänga i överkanten och ett skruvlock med invändig gänga och grepp. */
+/** Jar with an external thread at the top and a screw lid with an internal thread and grip. */
 function screwContainer(
   f: ContainerFeature,
   sk: SketchFeature,
@@ -233,15 +234,15 @@ function screwContainer(
   if (r.error) return { error: r.error };
   const R = circle.r;
   const h = threadDepth(P);
-  const Ri = R - w; // innerradie
-  const Rn = Math.min(Ri, R - h - MIN_NECK_WALL); // innerradie i halsen (godset innanför gängan)
-  const zCone = H - Lt - (Ri - Rn); // 45° övergång upp till halsen – skrivbar utan stöd
+  const Ri = R - w; // inner radius
+  const Rn = Math.min(Ri, R - h - MIN_NECK_WALL); // inner radius in the neck (the wall inside the thread)
+  const zCone = H - Lt - (Ri - Rn); // 45° transition up to the neck – printable without supports
   if (Rn < 1) return { error: t('err.wallTooThin') };
   if (Lt >= H - fl || zCone < fl) return { error: t('err.containerTooLow') };
   const fn = fnFor(2 * R);
   const m = ctx.module;
   const cavity = [[0, fl], [Ri, fl], [Ri, zCone], [Rn, H - Lt], [Rn, H + 1], [0, H + 1]].map(([x, y]) => `[${num(x)}, ${num(y)}]`).join(', ');
-  const Ro = R + c + w; // lockets ytterradie
+  const Ro = R + c + w; // the lid's outer radius
   const Hl = fl + Lt;
   const ribs = Math.max(8, Math.round((2 * Math.PI * Ro) / 5));
   const at = `translate([${num(circle.c.x)}, ${num(circle.c.y)}, 0])`;
@@ -252,7 +253,7 @@ function screwContainer(
       `      ${threadScad({ R, P, L: Lt, z0: H - Lt, chamfer: true }, '      ')}\n    }\n` +
       `    rotate_extrude($fn = ${fn}) polygon([${cavity}]);\n  }\n}`,
     `module ${m}_lid() {\n  ${place}${lidAt} difference() {\n    union() {\n      cylinder(r = ${num(Ro)}, h = ${num(Hl)}, $fn = ${fnFor(2 * Ro)});\n` +
-      `      for (i = [0 : ${ribs - 1}]) rotate(i * 360 / ${ribs}) translate([${num(Ro)}, 0, 0]) cylinder(r = 0.8, h = ${num(Hl)}, $fn = 12); // grepp\n    }\n` +
+      `      for (i = [0 : ${ribs - 1}]) rotate(i * 360 / ${ribs}) translate([${num(Ro)}, 0, 0]) cylinder(r = 0.8, h = ${num(Hl)}, $fn = 12); // grip\n    }\n` +
       `    translate([0, 0, ${num(Hl)}]) rotate([180, 0, 0]) ${threadScad({ R: R + c, P, L: Lt + 0.01, z0: -0.01, entry: true }, '    ')}\n  }\n}`,
   ].join('\n');
   return { code, tools: [{ op: 'add' as const, call: `${m}();` }, { op: 'add' as const, call: `${m}_lid();` }] };

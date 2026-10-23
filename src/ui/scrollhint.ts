@@ -1,5 +1,5 @@
-// Verktygsraderna går att svepa när knapparna inte får plats (stående läge): tona kanten där det
-// finns mer att se, så att det syns att raden fortsätter (klasserna more-start/more-end, style.css).
+// The toolbars can be swiped when the buttons do not fit (portrait): fade the edge where there is
+// more to see, so it is clear the row continues (classes more-start/more-end, style.css).
 
 const EDGE = 2;
 
@@ -17,7 +17,8 @@ export function initScrollHints() {
     const run = () => update(el);
     el.addEventListener('scroll', run, { passive: true });
     new ResizeObserver(run).observe(el);
-    // Knappar som visas/döljs (skissläge, verktyg) ändrar bredden utan att storleken ändras.
+    // Buttons that are shown/hidden (sketch mode, tools) change the width without the size
+    // changing.
     new MutationObserver(run).observe(el, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
     run();
   }

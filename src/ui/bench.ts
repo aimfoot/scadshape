@@ -1,4 +1,4 @@
-// Prestandamätning ("Mät prestanda"): exemplen renderas tre gånger var, sedan bildfrekvens.
+// Benchmark ("Benchmark" button): the examples are rendered three times each, then the frame rate.
 
 import { t } from '../i18n';
 import { isDevHost, remoteLog } from '../remote';
@@ -40,7 +40,7 @@ export async function runBench() {
   remoteLog('bench-start', { cores: report.cores, memGB: report.memGB, screen: report.screen });
   try {
     setStatus(t('bench.running'), 'busy');
-    await engine.render('cube(1);', 'binstl', undefined, TIMEOUT_MS); // ser till att motorn är laddad
+    await engine.render('cube(1);', 'binstl', undefined, TIMEOUT_MS); // makes sure the engine is loaded
     report.engineLoadMs = engine.loadMs;
     row([t('bench.loadEngine'), '', fmtMs(engine.loadMs ?? 0), '']);
     let last: Mesh | null = null;
@@ -55,7 +55,7 @@ export async function runBench() {
         remoteLog('bench-done', { ...run, ok: r.ok, problems: r.ok ? undefined : logProblems(r.log).slice(0, 5) });
         row([t(ex.name).replace(/^[^:]+: /, ''), String(i + 1), r.ok ? fmtMs(r.renderMs) : t('bench.fail'), fmtInt(run.triangles)]);
       }
-      if (ex.id === 'tung' && last) {
+      if (ex.id === 'heavy' && last) {
         viewer.setSketchLines([]);
         viewer.setMesh(last);
         viewer.setView('iso');

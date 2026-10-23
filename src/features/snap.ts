@@ -1,6 +1,7 @@
-// Snäpphake (cantilever med hulling) eller urtag för en hake, vid punkter i en skiss (eller i
-// skissens origo). Balken står längs planets normal, centrerad på punkten; hullingen pekar åt
-// vinkeln i planet. Töjningen i roten (ε = 1,5·t·y/L², rak balk) visas i panelen.
+// Snap hook (cantilever with a barb) or a catch for a hook, at points in a sketch (or at the
+// sketch's origin). The beam stands along the plane's normal, centered on the point; the barb
+// points at the angle in the plane. The strain at the root (ε = 1.5·t·y/L², straight beam) is shown
+// in the panel.
 
 import type { Vars } from '../expr';
 import { parseExpr } from '../expr';
@@ -12,26 +13,26 @@ import { textAnchors } from './text';
 export interface SnapFeature extends FeatureBase {
   type: 'snap';
   sketch: string;
-  points: string[] | null; // null = alla fristående punkter (eller origo om det inte finns några)
+  points: string[] | null; // null = all standalone points (or the origin if there are none)
   kind: 'hook' | 'catch';
-  length: string; // balkens längd (hake) från roten till hullingens topp
-  thickness: string; // balkens tjocklek i böjriktningen
+  length: string; // the beam's length (hook) from the root to the top of the barb
+  thickness: string; // the beam's thickness in the bending direction
   width: string;
-  overhang: string; // hullingens utstick (= böjningen vid montering)
-  retention: 'lock' | 'release'; // baksidan 90° (låser) eller 45° (går att ta isär)
-  angle: string; // åt vilket håll hullingen pekar (grader moturs från skissens X)
-  clearance: string; // urtag: spel per sida
-  depth: string; // urtag: djup
+  overhang: string; // the barb's overhang (= the deflection during assembly)
+  retention: 'lock' | 'release'; // back side 90° (locks) or 45° (can be taken apart)
+  angle: string; // which way the barb points (degrees counterclockwise from the sketch's X)
+  clearance: string; // catch: clearance per side
+  depth: string; // catch: depth
   direction: 'normal' | 'reverse';
   start?: string;
 }
 
-/** Infasningens vinkel mot balken (grader): lätt att trycka in. */
+/** The lead-in angle against the beam (degrees): easy to push in. */
 const RAMP = 30;
-/** Töjning som PLA tål vid upprepad montering (ungefär). */
+/** Strain that PLA tolerates in repeated assembly (roughly). */
 export const PLA_STRAIN = 0.025;
 
-/** Töjningen i roten för en rak balk med rektangulärt tvärsnitt, eller null om måtten är fel. */
+/** The strain at the root for a straight beam with a rectangular cross-section, or null if the sizes are wrong. */
 export function snapStrain(f: Pick<SnapFeature, 'length' | 'thickness' | 'overhang'>, vars: Vars): number | null {
   const L = parseExpr(f.length, vars).value, th = parseExpr(f.thickness, vars).value, y = parseExpr(f.overhang, vars).value;
   if (!(L && th && y) || L <= 0 || th <= 0 || y <= 0) return null;
@@ -109,7 +110,7 @@ export const snap: FeatureKind<SnapFeature> = {
   usable: () => true,
 
   changed(f, key, sk) {
-    // Haken byggs utåt från ytan, urtaget skärs in i kroppen.
+    // The hook is built outwards from the face, the catch is cut into the body.
     if (key === 'kind') f.direction = f.kind === 'catch' ? inwardOf(sk) : outwardOf(sk);
   },
 
@@ -131,21 +132,22 @@ export const snap: FeatureKind<SnapFeature> = {
     const m = ctx.module;
     let shape: string;
     if (L) {
-      // Tvärsnitt i (x, z): balken x ∈ [−t/2, t/2] från roten till L; hullingen åt +x.
+      // Cross-section in (x, z): the beam x ∈ [−t/2, t/2] from the root to L; the barb towards +x.
       const T = th.v, Y = y.v;
       const ramp = Y / Math.tan((RAMP * Math.PI) / 180);
-      const back = f.retention === 'lock' ? 0 : Y; // 45°-baksida går att ta isär
+      const back = f.retention === 'lock' ? 0 : Y; // a 45° back side can be taken apart
       const flat = Math.min(0.4, T / 2);
-      const hb = back + flat + ramp; // hullingens höjd
+      const hb = back + flat + ramp; // the barb's height
       if (hb >= L.v - 0.5) return { error: t('err.snapTooShort') };
-      const root = Math.min(T / 2, 1); // 45°-fas i roten (mindre spänning, skrivbar)
+      const root = Math.min(T / 2, 1); // 45° chamfer at the root (less stress, printable)
       const x0 = -T / 2, x1 = T / 2, z0 = L.v - hb;
       const poly = [
         [x0 - root, 0], [x1 + root, 0], [x1, root], [x1, z0], [x1 + Y, z0 + back], [x1 + Y, z0 + back + flat], [x1, L.v], [x0, L.v], [x0, root],
       ];
       shape = `rotate([90, 0, 0]) linear_extrude(height = ${b.code}, center = true) polygon([${poly.map(([u, v]) => `[${num(u)}, ${num(v)}]`).join(', ')}]);`;
     } else {
-      // Urtag: haken (tjocklek + utstick) plus spel runt om; skär en hundradel utanför ytan.
+      // Catch: the hook (thickness + overhang) plus clearance all around; cuts a hundredth beyond
+      // the face.
       const C = c!.v, Tt = th.v, Y = y.v;
       shape = `translate([${num(-Tt / 2 - C)}, -(${b.code}) / 2 - ${num(C)}, -0.01]) cube([${num(Tt + Y + 2 * C)}, ${b.code} + ${num(2 * C)}, ${depth!.code} + 0.01]);`;
     }

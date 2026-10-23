@@ -1,5 +1,5 @@
-// Rendering: OpenSCAD-motorn, 3D-vyn, statusraden, kodpanelen och källan (modell/exempel/egen kod).
-// Bara den senaste begäran renderas; äldre resultat visas aldrig.
+// Rendering: the OpenSCAD engine, the 3D view, the status bar, the code panel and the source
+// (model/example/custom code). Only the latest request is rendered; older results are never shown.
 
 import { buildModel, looseSketches } from '../model3d';
 import { sketchFrame } from '../frame';
@@ -11,16 +11,16 @@ import { Viewer } from '../viewer';
 import { t, type Key } from '../i18n';
 import { $, fmtInt, fmtMs, store } from './dom';
 import { app, on, vars } from './state';
-import kub from '../examples/kub.scad';
-import plattan from '../examples/plattan.scad';
-import kopp from '../examples/kopp.scad';
-import tung from '../examples/tung.scad';
+import cube from '../examples/cube.scad';
+import plate from '../examples/plate.scad';
+import cup from '../examples/cup.scad';
+import heavy from '../examples/heavy.scad';
 
 export const EXAMPLES: { id: string; name: Key; src: string }[] = [
-  { id: 'plattan', name: 'example.plate', src: plattan },
-  { id: 'kopp', name: 'example.cup', src: kopp },
-  { id: 'tung', name: 'example.heavy', src: tung },
-  { id: 'kub', name: 'example.cube', src: kub },
+  { id: 'plate', name: 'example.plate', src: plate },
+  { id: 'cup', name: 'example.cup', src: cup },
+  { id: 'heavy', name: 'example.heavy', src: heavy },
+  { id: 'cube', name: 'example.cube', src: cube },
 ];
 
 export const viewer = new Viewer($('#viewport'));
@@ -32,7 +32,7 @@ const statusEl = $('#status');
 const btnRender = $<HTMLButtonElement>('#btnRender');
 const codePanel = $('#codePanel');
 
-/** Skissen som inte ska ritas som linjer (den som featurepanelen visar regioner för). */
+/** The sketch that should not be drawn as lines (the one the feature panel shows regions for). */
 export const renderOpts = { hideSketch: null as string | null, onRendered: [] as (() => void)[] };
 
 export function setStatus(text: string, kind: '' | 'busy' | 'error' = '') {
@@ -42,7 +42,7 @@ export function setStatus(text: string, kind: '' | 'busy' | 'error' = '') {
 
 export function currentCode(): string {
   if (app.source === 'model') return (app.model = buildModel(app.previewDoc ?? app.doc)).code;
-  if (app.source === 'egen') return store.get('code') ?? '';
+  if (app.source === 'custom') return store.get('code') ?? '';
   return EXAMPLES.find(e => e.id === app.source)?.src ?? '';
 }
 
@@ -53,10 +53,10 @@ export function syncCodePanel() {
 }
 
 export function setSource(s: string) {
-  if (s !== app.source) view.fitNext = true; // ny källa = ny modell
+  if (s !== app.source) view.fitNext = true; // new source = new model
   app.source = s;
   store.set('source', s);
-  $('#codeBar').hidden = s === 'model'; // "Gör om till skisser" bara för kod
+  $('#codeBar').hidden = s === 'model'; // "Convert to sketches" only for code
   ($<HTMLSelectElement>('#source')).value = s;
   syncCodePanel();
 }
@@ -77,7 +77,7 @@ function showLog(log: string[]) {
 
 let renderWanted = false;
 let rendering = false;
-/** Anpassa vyn efter nästa rendering. */
+/** Fit the view after the next rendering. */
 export const view = { fitNext: true };
 export const isRendering = () => rendering;
 
@@ -110,8 +110,8 @@ async function renderLoop() {
 async function renderOnce() {
   const d = app.previewDoc ?? app.doc;
   viewer.setSketchLines(app.source === 'model' ? looseSketches(d).filter(s => s.id !== renderOpts.hideSketch).flatMap(s => sketchPolylines(s, sketchFrame(s, vars(), d))) : []);
-  const src = app.source === 'egen' ? code.value : currentCode();
-  if (app.source !== 'egen') code.value = src;
+  const src = app.source === 'custom' ? code.value : currentCode();
+  if (app.source !== 'custom') code.value = src;
   else store.set('code', code.value);
   for (const cb of renderOpts.onRendered) cb();
   const errs = app.source === 'model' ? app.model.errors.size : 0;
@@ -136,7 +136,7 @@ async function renderOnce() {
     }
     return;
   }
-  if (renderWanted) return; // något nyare väntar – visa inte gammal geometri
+  if (renderWanted) return; // something newer is waiting – do not show old geometry
   showLog(r.log);
   if (!r.ok || !r.data) {
     setStatus(r.log.some(l => /Current top level object is empty/.test(l)) ? t('status.empty') + errText : t('status.seeLog'), 'error');
@@ -147,8 +147,8 @@ async function renderOnce() {
   const mesh = parseBinaryStl(r.data);
   const before = { center: viewer.bounds.center.clone(), radius: viewer.bounds.radius };
   viewer.setMesh(mesh);
-  // Exempel/egen kod: en helt annan modell (storlek × 2 eller flyttad mer än sin storlek) → anpassa vyn.
-  // I den egna modellen står kameran kvar när man ändrar ett mått.
+  // Example/custom code: an entirely different model (size × 2 or moved more than its size) → fit
+  // the view. In the user's own model the camera stays put when a dimension changes.
   const after = viewer.bounds;
   const moved = after.center.distanceTo(before.center) > Math.max(after.radius, before.radius);
   const resized = after.radius > 2 * before.radius || after.radius < before.radius / 2;
@@ -173,8 +173,8 @@ export function initRenderUi() {
   btnRender.addEventListener('click', () => (rendering ? cancelRender() : requestRender()));
   code.addEventListener('input', () => {
     if (app.source === 'model') return;
-    store.set('code', code.value); // först – setSource läser tillbaka den sparade koden
-    if (app.source !== 'egen') setSource('egen');
+    store.set('code', code.value); // first – setSource reads back the saved code
+    if (app.source !== 'custom') setSource('custom');
   });
   code.addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

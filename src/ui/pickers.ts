@@ -1,5 +1,5 @@
-// Val i 3D-vyn för featurepanelen: regioner, revolve-axel, hålpunkter och cirklar.
-// Varje väljare säger vad vyn ska visa, vad ett tryck gör och vad infotexten ska säga.
+// Picking in the 3D view for the feature panel: regions, revolve axis, hole points and circles.
+// Each picker says what the view should show, what a tap does and what the info text should say.
 
 import type { SketchFeature, SolidFeature } from '../doc';
 import { holeCandidates, holePoints } from '../features/hole';
@@ -18,13 +18,13 @@ import { app, vars } from './state';
 export type PickMode = 'regions' | 'axis';
 
 export interface Picker {
-  /** Infotext ("2 av 3 regioner · tryck i vyn …"). */
+  /** Info text ("2 of 3 regions · tap in the view …"). */
   info(f: SolidFeature, sk: SketchFeature, mode: PickMode): string;
-  /** Har användaren gjort ett eget val (då visas "Standard"-länken)? */
+  /** Has the user made their own choice (then the "Default" link is shown)? */
   custom(f: SolidFeature): boolean;
   reset(f: SolidFeature): void;
   overlay(f: SolidFeature, sk: SketchFeature, mode: PickMode): Overlay;
-  /** Hantera ett tryck; true om något ändrades. Returnerar också nyckeln som ändrades. */
+  /** Handle a tap; true if something changed. Also returns the key that changed. */
   tap(f: SolidFeature, sk: SketchFeature, p: { x: number; y: number }, viewer: Viewer, mode: PickMode): string | null;
 }
 
@@ -58,7 +58,7 @@ const regionPicker: Picker = {
   tap(f, sk, p, viewer, mode) {
     if (f.type === 'revolve' && mode === 'axis') {
       const i = viewer.nearestAxis(p);
-      const shown = axisCandidates(sk); // i axelläget visas alla, i samma ordning
+      const shown = axisCandidates(sk); // in axis mode all are shown, in the same order
       if (i < 0 || !shown[i]) return null;
       f.axis = shown[i].axis;
       return 'axis';
@@ -79,7 +79,7 @@ const regionPicker: Picker = {
 
 type WithPoints = Extract<SolidFeature, { type: 'hole' | 'text' | 'snap' }>;
 const hasPoints = (f: SolidFeature): f is WithPoints => f.type === 'hole' || f.type === 'text' || f.type === 'snap';
-/** Valda punkter för hål, text eller snäpphake (de två senare: origo om inga är valda). */
+/** Chosen points for holes, text or snap hooks (the latter two: the origin if none are chosen). */
 const chosenPoints = (f: WithPoints, sk: SketchFeature) => (f.type === 'hole' ? holePoints(f, sk) : textAnchors(f as never, sk));
 
 const pointPicker: Picker = {
@@ -101,7 +101,7 @@ const pointPicker: Picker = {
       regions: [],
       axes: [],
       points: holeCandidates(sk).map(id => ({ p: sk.points[id], selected: chosen.has(id) })),
-      pointsOffset: f.type === 'hole' ? (parseExpr(f.start, vars()).value ?? 0) : 0, // där borrningen börjar
+      pointsOffset: f.type === 'hole' ? (parseExpr(f.start, vars()).value ?? 0) : 0, // where the drilling starts
     };
   },
   tap(f, sk, p, viewer) {
@@ -144,7 +144,8 @@ const circlePicker: Picker = {
     if (f.type !== 'thread') return null;
     const uv = viewer.pickOnPlane(p, sketchFrame(sk, vars(), app.doc));
     if (!uv) return null;
-    // Minsta cirkel som innehåller punkten, annars den vars kant ligger närmast (inom 3 mm).
+    // The smallest circle containing the point, otherwise the one whose edge is closest (within 3
+    // mm).
     let best: string | null = null, bestScore = Infinity;
     for (const id of threadCandidates(sk)) {
       const e = sk.entities[id] as { c: string; r: number };
@@ -164,7 +165,7 @@ const circlePicker: Picker = {
   },
 };
 
-/** Features utan skiss: inget att välja i vyn. */
+/** Features without a sketch: nothing to pick in the view. */
 const noPicker: Picker = {
   info: () => '',
   custom: () => false,

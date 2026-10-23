@@ -1,5 +1,5 @@
-// Variabler (parametrar) i dokumentet: namn = uttryck. En variabel får använda
-// variabler som står ovanför den i listan.
+// Variables (parameters) in the document: name = expression. A variable may use the variables above
+// it in the list.
 
 import { t } from './i18n';
 import { isIdentifier, parseExpr, type Vars } from './expr';
@@ -11,7 +11,7 @@ export interface Param {
 
 export interface ParamEval {
   vars: Map<string, number>;
-  errors: Map<string, string>; // namn → fel
+  errors: Map<string, string>; // name → error
 }
 
 const RESERVED = new Set(['PI', 'true', 'false', 'undef']);

@@ -1,6 +1,6 @@
-// Bygg scadshape till dist/ (serveras direkt av serve.py – ombyggnad publicerar omedelbart).
-//   node build.mjs            bygg en gång
-//   node build.mjs --watch    bygg om vid ändringar
+// Build scadshape into dist/ (served directly by serve.py – rebuilding publishes immediately).
+// node build.mjs            build once
+// node build.mjs --watch    rebuild on changes
 import * as esbuild from 'esbuild';
 import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -8,12 +8,12 @@ import { gzipSync, constants } from 'node:zlib';
 import { createHash } from 'node:crypto';
 
 const root = new URL('.', import.meta.url).pathname;
-// --out <katalog>: bygg någon annanstans (t.ex. dist-next för att testa utan att publicera).
+// --out <dir>: build somewhere else (e.g. dist-next to test without publishing).
 const outArg = process.argv.indexOf('--out');
 const dist = outArg > 0 ? join(root, process.argv[outArg + 1]) : join(root, 'dist');
 const watch = process.argv.includes('--watch');
 
-// Töm dist/ men behåll själva katalogen (tjänsten bind-monterar den).
+// Empty dist/ but keep the directory itself (the service bind-mounts it).
 mkdirSync(dist, { recursive: true });
 for (const name of readdirSync(dist)) rmSync(join(dist, name), { recursive: true, force: true });
 cpSync(join(root, 'public'), dist, { recursive: true });
@@ -27,8 +27,8 @@ cpSync(join(root, 'node_modules/@salusoft89/planegcs/LICENSE'), join(dist, 'lice
 for (const lib of readdirSync(join(root, 'vendor/libraries')))
   cpSync(join(root, 'vendor/libraries', lib, 'LICENSE'), join(dist, 'licenses', `lib-${lib}.txt`));
 
-// OpenSCAD-bibliotek (vendor/libraries/<namn>/) → dist/libs/<namn>.json { "<namn>/fil.scad": text, … };
-// workern hämtar dem bara när koden använder dem (src/libs.ts).
+// OpenSCAD libraries (vendor/libraries/<name>/) → dist/libs/<name>.json { "<name>/file.scad": text,
+// … }; the worker only fetches them when the code uses them (src/libs.ts).
 mkdirSync(join(dist, 'libs'), { recursive: true });
 for (const lib of readdirSync(join(root, 'vendor/libraries'))) {
   const files = {};
@@ -43,7 +43,7 @@ for (const lib of readdirSync(join(root, 'vendor/libraries'))) {
   writeFileSync(join(dist, 'libs', `${lib}.json`), JSON.stringify(files));
 }
 
-// Förkomprimera stora filer; serve.py skickar .gz när webbläsaren klarar det.
+// Precompress large files; serve.py sends .gz when the browser supports it.
 function precompress(dir) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
@@ -53,7 +53,7 @@ function precompress(dir) {
   }
 }
 
-/** Service worker med lista över appens filer och en hash av innehållet (ny hash = ny version). */
+/** Service worker with a list of the app's files and a hash of the content (new hash = new version). */
 function writeServiceWorker(dir) {
   const files = [];
   const walk = sub => {
@@ -82,9 +82,10 @@ const options = {
   minify: !watch,
   sourcemap: watch ? 'inline' : false,
   loader: { '.scad': 'text' },
-  // android/build.sh sätter SCADSHAPE_VERSION: appbygget, utan utvecklarverktyg (src/globals.d.ts).
+  // android/build.sh sets SCADSHAPE_VERSION: the app build, without developer tools
+  // (src/globals.d.ts).
   define: { __APP_VERSION__: JSON.stringify(process.env.SCADSHAPE_VERSION ?? ''), __DEV_TOOLS__: String(!process.env.SCADSHAPE_VERSION) },
-  external: ['node:*'], // planegcs laddar Node-moduler bara i Node
+  external: ['node:*'], // planegcs loads Node modules only in Node
   logLevel: 'info',
   plugins: [{ name: 'gz', setup: b => b.onEnd(r => r.errors.length || (writeServiceWorker(dist), precompress(dist))) }],
 };

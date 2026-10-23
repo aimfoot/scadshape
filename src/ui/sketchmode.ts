@@ -1,4 +1,4 @@
-// Skissläget: editorn, verktygsfältet, sammanhangsraden, måttdialogen och planvalet.
+// Sketch mode: the editor, the toolbar, the context bar, the dimension dialog and the plane choice.
 
 import { dependents, insertFeature, newSketch, removeFeature, type SketchFeature } from '../doc';
 import { parseExpr } from '../expr';
@@ -20,7 +20,7 @@ let editor: SketchEditor | null = null;
 let editing: SketchFeature | null = null;
 export const currentEditor = () => editor;
 
-/** Växla mellan delläge (3D) och skissläge. */
+/** Switch between part mode (3D) and sketch mode. */
 export function setMode(m: 'part' | 'sketch') {
   document.body.dataset.mode = m;
   const sketch = m === 'sketch';
@@ -38,7 +38,7 @@ export function setMode(m: 'part' | 'sketch') {
   }
 }
 
-// ---- Sammanhangsrad och status -----------------------------------------------------------------
+// ---- Context bar and status --------------------------------------------------------------------
 
 function renderCtxbar() {
   const acts = editor && editor.tool === 'select' ? editor.actions() : [];
@@ -84,7 +84,7 @@ function updateSketchUi() {
   }
 }
 
-// ---- Måttdialog ------------------------------------------------------------------------------
+// ---- Dimension dialog ------------------------------------------------------------------------
 
 const dimDlg = () => $<HTMLDialogElement>('#dimDlg');
 const dimValue = () => $<HTMLInputElement>('#dimValue');
@@ -165,9 +165,9 @@ function initDimDialog() {
   });
 }
 
-// ---- In och ut ur skissläget ------------------------------------------------------------------------
+// ---- Into and out of sketch mode --------------------------------------------------------------------
 
-/** Anropas innan skissläget öppnas (t.ex. för att stänga featurepanelen). */
+/** Called before sketch mode opens (e.g. to close the feature panel). */
 export const sketchHooks = { beforeEnter: () => {} };
 
 export function enterSketch(f: SketchFeature) {
@@ -186,7 +186,7 @@ export function enterSketch(f: SketchFeature) {
     editor.showConstraints = store.get('showConstraints') !== '0';
     if (app.solver) editor.setSolver(app.solver);
   } else editor.setSketch(f);
-  // Modellens kanter i skissplanet (t.ex. ytan man skissar på) att se och snäppa till.
+  // The model's edges in the sketch plane (e.g. the face being sketched on) to see and snap to.
   const pos = app.source === 'model' ? viewer.meshPositions : null;
   editor.reference = pos ? sketchReference(pos, sketchFrame(f, vars(), app.doc)) : null;
   if (!editor.reference?.segments.length) editor.reference = null;
@@ -196,7 +196,7 @@ export function enterSketch(f: SketchFeature) {
   remoteLog('sketch-enter', { name: f.name, plane: f.plane, offset: f.offset, outward: f.outward, reference: editor.reference?.segments.length ?? 0 });
 }
 
-/** Skiss på en rund yta: hur långt ytan faller bort under det ritade (se SketchFeature.seat). */
+/** Sketch on a round face: how far the surface falls away below the drawing (see SketchFeature.seat). */
 function updateSeat(sk: SketchFeature) {
   const pos = app.source === 'model' ? viewer.meshPositions : null;
   if (!sk.outward || !pos) return;
@@ -208,7 +208,8 @@ function updateSeat(sk: SketchFeature) {
   }
   if (!xs.length) return;
   const d = surfaceDepth(pos, sketchFrame(sk, vars(), app.doc), { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) });
-  // Ingen rund yta hittad (t.ex. täckt av det som redan byggts på skissen): behåll det gamla sätet.
+  // No round surface found (e.g. covered by what has already been built on the sketch): keep the
+  // old seat.
   if (d > 0) sk.seat = d;
 }
 
@@ -218,7 +219,7 @@ export function exitSketch() {
   const sk = editing;
   editing = null;
   updateSeat(sk);
-  // En helt tom ny skiss behöver inte sparas.
+  // A completely empty new sketch does not need to be saved.
   const keep = Object.keys(sk.entities).length > 0 || Object.keys(sk.points).length > 0 || dependents(app.doc, sk.id).length > 0;
   if (!keep) removeFeature(app.doc, sk);
   setMode('part');
@@ -234,7 +235,7 @@ export function exitSketch() {
     solids: app.model.solids,
     sketch: { points: sk.points, entities: sk.entities },
   });
-  // Efter en ny skiss: tipsa om nästa steg.
+  // After a new sketch: hint at the next step.
   if (keep && !dependents(app.doc, sk.id).length) {
     if (sketchRegions(sk).regions.length) showToast(t('toast.makeSolid', { name: sk.name }));
     else if (Object.values(sk.points).some(p => p.standalone)) showToast(t('toast.makeHoles', { name: sk.name }));
@@ -243,10 +244,10 @@ export function exitSketch() {
 
 // ---- Planval ------------------------------------------------------------------------------------
 
-/** Öppna planvalet för en ny skiss; content läggs i skissen när planet är valt. */
+/** Open the plane choice for a new sketch; content is put into the sketch once the plane is chosen. */
 export let openPlaneDialog: (content?: ((f: SketchFeature) => void) | null, title?: string) => void = () => {};
 
-/** Innehåll som väntar på den nya skissens plan (t.ex. en importerad SVG), eller null. */
+/** Content waiting for the new sketch's plane (e.g. an imported SVG), or null. */
 let pendingContent: ((f: SketchFeature) => void) | null = null;
 
 function newSketchOn(plane: Plane, init: (f: SketchFeature) => void) {
@@ -264,7 +265,7 @@ function addSketchAndEnter(f: SketchFeature) {
   enterSketch(f);
 }
 
-// ---- Skissa på en yta: tryck på en plan yta i 3D-vyn -------------------------------------------------
+// ---- Sketch on a face: tap a flat face in the 3D view ------------------------------------------------
 
 function stopFacePick() {
   viewer.tapOverride = null;
@@ -274,8 +275,8 @@ function stopFacePick() {
 type FaceHit = { point: [number, number, number]; normal: [number, number, number] };
 
 /**
- * Ny skiss (inte inlagd) i den tryckta ytans plan: ett grundplan med förskjutning, eller en sned
- * yta med eget plan (följer extruderingen den kommer från, annars fast i rummet).
+ * New sketch (not inserted) in the tapped face's plane: a base plane with offset, or a slanted face
+ * with its own plane (follows the extrude it comes from, otherwise fixed in space).
  */
 export function sketchForHit(hit: FaceHit): SketchFeature {
   const fp = facePlane(hit.normal, hit.point);
@@ -301,7 +302,7 @@ export function sketchForHit(hit: FaceHit): SketchFeature {
   return f;
 }
 
-/** Låt användaren trycka på en yta i 3D-vyn (raden "Tryck på en yta" med Avbryt). */
+/** Let the user tap a face in the 3D view (the "Tap a face" bar with Cancel). */
 export function pickFaceThen(onHit: (hit: FaceHit) => void): boolean {
   if (app.source !== 'model' || !viewer.meshPositions) {
     showToast(t('plane.noModel'), 'info');
@@ -359,7 +360,7 @@ function initPlaneDialog() {
     });
 }
 
-// ---- Koppla ihop --------------------------------------------------------------------------------
+// ---- Wiring -------------------------------------------------------------------------------------
 
 export function initSketchMode() {
   initDimDialog();
@@ -394,7 +395,7 @@ export function initSketchMode() {
       updateSketchUi();
     });
 
-  // Ytvalet avbryts av Esc eller av ett annat verktyg i delläget.
+  // The face pick is cancelled by Esc or by another tool in part mode.
   $('#partToolbar').addEventListener('click', e => {
     if ((e.target as HTMLElement).closest('button')?.id !== 'btnNewSketch') stopFacePick();
   }, true);
@@ -416,7 +417,7 @@ export function initSketchMode() {
   });
 }
 
-/** Språkbyte: rita om skisslägets texter. */
+/** Language change: redraw the sketch mode's texts. */
 export function refreshSketchTexts() {
   if (editor) {
     editor.requestDraw();

@@ -1,5 +1,5 @@
-// scadshape – CAD i telefonen: skisser med villkor → features (extrudera, revolve, hål, gängor …)
-// → OpenSCAD (WASM, Manifold) → 3D. Här kopplas UI-modulerna ihop.
+// scadshape – CAD on the phone: sketches with constraints → features (extrude, revolve, holes,
+// threads …) → OpenSCAD (WASM, Manifold) → 3D. This is where the UI modules are wired together.
 
 import { localizeDefaultNames, type Feature } from './doc';
 import { KINDS } from './features';
@@ -32,16 +32,17 @@ import { currentProjectName, initProjects, projectHooks } from './ui/projects';
 import { showToast } from './ui/toast';
 import { initTree, renderTree, treeActions } from './ui/tree';
 
-applyTheme(); // först, så att inget hinner ritas i fel tema
+applyTheme(); // first, so nothing is drawn in the wrong theme
 installErrorReporting();
 remoteLog('start', { ua: navigator.userAgent, screen: `${screen.width}×${screen.height} @${devicePixelRatio}`, lang: getLang() });
-// Modellerna (IndexedDB) läses in efter temat, så att inget hinner ritas i fel tema under tiden.
+// The models (IndexedDB) are loaded after the theme, so nothing is drawn in the wrong theme
+// meanwhile.
 await openStorage();
 initState();
-saveDoc(); // spara ev. migrerat dokument
+saveDoc(); // save a possibly migrated document
 storageHooks.error = () => showToast(t('storage.saveFailed'), 'error');
 
-// ---- Dokumentet ändrat: spara, rita om trädet, rendera ------------------------------------------
+// ---- The document changed: save, redraw the tree, render ----------------------------------------
 
 on('docChanged', () => {
   recordDoc();
@@ -57,7 +58,7 @@ sketchHooks.beforeEnter = () => {
   if (currentPanel()) closePanel();
 };
 
-// ---- Villkorslösaren (planegcs) laddas i bakgrunden ---------------------------------------------
+// ---- The constraint solver (planegcs) loads in the background -----------------------------------
 
 loadSolver()
   .then(s => {
@@ -70,11 +71,11 @@ loadSolver()
     showToast(t('toast.solverFailed'), 'error');
   });
 
-// ---- Källa, paneler och knappar -------------------------------------------------------------
+// ---- Source, panels and buttons -------------------------------------------------------------
 
 function fillSources() {
   const sel = $<HTMLSelectElement>('#source');
-  sel.replaceChildren(new Option(currentProjectName(), 'model'), ...EXAMPLES.map(e => new Option(t(e.name), e.id)), new Option(t('source.custom'), 'egen'));
+  sel.replaceChildren(new Option(currentProjectName(), 'model'), ...EXAMPLES.map(e => new Option(t(e.name), e.id)), new Option(t('source.custom'), 'custom'));
   if (![...sel.options].some(o => o.value === app.source)) app.source = 'model';
   sel.value = app.source;
 }
@@ -156,8 +157,9 @@ $('#source').addEventListener('change', e => {
 });
 $('#btnCode').addEventListener('click', () => togglePanel($('#codePanel'), $('#btnCode'), 'codeOpen'));
 $('#btnTree').addEventListener('click', () => togglePanel($('#tree'), $('#btnTree'), 'treeOpen'));
-// Mätknappen är ett utvecklarverktyg: finns inte i appen (och runBench följer då inte med).
-// Bara på utvecklingsservern: där hamnar mätningen (den publika webben och appen har ingen nytta av den).
+// The benchmark button is a developer tool: not in the app (and runBench is then left out). Only on
+// the dev server: that is where the measurement ends up (the public web and the app have no use for
+// it).
 if (__DEV_TOOLS__ && isDevHost) $('#btnBench').addEventListener('click', runBench);
 else $('#btnBench').remove();
 $('#btnParams').addEventListener('click', openParams);
@@ -171,7 +173,7 @@ $('#btnSnap').addEventListener('click', () => startFeature('snap'));
 $('#btnFit').addEventListener('click', () => viewer.fit());
 for (const b of $$<HTMLButtonElement>('[data-view]')) b.addEventListener('click', () => viewer.setView(b.dataset.view as ViewName));
 
-// Testkrok (headless-tester i tools/browser).
+// Test hook (headless tests in tools/browser).
 Object.assign(window, {
   __scadshape: {
     get doc() { return app.doc; },
@@ -186,7 +188,8 @@ Object.assign(window, {
 
 requestRender();
 
-// Importerade filer: när listan är inläst byggs modellen om (en saknad fil blir ett fel i trädet).
+// Imported files: when the list is loaded the model is rebuilt (a missing file becomes an error in
+// the tree).
 initBlobs().then(
   () => {
     if (!app.doc.features.some(f => f.type === 'mesh')) return;
@@ -197,6 +200,7 @@ initBlobs().then(
   () => {},
 );
 
-// Android-appen: bakåtknappen, systemraderna, filer från andra appar (sist – allt annat är igång).
+// The Android app: back button, system bars, files from other apps (last – everything else is
+// running).
 initAndroid();
 document.body.classList.remove('loading');

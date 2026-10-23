@@ -1,4 +1,4 @@
-// Mått och villkorssymboler: mäta aktuella värden, rita dem och ge träffytor.
+// Dimensions and constraint symbols: measure current values, draw them and provide hit areas.
 
 import { angleOf, dist, fmtNum, polar, TAU, type Vec } from './geom';
 import { arcGeom, isDimension, type Constraint, type SketchData } from './model';
@@ -23,7 +23,7 @@ const cross = (a: Vec, b: Vec) => a.x * b.y - a.y * b.x;
 const dot = (a: Vec, b: Vec) => a.x * b.x + a.y * b.y;
 const mid = (a: Vec, b: Vec): Vec => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-/** Radie för cirkel/båge. */
+/** Radius for a circle/arc. */
 export function radiusOf(sk: SketchData, e: string): number | null {
   const ent = sk.entities[e];
   if (ent?.type === 'circle') return ent.r;
@@ -31,7 +31,7 @@ export function radiusOf(sk: SketchData, e: string): number | null {
   return null;
 }
 
-/** Cirkelns/bågens centrum och radie. */
+/** The circle's/arc's center and radius. */
 function curveOf(sk: SketchData, e: string): { c: Vec; r: number } | null {
   const ent = sk.entities[e];
   if (ent?.type === 'circle') return { c: sk.points[ent.c], r: ent.r };
@@ -39,22 +39,22 @@ function curveOf(sk: SketchData, e: string): { c: Vec; r: number } | null {
   return null;
 }
 
-/** Avstånd från en punkt till en cirkels/bågs kant (utanför eller innanför). */
+/** Distance from a point to a circle's/arc's edge (outside or inside). */
 export const pointCurveDistance = (p: Vec, cv: { c: Vec; r: number }) => Math.abs(dist(p, cv.c) - cv.r);
 
 /**
- * Kortaste vägen mellan två cirklars kanter längs centrumlinjen: a på den första, b på den andra.
- * Bredvid varandra: kant mot kant; den ena inuti den andra: inre kanten mot den yttre.
+ * The shortest path between two circles' edges along the center line: a on the first, b on the
+ * second. Side by side: edge to edge; one inside the other: the inner edge to the outer.
  */
 export function curveGap(c1: { c: Vec; r: number }, c2: { c: Vec; r: number }): { gap: number; a: Vec; b: Vec } {
   const d = dist(c1.c, c2.c);
   const ang = d < 1e-9 ? 0 : angleOf(c1.c, c2.c);
   if (d >= c1.r + c2.r) return { gap: d - c1.r - c2.r, a: polar(c1.c, c1.r, ang), b: polar(c2.c, c2.r, ang + Math.PI) };
-  // Inuti (eller överlappande): kanterna åt samma håll, sett från den större cirkelns centrum.
+  // Inside (or overlapping): the edges in the same direction, seen from the larger circle's center.
   return { gap: Math.max(0, Math.abs(c1.r - c2.r) - d), a: polar(c1.c, c1.r, c1.r >= c2.r ? ang : ang + Math.PI), b: polar(c2.c, c2.r, c1.r >= c2.r ? ang : ang + Math.PI) };
 }
 
-/** Mellanrummet mellan en cirkels kant och en linje (linjen utanför; 0 om den skär cirkeln), vinkelrätt mot linjen. */
+/** The gap between a circle's edge and a line (the line outside; 0 if it cuts the circle), perpendicular to the line. */
 export function curveLineGap(cv: { c: Vec; r: number }, l: Line): { gap: number; a: Vec; b: Vec } {
   const d = sub(l.b, l.a);
   const t = dot(sub(cv.c, l.a), d) / (dot(d, d) || 1);
@@ -64,24 +64,25 @@ export function curveLineGap(cv: { c: Vec; r: number }, l: Line): { gap: number;
   return { gap: Math.max(0, h - cv.r), a: polar(cv.c, cv.r, ang), b: foot };
 }
 
-/** Linjens riktning a→b mot X-axeln, grader i (−180, 180]. */
+/** The line's direction a→b against the X axis, degrees in (−180, 180]. */
 export const xAngle = (l: Line) => (Math.atan2(l.b.y - l.a.y, l.b.x - l.a.x) * 180) / Math.PI;
 
-/** Signerad vinkel (grader) från linje 1:s riktning till linje 2:s, i (−180, 180]. */
+/** Signed angle (degrees) from line 1's direction to line 2's, in (−180, 180]. */
 export function signedAngle(l1: Line, l2: Line) {
   const d1 = sub(l1.b, l1.a), d2 = sub(l2.b, l2.a);
   return (Math.atan2(cross(d1, d2), dot(d1, d2)) * 180) / Math.PI;
 }
 
-/** Avstånd från punkt till (oändlig) linje. */
+/** Distance from a point to an (infinite) line. */
 export function pointLineDistance(p: Vec, l: Line) {
   const d = sub(l.b, l.a);
   return Math.abs(cross(d, sub(p, l.a))) / (len(d) || 1);
 }
 
 /**
- * Vinkeln användaren ser: mellan halvlinjerna från skärningspunkten mot linjernas
- * mittpunkter (0–180°). s1/s2 anger om halvlinjen går med (1) eller mot (−1) linjens riktning.
+ * The angle the user sees: between the half-lines from the intersection towards the lines'
+ * midpoints (0–180°). s1/s2 say whether the half-line goes with (1) or against (−1) the line's
+ * direction.
  */
 export function visibleAngle(l1: Line, l2: Line) {
   const d1 = sub(l1.b, l1.a), d2 = sub(l2.b, l2.a);
@@ -102,7 +103,7 @@ export function visibleAngle(l1: Line, l2: Line) {
   return { I, s1, s2, theta: s1 === s2 ? v : 180 - v, r1: { x: d1.x * s1, y: d1.y * s1 }, r2: { x: d2.x * s2, y: d2.y * s2 } };
 }
 
-/** Måttets aktuella värde i geometrin (det som visas, alltid ≥ 0). */
+/** The dimension's current value in the geometry (what is shown, always ≥ 0). */
 export function measure(sk: SketchData, c: Constraint): number | null {
   switch (c.type) {
     case 'distance': {
@@ -157,7 +158,7 @@ function dimensionValueText(c: Constraint): string {
       return `Ø${fmtNum(c.value)}`;
     case 'angle':
     case 'xangle':
-      return `${fmtNum(Math.abs(c.value), 1)}°`; // drawDimension visar den synliga vinkeln
+      return `${fmtNum(Math.abs(c.value), 1)}°`; // drawDimension shows the visible angle
     case 'distance':
     case 'pldistance':
     case 'pcdistance':
@@ -193,7 +194,7 @@ export interface DrawStyle {
 
 type S = (p: Vec) => Vec;
 
-/** Skissens mittpunkt (för att lägga mått och symboler utanför formen). */
+/** The sketch's center (to place dimensions and symbols outside the shape). */
 function centroid(sk: SketchData): Vec {
   const ps = Object.values(sk.points);
   if (!ps.length) return { x: 0, y: 0 };
@@ -201,7 +202,7 @@ function centroid(sk: SketchData): Vec {
   return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
 }
 
-/** Normal till a→b (skärm) som pekar bort från `away`; uppåt om det är oklart. */
+/** Normal to a→b (screen) pointing away from `away`; up if unclear. */
 function outward(a: Vec, b: Vec, away: Vec): Vec {
   const d = sub(b, a);
   const L = len(d) || 1;
@@ -247,7 +248,7 @@ function arrowLine(ctx: CanvasRenderingContext2D, a: Vec, b: Vec) {
   ctx.stroke();
 }
 
-/** Rita ett mått; returnerar etikettens träffyta. */
+/** Draw a dimension; returns the label's hit area. */
 export function drawDimension(ctx: CanvasRenderingContext2D, sk: SketchData, c: Constraint, S: S, color: string, bg: string): Hotspot | null {
   ctx.strokeStyle = color;
   ctx.lineWidth = 1;
@@ -314,7 +315,7 @@ export function drawDimension(ctx: CanvasRenderingContext2D, sk: SketchData, c: 
       break;
     }
     case 'pcdistance': {
-      // Längs linjen från centrum genom punkten, från punkten till kanten.
+      // Along the line from the center through the point, from the point to the edge.
       const cv = curveOf(sk, c.e);
       const p = sk.points[c.p];
       if (!cv || !p) return null;
@@ -372,7 +373,7 @@ export function drawDimension(ctx: CanvasRenderingContext2D, sk: SketchData, c: 
       break;
     }
     case 'xangle': {
-      // Från en streckad stråle längs +X vid linjens start till linjen.
+      // From a dashed ray along +X at the line's start to the line.
       const l = lineOf(sk, c.e);
       if (!l) return null;
       const I = S(l.a);
@@ -386,7 +387,7 @@ export function drawDimension(ctx: CanvasRenderingContext2D, sk: SketchData, c: 
       ctx.stroke();
       ctx.restore();
       ctx.beginPath();
-      ctx.arc(I.x, I.y, 30, 0, -a, a > 0); // skärmens y är nedåt
+      ctx.arc(I.x, I.y, 30, 0, -a, a > 0); // the screen's y points down
       ctx.stroke();
       at = { x: I.x + 48 * Math.cos(-a / 2), y: I.y + 48 * Math.sin(-a / 2) };
       break;
@@ -397,7 +398,7 @@ export function drawDimension(ctx: CanvasRenderingContext2D, sk: SketchData, c: 
       const v = visibleAngle(l1, l2);
       text = `${c.expr ? `${c.expr} = ` : ''}${fmtNum(v.theta, 1)}°`;
       const I = S(v.I);
-      // Skärmens y är nedåt: vinklarna speglas.
+      // The screen's y points down: the angles are mirrored.
       const a1 = -Math.atan2(v.r1.y, v.r1.x), a2 = -Math.atan2(v.r2.y, v.r2.x);
       let d = a2 - a1;
       while (d > Math.PI) d -= TAU;
@@ -415,21 +416,21 @@ export function drawDimension(ctx: CanvasRenderingContext2D, sk: SketchData, c: 
   return { ...h, key: `c:${c.id}`, dim: true };
 }
 
-/** Rita villkorssymboler; returnerar träffytor. */
+/** Draw constraint symbols; returns hit areas. */
 export function drawGlyphs(
   ctx: CanvasRenderingContext2D, sk: SketchData, S: S, colorFor: (key: string) => string, bg: string,
   visible: (c: Constraint) => boolean = () => true,
 ): Hotspot[] {
   const spots: Hotspot[] = [];
   const center = S(centroid(sk));
-  const stack = new Map<string, number>(); // hur många symboler som redan ritats vid ett ankare
+  const stack = new Map<string, number>(); // how many symbols have already been drawn at an anchor
   const font = '700 11px system-ui, sans-serif';
   const place = (anchorKey: string, base: Vec, along: Vec) => {
     const n = stack.get(anchorKey) ?? 0;
     stack.set(anchorKey, n + 1);
     return { x: base.x + along.x * 20 * n, y: base.y + along.y * 20 * n };
   };
-  /** Ankare vid en entitet: lite vid sidan av mitten. */
+  /** Anchor at an entity: a little to the side of the middle. */
   const entityAnchor = (e: string): { base: Vec; along: Vec } | null => {
     const ent = sk.entities[e];
     if (!ent) return null;
@@ -438,7 +439,8 @@ export function drawGlyphs(
       const d = sub(b, a);
       const L = len(d) || 1;
       const n = outward(a, b, center);
-      // Utåt (som måtten) men vid en fjärdedel av linjen, så att de inte hamnar på måttet i mitten.
+      // Outwards (like the dimensions) but at a quarter of the line, so they do not land on the
+      // dimension in the middle.
       const q = { x: a.x + d.x * 0.25, y: a.y + d.y * 0.25 };
       return { base: { x: q.x + n.x * 18, y: q.y + n.y * 18 }, along: { x: d.x / L, y: d.y / L } };
     }

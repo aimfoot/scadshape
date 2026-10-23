@@ -1,5 +1,6 @@
-// Mätverktyget i delläget: tryck på hörn, kanter och ytor; ett val visar dess mått
-// (kantlängd, Ø, koordinater), två val avståndet/vinkeln mellan dem. Ett tredje tryck börjar om.
+// The measure tool in part mode: tap corners, edges and faces; one pick shows its measurements
+// (edge length, Ø, coordinates), two picks the distance/angle between them. A third tap starts
+// over.
 
 import { describe, measureBetween, refOf, type Ref, type V3 } from '../measure';
 import { remoteLog } from '../remote';
@@ -62,12 +63,12 @@ export function initMeasure() {
     refs = [];
     show();
   });
-  // Andra verktyg (ny skiss, features) tar över trycken i 3D-vyn.
+  // Other tools (new sketch, features) take over the taps in the 3D view.
   for (const b of $$<HTMLButtonElement>('#partToolbar button')) if (b.id !== 'btnMeasure') b.addEventListener('click', stopMeasure, { capture: true });
   addEventListener('keydown', e => {
     if (e.key === 'Escape' && active) stopMeasure();
   });
-  // Modellen har renderats om: gamla val pekar på ett annat nät.
+  // The model has been re-rendered: old picks point to a different mesh.
   viewer.onMeshChanged = () => {
     if (!active) return;
     refs = [];

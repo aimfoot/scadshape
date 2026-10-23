@@ -1,6 +1,6 @@
-// Exempelmodeller (startkortet, src/ui/welcome.ts): byggs när de öppnas, i dokumentets nuvarande
-// format, med mått som hänger på variabler – ändra en variabel och modellen följer med.
-// Variabelnamnen följer språket (bredd/width …).
+// Example models (the start card, src/ui/welcome.ts): built when they are opened, in the document's
+// current format, with dimensions tied to variables – change a variable and the model follows. The
+// variable names follow the language (bredd/width …).
 
 import { emptyDoc, insertFeature, newFeature, newSketch, type Doc } from '../doc';
 import { applyHoleSize } from '../features/hole';
@@ -23,7 +23,7 @@ const VAR_NAMES = {
 };
 const SIGN_TEXT = { sv: 'Hej!', en: 'Hello!' };
 
-/** Skissbygge med villkor: punkter, linjer och mått kopplade till variabler. */
+/** Sketch builder with constraints: points, lines and dimensions tied to variables. */
 class Sketch {
   constructor(readonly sk: SketchFeature) {
     sk.points[ORIGIN] ??= { x: 0, y: 0 };
@@ -41,7 +41,7 @@ class Sketch {
   c(o: NewConstraint) {
     this.sk.constraints.push({ id: newId(this.sk, 'c'), ...o } as SketchFeature['constraints'][number]);
   }
-  /** Rektangel med mitten i origo (konstruktionsdiagonal + mittpunkt), mått bredd × höjd. */
+  /** Rectangle centered on the origin (construction diagonal + midpoint), dimensions width × height. */
   centeredRect(w: number, h: number, wExpr: string, hExpr: string) {
     const p = [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]].map(([x, y]) => this.pt(x, y));
     const lines = p.map((a, i) => this.line(a, p[(i + 1) % 4]));
@@ -50,7 +50,7 @@ class Sketch {
     this.c({ type: 'distance', p1: p[0], p2: p[1], dir: 'h', value: w, expr: wExpr });
     this.c({ type: 'distance', p1: p[1], p2: p[2], dir: 'v', value: h, expr: hExpr });
   }
-  /** Fristående punkt (t.ex. hålcentrum) på X-axeln, |x| mm från origo. */
+  /** Standalone point (e.g. a hole center) on the X axis, |x| mm from the origin. */
   pointOnX(x: number, absExpr: string) {
     const p = this.pt(x, 0, true);
     this.c({ type: 'hpoints', p1: ORIGIN, p2: p });
@@ -59,7 +59,7 @@ class Sketch {
   }
 }
 
-/** Skiss på XY; med offset en skiss på en ovansida (som att trycka på ytan): hål borrar nedåt, text bygger uppåt. */
+/** Sketch on XY; with offset a sketch on a top face (like tapping the face): holes drill down, text builds up. */
 function sketch(doc: Doc, offset?: string) {
   const sk = newSketch(doc, 'XY');
   if (offset) Object.assign(sk, { offset, outward: 'normal' });
@@ -84,12 +84,12 @@ export function buildExample(id: ExampleId): Doc {
       const { sk, s } = sketch(doc);
       s.centeredRect(70, 30, v.length, v.width);
       insertFeature(doc, Object.assign(newFeature(doc, 'extrude', sk), { depth: v.thickness, radius: '5' }));
-      // Hålen ritas på plattans ovansida och borras nedåt genom den.
+      // The holes are drawn on the plate's top face and drilled down through it.
       const top = sketch(doc, v.thickness);
       top.s.pointOnX(-25, `${v.length} / 2 - 10`);
       top.s.pointOnX(25, `${v.length} / 2 - 10`);
       const holes = Object.assign(newFeature(doc, 'hole', top.sk), { kind: 'countersink' as const, through: true });
-      applyHoleSize(holes, 'M4'); // diameter och försänkning från förvalet
+      applyHoleSize(holes, 'M4'); // diameter and countersink from the preset
       insertFeature(doc, holes);
       break;
     }
@@ -103,7 +103,8 @@ export function buildExample(id: ExampleId): Doc {
       break;
     }
     case 'cup': {
-      // Halva tvärsnittet (L-form) i Fram-planet, varvat runt skissens Y-axel (= Z i världen).
+      // Half the cross-section (L shape) in the Front plane, revolved around the sketch's Y axis (=
+      // Z in the world).
       doc.params = [{ name: v.diameter, expr: '70' }, { name: v.height, expr: '80' }];
       const sk = newSketch(doc, 'XZ');
       insertFeature(doc, sk);

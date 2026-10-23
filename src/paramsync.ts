@@ -1,4 +1,4 @@
-// När variabler ändras: räkna om skissmått som använder dem och lös skissen igen.
+// When variables change: recompute the sketch dimensions that use them and solve the sketch again.
 
 import { t } from './i18n';
 import type { SketchFeature } from './doc';
@@ -6,7 +6,7 @@ import { parseExpr, type Vars } from './expr';
 import { visibleAngle, signedAngle } from './sketch/annotate';
 import type { SketchSolver } from './sketch/solver';
 
-/** Uppdatera måtten i en skiss från variablerna. Vid fel lämnas skissen orörd. */
+/** Update the dimensions in a sketch from the variables. On error the sketch is left untouched. */
 export function syncSketchParams(sk: SketchFeature, vars: Vars, solver: SketchSolver | null): { changed: boolean; error?: string } {
   const before = JSON.stringify(sk);
   let changed = false;

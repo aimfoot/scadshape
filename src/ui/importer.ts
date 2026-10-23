@@ -1,5 +1,5 @@
-// Importera i delläget: STL → feature "Importerad kropp" (filen i blobs.ts), SVG → en ny skiss
-// med linjer, bågar och cirklar (storlek, placering och låsning väljs först, sedan planet).
+// Import in part mode: STL → feature "Imported body" (the file in blobs.ts), SVG → a new sketch
+// with lines, arcs and circles (size, placement and locking are chosen first, then the plane).
 
 import { putBlob } from '../blobs';
 import { insertFeature, newFeature, type Feature } from '../doc';
@@ -17,10 +17,10 @@ import { openPlaneDialog } from './sketchmode';
 import { app, vars } from './state';
 import { showToast } from './toast';
 
-/** Över så många punkter låses geometrin som standard; över LOCK_MAX alltid (lösaren orkar inte fler fria). */
+/** Above this many points the geometry is locked by default; above LOCK_MAX always (the solver cannot handle more free ones). */
 export const LOCK_DEFAULT = 150;
 export const LOCK_MAX = 600;
-/** Fler punkter än så blir för tungt i skissen (regioner, ritning). */
+/** More points than this become too heavy in the sketch (regions, drawing). */
 export const SVG_MAX_POINTS = 6000;
 const STL_MAX_BYTES = 64 * 1024 * 1024;
 
@@ -43,7 +43,7 @@ async function importStl(file: File, bytes: Uint8Array) {
   showToast(t('import.stlDone', { name: file.name, size: size.map(v => fmtInput(Math.round(v * 10) / 10)).join(' × ') }));
 }
 
-// ---- SVG-dialogen -----------------------------------------------------------------------------------
+// ---- The SVG dialog ---------------------------------------------------------------------------------
 
 let svg: { drawing: SvgDrawing; name: string } | null = null;
 let origin: 'corner' | 'center' = 'corner';
@@ -53,7 +53,7 @@ const svgDlg = () => $<HTMLDialogElement>('#svgDlg');
 const widthOf = (d: SvgDrawing) => d.max.x - d.min.x;
 const heightOf = (d: SvgDrawing) => d.max.y - d.min.y;
 
-/** Skalan ur breddfältet, eller null om fältet är fel. */
+/** The scale from the width field, or null if the field is wrong. */
 function svgScale(): number | null {
   if (!svg) return null;
   const r = parseExpr($<HTMLInputElement>('#svgWidth').value.trim() || '0', vars());
@@ -127,7 +127,7 @@ function confirmSvg() {
   }, t('import.svgPlane'));
 }
 
-// ---- Koppla ihop ------------------------------------------------------------------------------------
+// ---- Wiring -----------------------------------------------------------------------------------------
 
 export async function importFile(file: File) {
   if (document.body.dataset.mode !== 'part') return;
@@ -163,5 +163,5 @@ export function initImport() {
   });
 }
 
-/** För tester: importera en fil som om den valts i filväljaren. */
+/** For tests: import a file as if it was chosen in the file picker. */
 export const importForTest = importFile;

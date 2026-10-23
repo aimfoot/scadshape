@@ -1,15 +1,15 @@
-// Lagring för modellerna (projects.ts): IndexedDB (databasen "scadshape", tabellen "kv", text per
-// nyckel). openStorage() (main.ts, innan modellen läses) läser allt till minnet, så resten av koden
-// läser och skriver synkront; varje ändring skrivs genast vidare till IndexedDB.
-// Modellerna låg i localStorage före 2026-10-22: finns de kvar där flyttas de hit (skrivs, läses
-// tillbaka och jämförs, tas sedan bort ur localStorage). Utan IndexedDB (Node-tester, blockerad
-// lagring) används localStorage som förut, annars bara minnet.
+// Storage for the models (projects.ts): IndexedDB (database "scadshape", store "kv", text per key).
+// openStorage() (main.ts, before the model is read) loads everything into memory, so the rest of
+// the code reads and writes synchronously; every change is written through to IndexedDB right away.
+// The models were in localStorage before 2026-10-22: if they are still there they are moved here
+// (written, read back and compared, then removed from localStorage). Without IndexedDB (Node tests,
+// blocked storage) localStorage is used as before, otherwise only memory.
 
 import { remoteLog } from './remote';
 
 const DB = 'scadshape';
 const STORE = 'kv';
-/** Nycklarna som hör hit: projektlistan, aktuellt projekt och dokumenten (inte UI-inställningarna). */
+/** The keys that belong here: the project list, the current project and the documents (not the UI settings). */
 const OURS = /^scadshape\.(projects|current|doc(\..+)?)$/;
 
 type Kind = 'indexeddb' | 'localstorage' | 'memory';
@@ -19,13 +19,13 @@ let db: IDBDatabase | null = null;
 let kind: Kind = 'memory';
 let saved: Promise<void> = Promise.resolve();
 
-/** Anropas om en skrivning misslyckas (t.ex. full lagring) – ändringen finns då bara i minnet. */
+/** Called if a write fails (e.g. storage full) – the change then only exists in memory. */
 export const storageHooks = { error: (_e: unknown) => {} };
 
 const done = (tx: IDBTransaction) =>
   new Promise<void>((res, rej) => {
     tx.oncomplete = () => res();
-    tx.onerror = tx.onabort = () => rej(tx.error ?? new Error('IndexedDB-transaktionen avbröts'));
+    tx.onerror = tx.onabort = () => rej(tx.error ?? new Error('The IndexedDB transaction was aborted'));
   });
 const call = <T>(req: IDBRequest<T>) => new Promise<T>((res, rej) => ((req.onsuccess = () => res(req.result)), (req.onerror = () => rej(req.error))));
 
@@ -49,7 +49,7 @@ async function readAll(d: IDBDatabase) {
   return new Map(keys.map((k, i) => [String(k), String(values[i])]));
 }
 
-/** Modellnycklarna i localStorage (tomt om den saknas eller är blockerad). */
+/** The model keys in localStorage (empty if it is missing or blocked). */
 function localItems(): [string, string][] {
   try {
     const ls = globalThis.localStorage;
@@ -62,8 +62,9 @@ function localItems(): [string, string][] {
 }
 
 /**
- * Finns modellnycklar i localStorage är flytten inte klar (de tas bort först när IndexedDB bevisligen
- * har dem), eller så kördes en session utan IndexedDB: localStorage är då nyast och ersätter allt.
+ * If model keys exist in localStorage the move is not finished (they are only removed once
+ * IndexedDB demonstrably has them), or a session ran without IndexedDB: localStorage is then newest
+ * and replaces everything.
  */
 async function moveFromLocalStorage(d: IDBDatabase, items: [string, string][]) {
   const tx = d.transaction(STORE, 'readwrite', { durability: 'strict' });
@@ -72,7 +73,7 @@ async function moveFromLocalStorage(d: IDBDatabase, items: [string, string][]) {
   for (const [k, v] of items) store.put(v, k);
   await done(tx);
   const back = await readAll(d);
-  if (back.size !== items.length || items.some(([k, v]) => back.get(k) !== v)) throw new Error('kontrollen efter flytten stämde inte');
+  if (back.size !== items.length || items.some(([k, v]) => back.get(k) !== v)) throw new Error('the check after the move did not match');
   for (const [k] of items) globalThis.localStorage.removeItem(k);
   remoteLog('storage-moved', { keys: items.length, bytes: items.reduce((n, [, v]) => n + v.length, 0) });
 }
@@ -86,7 +87,8 @@ async function open() {
       for (const [k, v] of await readAll(d)) mem.set(k, v);
       db = d;
       kind = 'indexeddb';
-      // Be webbläsaren att inte rensa lagringen när det blir ont om plats (beviljas oftast för installerade appar).
+      // Ask the browser not to clear the storage when space runs low (usually granted for installed
+      // apps).
       void globalThis.navigator?.storage?.persist?.().catch(() => {});
       return;
     } catch (e) {
@@ -98,7 +100,7 @@ async function open() {
   try {
     if (globalThis.localStorage) kind = 'localstorage';
   } catch {
-    /* blockerad: bara minnet */
+    /* blocked: memory only */
   }
 }
 
@@ -127,7 +129,7 @@ function flush() {
 
 function write(k: string, v: string | null) {
   if (kind === 'indexeddb') {
-    // Allt som ändras i samma varv skrivs i en transaktion.
+    // Everything changed in the same tick is written in one transaction.
     if (!pending.size) queueMicrotask(flush);
     pending.set(k, v);
   } else if (kind === 'localstorage') {
@@ -135,7 +137,7 @@ function write(k: string, v: string | null) {
       if (v === null) globalThis.localStorage.removeItem(k);
       else globalThis.localStorage.setItem(k, v);
     } catch (e) {
-      storageHooks.error(e); // full eller blockerad: finns kvar i minnet under sessionen
+      storageHooks.error(e); // full or blocked: stays in memory for the session
     }
   }
 }
@@ -152,22 +154,22 @@ export const kv = {
   },
 };
 
-/** Var modellerna sparas just nu. */
+/** Where the models are stored right now. */
 export const storageKind = () => kind;
-/** Väntar tills allt som ändrats hittills är skrivet (tester). */
+/** Waits until everything changed so far has been written (tests). */
 export const storageSaved = () => (pending.size ? new Promise<void>(r => queueMicrotask(() => r())).then(() => saved) : saved);
 
 let opening: Promise<void> | null = null;
-/** Läs in lagringen (en gång). Före det är den tom och skrivningar stannar i minnet. */
+/** Load the storage (once). Before that it is empty and writes stay in memory. */
 export const openStorage = () => (opening ??= open());
 
-/** Testkrok (tools/browser): läs/skriv/töm lagringen oavsett var den ligger. */
+/** Test hook (tools/browser): read/write/clear the storage wherever it is. */
 export const storageForTests = {
   get: kv.get,
   set: kv.set,
   remove: kv.remove,
   keys: () => [...mem.keys()],
-  /** Tömmer modellerna (minnet och lagringen); ladda om sidan efteråt. */
+  /** Clears the models (memory and storage); reload the page afterwards. */
   clear() {
     for (const k of [...mem.keys()]) kv.remove(k);
     return storageSaved();

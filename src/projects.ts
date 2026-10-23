@@ -1,6 +1,6 @@
-// Projekt: flera modeller i webbläsarens lagring (IndexedDB via kv.ts). Ett index (namn, senast
-// ändrad) och ett dokument per projekt; det gamla enda dokumentet ("scadshape.doc") blir det första projektet.
-// Export/import som .scadshape.json för att flytta eller säkerhetskopiera en modell.
+// Projects: several models in the browser's storage (IndexedDB via kv.ts). An index (name, last
+// changed) and one document per project; the old single document ("scadshape.doc") becomes the
+// first project. Export/import as .scadshape.json to move or back up a model.
 
 import { emptyDoc, migrate, type Doc } from './doc';
 import { kv } from './kv';
@@ -8,7 +8,7 @@ import { kv } from './kv';
 export interface ProjectInfo {
   id: string;
   name: string;
-  /** Senast sparad (ms sedan 1970). */
+  /** Last saved (ms since 1970). */
   updated: number;
 }
 
@@ -29,10 +29,10 @@ function readIndex(): ProjectInfo[] {
 }
 const writeIndex = (list: ProjectInfo[]) => kv.set(INDEX_KEY, JSON.stringify(list));
 
-/** Alla projekt, senast ändrade först. */
+/** All projects, most recently changed first. */
 export const listProjects = () => readIndex().sort((a, b) => b.updated - a.updated);
 
-/** Ett unikt namn: "Modell", "Modell 2" … */
+/** A unique name: "Model", "Model 2" … */
 export function uniqueProjectName(base: string, except?: string) {
   const taken = new Set(readIndex().filter(p => p.id !== except).map(p => p.name));
   if (!taken.has(base)) return base;
@@ -48,7 +48,7 @@ export function createProject(name: string, doc: Doc = emptyDoc()): string {
   return id;
 }
 
-/** Aktuellt projekt; skapas (eller flyttas från det gamla enda dokumentet) om det inte finns. */
+/** The current project; created (or moved from the old single document) if it does not exist. */
 export function currentProjectId(defaultName: string): string {
   const list = readIndex();
   const cur = kv.get(CURRENT_KEY);
@@ -58,7 +58,7 @@ export function currentProjectId(defaultName: string): string {
   try {
     doc = migrate(JSON.parse(kv.get(LEGACY_DOC_KEY) ?? 'null')) ?? doc;
   } catch {
-    /* trasigt gammalt dokument: börja tomt */
+    /* broken old document: start empty */
   }
   const id = createProject(defaultName, doc);
   kv.remove(LEGACY_DOC_KEY);
@@ -101,7 +101,7 @@ export function deleteProject(id: string) {
   writeIndex(readIndex().filter(p => p.id !== id));
 }
 
-// ---- Fil ------------------------------------------------------------------------------------
+// ---- File -----------------------------------------------------------------------------------
 
 interface ProjectFile {
   format: 'scadshape';
@@ -115,7 +115,7 @@ export function exportProject(id: string): string {
   return JSON.stringify(file, null, 1);
 }
 
-/** Läs en projektfil; null om den inte är en scadshape-modell. */
+/** Read a project file; null if it is not a scadshape model. */
 export function parseProjectFile(text: string): { name: string; doc: Doc } | null {
   try {
     const o = JSON.parse(text) as Partial<ProjectFile>;

@@ -1,5 +1,5 @@
-// Ångra/gör om i delläget: en ögonblicksbild av dokumentet per ändring (docChanged).
-// Ett helt skisspass blir ett steg (skissläget har en egen, finare ångra).
+// Undo/redo in part mode: a snapshot of the document per change (docChanged). A whole sketch
+// session becomes one step (sketch mode has its own, finer undo).
 
 import { $ } from './dom';
 import { closePanel, currentPanel } from './panel';
@@ -15,7 +15,7 @@ function sync() {
   $<HTMLButtonElement>('#btnDocRedo').disabled = !redoStack.length;
 }
 
-/** Anropas vid varje docChanged: spara föregående läge om dokumentet ändrats. */
+/** Called on every docChanged: save the previous state if the document changed. */
 export function recordDoc() {
   const now = JSON.stringify(app.doc);
   if (now === current) return;
@@ -26,7 +26,7 @@ export function recordDoc() {
   sync();
 }
 
-/** Börja om (ny modell öppnad). */
+/** Start over (a new model was opened). */
 export function resetHistory() {
   undoStack = [];
   redoStack = [];
@@ -38,7 +38,7 @@ function restore(state: string) {
   if (currentPanel()) closePanel();
   current = state;
   app.doc = JSON.parse(state);
-  emit('docChanged'); // recordDoc ser att inget ändrats
+  emit('docChanged'); // recordDoc sees that nothing changed
   sync();
 }
 

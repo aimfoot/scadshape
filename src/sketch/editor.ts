@@ -1,12 +1,12 @@
-// Skisseditor på en 2D-canvas: rita med fingret (eller musen), med villkor och mått.
+// Sketch editor on a 2D canvas: draw with a finger (or the mouse), with constraints and dimensions.
 //
-// Inmatning: punkten hamnar där fingret är (med snäpp). Medan fingret är nere
-// visas ett förstoringsglas ovanför fingret; dra för att finjustera, släpp för
-// att placera. Man kan också dra från första till andra punkten i ett svep.
-// Två fingrar panorerar/zoomar alltid. Mus: hjul zoomar, höger/mitten-knapp panorerar.
+// Input: the point lands where the finger is (with snapping). While the finger is down a magnifier
+// is shown above the finger; drag to fine-tune, release to place. You can also drag from the first
+// to the second point in one swipe. Two fingers always pan/zoom. Mouse: the wheel zooms, the
+// right/middle button pans.
 //
-// Varje ändring löses av planegcs (solver.ts). Krockar ändringen med villkoren
-// rullas den tillbaka och onMessage får en förklaring.
+// Every change is solved by planegcs (solver.ts). If the change conflicts with the constraints it
+// is rolled back and onMessage gets an explanation.
 
 import {
   angleOf, arcPoints, arcThrough, ccwSweep, dist, distToArc, distToSegment, fmtNum, polar, TAU, type Vec,
@@ -25,13 +25,13 @@ import { currentTheme } from '../theme';
 export type ToolName = 'select' | 'point' | 'line' | 'rect' | 'rectc' | 'circle' | 'polygon' | 'slot' | 'arc3' | 'arcc';
 
 interface Snap extends Vec {
-  pointId?: string; // befintlig punkt (eller ORIGIN)
-  entity?: string; // kurva (kind 'curve') eller linje (kind 'mid')
+  pointId?: string; // existing point (or ORIGIN)
+  entity?: string; // curve (kind 'curve') or line (kind 'mid')
   kind: 'point' | 'grid' | 'free' | 'h' | 'v' | 'curve' | 'mid' | 'ref' | 'refEdge';
 }
 
 interface View {
-  cx: number; // världskoordinat i mitten av canvas (mm)
+  cx: number; // world coordinate at the center of the canvas (mm)
   cy: number;
   scale: number; // px per mm
 }
@@ -40,7 +40,7 @@ type Hit = { type: 'point'; id: string } | { type: 'entity'; id: string } | { ty
 
 type Gesture =
   | { kind: 'none' }
-  | { kind: 'ignore' } // vänta tills alla fingrar släppt
+  | { kind: 'ignore' } // wait until all fingers are released
   | { kind: 'pinch'; d0: number; s0: number; world0: Vec }
   | { kind: 'pan'; last: Vec }
   | { kind: 'press'; down: Vec; downSnap: Snap; moved: boolean; touch: boolean; startedDrag: boolean }
@@ -48,7 +48,7 @@ type Gesture =
 
 interface DragState {
   hit: Hit;
-  before: string; // skissen före draget (för ångra/återställning)
+  before: string; // the sketch before the drag (for undo/restore)
   startPts: Map<string, Vec>;
   startWorld: Vec;
 }
@@ -74,8 +74,8 @@ const LIGHT = {
   gridMajor: 'rgba(110,125,140,.28)',
   axisX: 'rgba(208,69,59,.55)',
   axisY: 'rgba(58,154,75,.55)',
-  free: '#1a6fc4', // underbestämd (blå)
-  defined: '#141d26', // fullt bestämd (svart)
+  free: '#1a6fc4', // under-defined (blue)
+  defined: '#141d26', // fully defined (black)
   construction: '#7d8b99',
   selected: '#e8790c',
   conflict: '#d0453b',
@@ -84,12 +84,12 @@ const LIGHT = {
   snap: '#e8790c',
   open: '#d0453b',
   dim: '#3b4a59',
-  reference: 'rgba(92,107,122,.75)', // modellens kanter i skissplanet
-  label: 'rgba(255,255,255,.92)', // bakom mått, villkorssymboler och mätetiketten
+  reference: 'rgba(92,107,122,.75)', // the model's edges in the sketch plane
+  label: 'rgba(255,255,255,.92)', // behind dimensions, constraint symbols and the measurement label
   labelLine: 'rgba(31,58,87,.25)',
   loupeRing: 'rgba(31,58,87,.45)',
 };
-/** Mörkt tema: samma betydelser; fullt bestämt blir ljust i stället för svart. */
+/** Dark theme: the same meanings; fully defined becomes light instead of black. */
 const DARK: typeof LIGHT = {
   bg: '#141a20',
   gridMinor: 'rgba(150,165,180,.10)',
@@ -113,13 +113,13 @@ const DARK: typeof LIGHT = {
 };
 const PALETTES = { light: LIGHT, dark: DARK };
 
-/** Modellens kontur i skissplanet (skissa på en yta): bara att se och snäppa till. */
+/** The model's outline in the sketch plane (sketch on a face): only to look at and snap to. */
 export interface SketchReference {
   segments: [Vec, Vec][];
   snaps: Vec[];
 }
 
-/** Avlångt hål: radien är avståndet från punkten till mittlinjen A–B (minst en hundradel). */
+/** Slot: the radius is the distance from the point to the center line A–B (at least a hundredth). */
 function slotRadius(a: Vec, b: Vec, p: Vec) {
   const L = dist(a, b);
   if (L < 1e-9) return 0;
@@ -156,28 +156,28 @@ export class SketchEditor {
 
   sketch: SketchData;
   tool: ToolName = 'line';
-  /** Färger för aktuellt tema (theme.ts). */
+  /** Colors for the current theme (theme.ts). */
   private get C() {
     return PALETTES[currentTheme()];
   }
   snapToGrid = true;
   showConstraints = true;
-  selection = new Set<string>(); // 'p:<id>', 'e:<id>' eller 'c:<id>'
-  /** Modellens kanter i planet. */
+  selection = new Set<string>(); // 'p:<id>', 'e:<id>' or 'c:<id>'
+  /** The model's edges in the plane. */
   reference: SketchReference | null = null;
-  /** Ta med referensen när vyn anpassas (skiss skapad på en yta). */
+  /** Include the reference when the view is fitted (sketch created on a face). */
   fitReference = false;
 
   private solver: SketchSolver | null = null;
   private lastSolve: SolveResult | null = null;
   private free: { points: Set<string>; radii: Set<string> } | null = null;
-  private flash = new Set<string>(); // villkor som just krockade (visas rött en stund)
+  private flash = new Set<string>(); // constraints that just conflicted (shown red for a while)
   private flashTimer = 0;
 
-  private placed: Snap[] = []; // punkter placerade i pågående verktygsoperation
-  private cursor: Snap | null = null; // aktuell (snäppt) position för förhandsvisning
-  private fingerScreen: Vec | null = null; // för förstoringsglaset
-  private arcAccum = 0; // mittpunktsbåge: hur långt användaren svept (radianer, moturs +)
+  private placed: Snap[] = []; // points placed in the running tool operation
+  private cursor: Snap | null = null; // current (snapped) position for the preview
+  private fingerScreen: Vec | null = null; // for the magnifier
+  private arcAccum = 0; // center arc: how far the user has swept (radians, counterclockwise +)
   private arcLastAngle = 0;
   private pointers = new Map<number, Vec>();
   private gesture: Gesture = { kind: 'none' };
@@ -187,15 +187,15 @@ export class SketchEditor {
   private loops: Loop[] = [];
   private degrees = new Map<string, number>();
   private hotspots: Hotspot[] = [];
-  private dirty = false; // en omritning är redan schemalagd
+  private dirty = false; // a redraw is already scheduled
 
-  /** Efter varje bestående ändring av skissen (för att spara). */
+  /** After every lasting change to the sketch (to save). */
   onChange?: () => void;
-  /** När hjälptext, ångra-läge, markering eller lösarstatus ändras. */
+  /** When the hint text, undo state, selection or solver status changes. */
   onState?: () => void;
-  /** Meddelande till användaren (t.ex. krockande villkor). */
+  /** Message to the user (e.g. conflicting constraints). */
   onMessage?: (text: string, kind: 'info' | 'error') => void;
-  /** Användaren vill ändra ett mått (tryckt på etiketten: viaTap, eller nyss skapat). */
+  /** The user wants to change a dimension (tapped the label: viaTap, or just created). */
   onEditDimension?: (id: string, viaTap?: boolean) => void;
 
   constructor(host: HTMLElement, sketch: SketchData) {
@@ -238,7 +238,7 @@ export class SketchEditor {
     const steps = HINTS[this.tool];
     return t(steps[Math.min(this.placed.length, steps.length - 1)]);
   }
-  /** Ett ritverktyg har en pågående operation som kan avslutas. */
+  /** A drawing tool has a running operation that can be finished. */
   get chainActive() {
     return this.tool !== 'select' && this.placed.length > 0;
   }
@@ -259,7 +259,7 @@ export class SketchEditor {
     for (const d of this.degrees.values()) if (d === 1) open++;
     return { open };
   }
-  /** Frihetsgrader (null om lösaren inte är laddad). */
+  /** Degrees of freedom (null if the solver is not loaded). */
   get dof(): number | null {
     return this.solver && this.lastSolve?.ok ? this.lastSolve.dof : null;
   }
@@ -307,7 +307,7 @@ export class SketchEditor {
     });
   }
 
-  /** Zooma så att hela skissen syns (eller ett standardområde om den är tom). */
+  /** Zoom so the whole sketch is visible (or a default area if it is empty). */
   fit() {
     const pts: Vec[] = Object.values(this.sketch.points);
     if (this.fitReference) for (const [a, b] of this.reference?.segments ?? []) pts.push(a, b);
@@ -324,23 +324,23 @@ export class SketchEditor {
     const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
     const wMm = Math.max(x1 - x0, 10), hMm = Math.max(y1 - y0, 10);
     const w = Math.max(this.w, 100), h = Math.max(this.h, 100);
-    // Minst 90 px på var sida i sidled: måttetiketter med variabelnamn ("width = 30") står utanför
-    // geometrin och klipptes annars på smala telefoner.
+    // At least 90 px on each side horizontally: dimension labels with variable names ("width = 30")
+    // stand outside the geometry and were otherwise clipped on narrow phones.
     const scale = Math.min(w / (wMm * 1.5), Math.max(w - 180, w / 3) / wMm, h / (hMm * 1.6));
     this.view = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, scale };
     this.requestDraw();
   }
 
-  /** Klientkoordinater (CSS px) för en punkt i skissen (mm) – för tester. */
+  /** Client coordinates (CSS px) for a point in the sketch (mm) – for tests. */
   clientPoint(p: Vec): Vec {
     const r = this.canvas.getBoundingClientRect();
     const s = this.toScreen(p);
     return { x: r.left + s.x, y: r.top + s.y };
   }
 
-  // ---- Villkor och mått ----------------------------------------------------------
+  // ---- Constraints and dimensions ------------------------------------------------
 
-  /** Villkor/åtgärder som passar det som är markerat. */
+  /** Constraints/actions that fit the selection. */
   actions(): Action[] {
     const sk = this.sketch;
     const sel = [...this.selection];
@@ -409,7 +409,7 @@ export class SketchEditor {
       add(t('act.vertical'), 'V', () => [{ type: 'vpoints', p1, p2 }]);
       A.push({ label: t('act.dimension'), symbol: '↔', run: () => this.addDimension() });
     }
-    // Punkter på en cirkel: vinkel (mot X-axeln eller en linje) och jämn fördelning.
+    // Points on a circle: angle (to the X axis or a line) and even distribution.
     const onCircle = pts.length ? this.curveOfPoint(pts[0]) : null;
     if (pts.length === 1 && onCircle && (n === 1 || (n === 2 && lines.length === 1))) {
       const [p] = pts, ref = lines[0] ?? null;
@@ -450,7 +450,7 @@ export class SketchEditor {
     }
   }
 
-  /** Avrunda/fasa hörnen och öppna måttet (radie resp. ben) för redigering. */
+  /** Fillet/chamfer the corners and open the dimension (radius or leg) for editing. */
   private cutCorners(kind: CornerKind, points: string[]) {
     const sk = this.sketch;
     const trial = cloneSketch(sk);
@@ -462,14 +462,14 @@ export class SketchEditor {
     this.onEditDimension?.(dim);
   }
 
-  /** Cirkeln/bågen som punkten sitter på (villkoret "på kurvan"); med only: bara just den. */
+  /** The circle/arc the point sits on (the "on curve" constraint); with only: just that one. */
   private curveOfPoint(p: string, only?: string): string | null {
     const sk = this.sketch;
     const c = sk.constraints.find(c => c.type === 'onCurve' && c.p === p && (!only || c.e === only) && sk.entities[c.e] && sk.entities[c.e].type !== 'line');
     return c ? (c as { e: string }).e : null;
   }
 
-  /** Radielinjen centrum → punkt (konstruktion): befintlig eller ny. Inne i en transaktion. */
+  /** The radius line center → point (construction): existing or new. Inside a transaction. */
   private radiusLine(p: string, e: string): string {
     const sk = this.sketch;
     const c = (sk.entities[e] as { c: string }).c;
@@ -480,7 +480,7 @@ export class SketchEditor {
     return id;
   }
 
-  /** Vinkel för en punkt på en cirkel: radien mot en linje, eller mot X-axeln. Öppnar måttet. */
+  /** Angle for a point on a circle: the radius against a line, or against the X axis. Opens the dimension. */
   private anglePoint(p: string, e: string, ref: string | null) {
     const sk = this.sketch;
     const L = (x: string) => {
@@ -503,8 +503,8 @@ export class SketchEditor {
   }
 
   /**
-   * Fördela punkter jämnt runt en cirkel (den första stannar kvar) och håll dem så med en
-   * konstruktionspolygon med lika sidor. Ett mått på ett avstånd eller en vinkel styr då alla.
+   * Distribute points evenly around a circle (the first stays) and keep them so with a construction
+   * polygon with equal sides. A dimension on one distance or angle then drives them all.
    */
   private distribute(e: string, pts: string[]) {
     const sk = this.sketch;
@@ -517,7 +517,7 @@ export class SketchEditor {
     const set = new Set(order);
     const ok = this.transact(
       () => {
-        // En tidigare fördelning av samma punkter ersätts.
+        // An earlier distribution of the same points is replaced.
         for (const [id, x] of Object.entries(sk.entities)) if (x.type === 'line' && x.construction && set.has(x.p1) && set.has(x.p2)) delete sk.entities[id];
         order.forEach((p, i) => Object.assign(sk.points[p], polar(c, circ.r, a0 + (TAU * i) / n)));
         const construction = (l: string) => ((sk.entities[l] as { construction?: boolean }).construction = true) && l;
@@ -544,7 +544,7 @@ export class SketchEditor {
     }
   }
 
-  /** Skapa ett mått för markeringen med nuvarande värde och öppna det för redigering. */
+  /** Create a dimension for the selection with the current value and open it for editing. */
   addDimension() {
     const sk = this.sketch;
     const sel = [...this.selection];
@@ -626,7 +626,7 @@ export class SketchEditor {
     }
   }
 
-  /** Vad blir värdet om måttet byter riktning/typ (för dialogen)? */
+  /** What would the value be if the dimension changed direction/type (for the dialog)? */
   previewDimension(id: string, opts: { dir?: 'aligned' | 'h' | 'v'; rd?: 'radius' | 'diameter' }): number | null {
     const c = this.sketch.constraints.find(x => x.id === id);
     if (!c) return null;
@@ -638,7 +638,7 @@ export class SketchEditor {
     return measure(this.sketch, c);
   }
 
-  /** Sätt ett mått (och ev. riktning/typ). Returnerar false om det inte gick (krock). */
+  /** Set a dimension (and possibly direction/type). Returns false if it failed (conflict). */
   setDimension(id: string, value: number, opts: { dir?: 'aligned' | 'h' | 'v'; rd?: 'radius' | 'diameter'; expr?: string } = {}): boolean {
     const sk = this.sketch;
     const idx = sk.constraints.findIndex(x => x.id === id);
@@ -672,7 +672,7 @@ export class SketchEditor {
           const sign = Math.sign(c.value) || Math.sign(signedAngle(L(c.e1), L(c.e2))) || 1;
           sk.constraints[idx] = { ...c, value: sign * abs, expr };
         } else if (c.type === 'xangle') {
-          // Samma sida om X-axeln som nu (vinkeln skrivs utan tecken).
+          // The same side of the X axis as now (the angle is written without a sign).
           const l = sk.entities[c.e] as { p1: string; p2: string };
           const sign = Math.sign(xAngle({ a: sk.points[l.p1], b: sk.points[l.p2] })) || 1;
           sk.constraints[idx] = { ...c, value: sign * value, expr };
@@ -682,9 +682,9 @@ export class SketchEditor {
     );
   }
 
-  // ---- Lösning och transaktioner ----------------------------------------------------
+  // ---- Solving and transactions -----------------------------------------------------
 
-  /** Lös utan att röra ångra-historiken (vid inladdning). */
+  /** Solve without touching the undo history (when loading). */
   private solveQuietly() {
     pruneConstraints(this.sketch);
     if (this.solver) {
@@ -696,8 +696,8 @@ export class SketchEditor {
   }
 
   /**
-   * Gör en ändring, lös och behåll den bara om villkoren håller.
-   * strict: även överflödiga (redundanta) villkor avvisas – för nya villkor/mått.
+   * Make a change, solve, and keep it only if the constraints hold. strict: redundant constraints
+   * are rejected too – for new constraints/dimensions.
    */
   private transact(fn: () => void, opts: { strict?: boolean; before?: string } = {}): boolean {
     const before = opts.before ?? JSON.stringify(this.sketch);
@@ -756,7 +756,7 @@ export class SketchEditor {
   }
 
   private restore(json: string) {
-    // Behåll objektet (det är featuren i dokumentet) men byt innehåll.
+    // Keep the object (it is the feature in the document) but replace its contents.
     Object.assign(this.sketch, JSON.parse(json) as SketchData);
     this.selection.clear();
     this.resetTool();
@@ -775,7 +775,7 @@ export class SketchEditor {
   }
 
   private recompute() {
-    // Släpp markeringar av sådant som inte längre finns (borttaget, sammanfogat, ångrat).
+    // Drop selections of things that no longer exist (removed, merged, undone).
     const sk = this.sketch;
     for (const k of [...this.selection]) {
       const id = k.slice(2);
@@ -787,7 +787,7 @@ export class SketchEditor {
     this.requestDraw();
   }
 
-  // ---- Koordinater ---------------------------------------------------------------
+  // ---- Coordinates ---------------------------------------------------------------
 
   private toScreen(p: Vec, v = this.view): Vec {
     return { x: (p.x - v.cx) * v.scale + this.w / 2, y: this.h / 2 - (p.y - v.cy) * v.scale };
@@ -796,19 +796,19 @@ export class SketchEditor {
     return { x: (s.x - this.w / 2) / v.scale + v.cx, y: (this.h / 2 - s.y) / v.scale + v.cy };
   }
 
-  /** Rutnätssteg (mm) så att rutorna blir minst ~14 px. */
+  /** Grid step (mm) so the cells are at least ~14 px. */
   private gridStep() {
     const steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
     return steps.find(s => s * this.view.scale >= 14) ?? 1000;
   }
 
-  // ---- Snäpp --------------------------------------------------------------------
+  // ---- Snapping -----------------------------------------------------------------
 
   private snapAt(screen: Vec, touch: boolean, exclude?: string): Snap {
     const tol = touch ? 22 : 10;
     const sk = this.sketch;
     const w = this.toWorld(screen);
-    // 1. Befintliga punkter och origo.
+    // 1. Existing points and the origin.
     let best: Snap | null = null;
     let bestD = tol;
     const consider = (id: string, p: Vec) => {
@@ -822,7 +822,7 @@ export class SketchEditor {
     consider(ORIGIN, { x: 0, y: 0 });
     for (const [id, p] of Object.entries(sk.points)) consider(id, p);
     if (best) return best;
-    // Modellens hörn och hålcentrum (ny punkt på samma ställe, inget villkor).
+    // The model's corners and hole centers (a new point at the same place, no constraint).
     for (const p of this.reference?.snaps ?? []) {
       const d = dist(this.toScreen(p), screen);
       if (d < bestD) {
@@ -832,7 +832,7 @@ export class SketchEditor {
     }
     if (best) return best;
 
-    // 2. Mittpunkter på linjer (lite mindre radie så att ändpunkterna vinner).
+    // 2. Midpoints of lines (a slightly smaller radius so the end points win).
     bestD = tol * 0.8;
     for (const [id, e] of Object.entries(sk.entities)) {
       if (e.type !== 'line' || e.p1 === exclude || e.p2 === exclude) continue;
@@ -845,7 +845,7 @@ export class SketchEditor {
     }
     if (best) return best;
 
-    // 3. Kurvor: projicera på närmaste.
+    // 3. Curves: project onto the nearest.
     const tolMm = (tol * 0.7) / this.view.scale;
     let bestC = tolMm;
     for (const [id, e] of Object.entries(sk.entities)) {
@@ -875,7 +875,7 @@ export class SketchEditor {
     }
     if (best) return best;
 
-    // Modellens kanter.
+    // The model's edges.
     for (const [a, b] of this.reference?.segments ?? []) {
       const dx = b.x - a.x, dy = b.y - a.y;
       const t = Math.max(0, Math.min(1, ((w.x - a.x) * dx + (w.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
@@ -888,7 +888,7 @@ export class SketchEditor {
     }
     if (best) return best;
 
-    // 4. Rutnät.
+    // 4. Grid.
     let x = w.x, y = w.y;
     let kind: Snap['kind'] = 'free';
     if (this.snapToGrid) {
@@ -897,7 +897,7 @@ export class SketchEditor {
       y = Math.round(y / g) * g;
       kind = 'grid';
     }
-    // 5. Vågrätt/lodrätt från föregående punkt (linje).
+    // 5. Horizontal/vertical from the previous point (line).
     const from = this.tool === 'line' ? this.placed[this.placed.length - 1] : undefined;
     if (from) {
       const hTol = (touch ? 14 : 8) / this.view.scale;
@@ -912,9 +912,9 @@ export class SketchEditor {
     return { x, y, kind };
   }
 
-  // ---- Skapa geometri -------------------------------------------------------------
+  // ---- Create geometry ------------------------------------------------------------
 
-  /** Punkt för ett snäpp: befintlig punkt, eller ny (med villkor om den fäst på en kurva/mittpunkt). */
+  /** Point for a snap: an existing point, or a new one (with a constraint if it attached to a curve/midpoint). */
   private pointFor(s: Snap): string {
     const sk = this.sketch;
     if (s.pointId) {
@@ -938,12 +938,12 @@ export class SketchEditor {
     return id;
   }
 
-  /** Antal sidor för polygonverktyget. */
+  /** Number of sides for the polygon tool. */
   polygonSides = 6;
 
   /**
-   * Regelbunden polygon: hörn på en konstruktionscirkel och lika långa sidor – då går den att
-   * måttsätta med cirkelns diameter (eller en sida) och vrida som en helhet.
+   * Regular polygon: corners on a construction circle and equal sides – then it can be dimensioned
+   * by the circle's diameter (or a side) and rotated as a whole.
    */
   private addPolygon(center: Snap, corner: Snap) {
     const sk = this.sketch;
@@ -961,8 +961,8 @@ export class SketchEditor {
   }
 
   /**
-   * Mittpunktsrektangel: vågräta/lodräta sidor och en diagonal (konstruktion) med centrum som
-   * mittpunkt – då förblir den centrerad när sidorna måttsätts.
+   * Center rectangle: horizontal/vertical sides and a diagonal (construction) with the center as
+   * its midpoint – then it stays centered when the sides are dimensioned.
    */
   private addCenterRect(center: Snap, corner: Snap) {
     const sk = this.sketch;
@@ -981,7 +981,7 @@ export class SketchEditor {
     sk.constraints.push({ id: newId(sk, 'c'), type: 'midpoint', p: c, e: diag, quiet: true });
   }
 
-  /** Avlångt hål: två halvcirkelbågar och två linjer, tangenta, lika radier, med en mittlinje (konstruktion). */
+  /** Slot: two half-circle arcs and two lines, tangent, equal radii, with a center line (construction). */
   private addSlot(a: Snap, b: Snap, r: number) {
     const sk = this.sketch;
     const L = dist(a, b);
@@ -990,7 +990,7 @@ export class SketchEditor {
     const at = (p: Vec, k: number): Snap => ({ x: p.x + n.x * r * k, y: p.y + n.y * r * k, kind: 'free' });
     const ca = this.pointFor(a), cb = this.pointFor(b);
     const aL = this.pointFor(at(a, 1)), aR = this.pointFor(at(a, -1)), bL = this.pointFor(at(b, 1)), bR = this.pointFor(at(b, -1));
-    // Bågarna går moturs: vid A från vänster till höger (bort från B), vid B tvärtom.
+    // The arcs go counterclockwise: at A from left to right (away from B), at B the other way.
     const arcA = newId(sk, 'e');
     sk.entities[arcA] = { type: 'arc', c: ca, p1: aL, p2: aR };
     const arcB = newId(sk, 'e');
@@ -1002,7 +1002,7 @@ export class SketchEditor {
     sk.constraints.push({ id: newId(sk, 'c'), type: 'equal', e1: arcA, e2: arcB, quiet: true });
   }
 
-  /** Placera en punkt i aktuellt verktyg. */
+  /** Place a point in the current tool. */
   private place(s: Snap) {
     const P = this.placed;
     const sk = this.sketch;
@@ -1026,7 +1026,7 @@ export class SketchEditor {
         }
         const prev = P[P.length - 1];
         if (same(prev, s)) {
-          if (P.length > 1) this.placed = []; // tryck på sista punkten igen → avsluta kedjan
+          if (P.length > 1) this.placed = []; // tap the last point again → finish the chain
           break;
         }
         let a = '', b = '';
@@ -1037,7 +1037,7 @@ export class SketchEditor {
         });
         if (!ok) break;
         P[P.length - 1] = { ...prev, ...sk.points[a], pointId: a, kind: 'point' };
-        if (s.pointId) this.placed = []; // fäste i befintlig punkt → kedjan klar
+        if (s.pointId) this.placed = []; // attached to an existing point → the chain is done
         else P.push({ ...s, ...sk.points[b], pointId: b, kind: 'point' });
         break;
       }
@@ -1157,7 +1157,7 @@ export class SketchEditor {
     this.changedState();
   }
 
-  /** Mittpunktsbåge: följ hur användaren sveper runt centrum för att välja riktning. */
+  /** Center arc: follow how the user sweeps around the center to choose the direction. */
   private trackArcSweep(s: Vec) {
     if (this.tool !== 'arcc' || this.placed.length !== 2) return;
     const a = angleOf(this.placed[0], s);
@@ -1168,20 +1168,22 @@ export class SketchEditor {
     this.arcLastAngle = a;
   }
 
-  // ---- Träffar (markering) ------------------------------------------------------------
+  // ---- Hits (selection) ---------------------------------------------------------------
 
   private hitTest(screen: Vec, touch: boolean): Hit | null {
-    // En punkt rakt under fingret går före etiketter och symboler som råkar ligga ovanpå.
+    // A point right under the finger takes precedence over labels and symbols that happen to lie on
+    // top.
     const close = touch ? 10 : 5;
     for (const [id, p] of Object.entries(this.sketch.points))
       if (dist(this.toScreen(p), screen) < close) return { type: 'point', id };
-    // Måttetiketter får lite marginal; villkorssymboler bara själva rutan (så att ett tryck på linjen väljer linjen).
+    // Dimension labels get a little margin; constraint symbols only the box itself (so a tap on the
+    // line selects the line).
     for (const h of [...this.hotspots].reverse()) {
       const pad = h.dim && touch ? 4 : 0;
       if (screen.x >= h.x - pad && screen.x <= h.x + h.w + pad && screen.y >= h.y - pad && screen.y <= h.y + h.h + pad)
         return { type: 'constraint', id: h.key.slice(2), dim: h.dim };
     }
-    // Det närmaste vinner; punkter får 6 px försprång så att ändpunkter är lätta att ta.
+    // The nearest wins; points get a 6 px head start so end points are easy to pick.
     const tol = touch ? 22 : 10;
     let bestP: Hit | null = null;
     let dP = tol;
@@ -1228,7 +1230,7 @@ export class SketchEditor {
       const touch = e.pointerType !== 'mouse';
 
       if (this.pointers.size === 2) {
-        // Två fingrar: avbryt pågående tryck/drag och börja nypa.
+        // Two fingers: cancel the running tap/drag and start pinching.
         this.cancelDrag();
         const [a, b] = [...this.pointers.values()];
         const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
@@ -1266,7 +1268,7 @@ export class SketchEditor {
         const [a, b] = [...this.pointers.values()];
         const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         this.view.scale = clamp((g.s0 * dist(a, b)) / g.d0, 0.05, 2000);
-        // Håll världspunkten under fingrarnas mittpunkt.
+        // Keep the world point under the fingers' midpoint.
         const w = this.toWorld(mid);
         this.view.cx += g.world0.x - w.x;
         this.view.cy += g.world0.y - w.y;
@@ -1282,7 +1284,7 @@ export class SketchEditor {
       }
       if (g.kind === 'press') {
         if (!g.moved && dist(p, g.down) > (g.touch ? 10 : 4)) g.moved = true;
-        // Dra från första punkten: placera den direkt när draget börjar.
+        // Drag from the first point: place it as soon as the drag starts.
         if (g.moved && !g.startedDrag && this.placed.length === 0) {
           g.startedDrag = true;
           this.place(g.downSnap);
@@ -1312,7 +1314,7 @@ export class SketchEditor {
         this.requestDraw();
         return;
       }
-      // Mus utan knapp: förhandsvisa.
+      // Mouse without a button: preview.
       if (!touch && g.kind === 'none' && this.tool !== 'select') {
         this.cursor = this.snapAt(p, false);
         this.trackArcSweep(this.cursor);
@@ -1372,15 +1374,15 @@ export class SketchEditor {
   }
 
   /**
-   * Tryck på modellens kant (skissa på en yta): lägg in kanten som låst konstruktionslinje så att
-   * den går att måttsätta mot. Hörnen delas med redan inlagda kanter.
+   * Tap on the model's edge (sketch on a face): add the edge as a locked construction line so it
+   * can be dimensioned against. The corners are shared with edges already added.
    */
   private useReferenceEdge(screen: Vec, touch: boolean): Hit | null {
     const segs = this.reference?.segments;
     if (!segs?.length) return null;
     const w = this.toWorld(screen);
     let best: [Vec, Vec] | null = null;
-    let bestD = (touch ? 14 : 8) / this.view.scale; // snävt: ett tryck bredvid ska fortfarande avmarkera
+    let bestD = (touch ? 14 : 8) / this.view.scale; // tight: a tap next to it should still deselect
     for (const s of segs) {
       const d = distToSegment(w, s[0], s[1]);
       if (d < bestD) {
@@ -1414,7 +1416,7 @@ export class SketchEditor {
     if (!hit) this.selection.clear();
     else {
       const key = `${hit.type === 'point' ? 'p' : hit.type === 'entity' ? 'e' : 'c'}:${hit.id}`;
-      // Ett mått öppnas direkt för redigering.
+      // A dimension opens for editing right away.
       if (hit.type === 'constraint' && hit.dim) {
         this.selection.clear();
         this.changedState();
@@ -1427,7 +1429,7 @@ export class SketchEditor {
     this.changedState();
   }
 
-  // ---- Dra geometri ----------------------------------------------------------------------
+  // ---- Drag geometry ---------------------------------------------------------------------
 
   private startDrag(hit: Hit, downScreen: Vec) {
     const sk = this.sketch;
@@ -1453,7 +1455,7 @@ export class SketchEditor {
       else target = { points: [...d.startPts].filter(([id]) => id !== ORIGIN).map(([id, p]) => ({ id, x: p.x + delta.x, y: p.y + delta.y })) };
     }
     if (this.solver) {
-      this.solver.solve(sk, target); // misslyckas det står geometrin kvar
+      this.solver.solve(sk, target); // if it fails the geometry stays
     } else {
       for (const t of target.points ?? []) Object.assign(sk.points[t.id], { x: t.x, y: t.y });
       if (target.radius) {
@@ -1471,7 +1473,7 @@ export class SketchEditor {
     this.cursor = null;
     if (!d) return;
     const sk = this.sketch;
-    // Släppt på en punkt: slå ihop. Släppt på en kurva: lägg punkten på kurvan.
+    // Dropped on a point: merge. Dropped on a curve: put the point on the curve.
     this.transact(
       () => {
         if (d.hit.type !== 'point') return;
@@ -1495,7 +1497,7 @@ export class SketchEditor {
     this.recompute();
   }
 
-  // ---- Rita ----------------------------------------------------------------------------
+  // ---- Draw ----------------------------------------------------------------------------
 
   private resize() {
     const r = this.canvas.parentElement!.getBoundingClientRect();
@@ -1530,7 +1532,7 @@ export class SketchEditor {
   }
 
   private isFree(kind: 'p' | 'e', id: string): boolean {
-    if (!this.free) return true; // utan lösare vet vi inte
+    if (!this.free) return true; // without a solver we do not know
     if (kind === 'p') return this.free.points.has(id);
     const e = this.sketch.entities[id];
     if (!e) return false;
@@ -1538,12 +1540,12 @@ export class SketchEditor {
     return entityPointIds(e).some(p => this.free!.points.has(p));
   }
 
-  /** Rita rutnät, regioner, kurvor, villkor och förhandsvisning med vyn `v`. */
+  /** Draw the grid, regions, curves, constraints and preview with the view `v`. */
   private drawScene(ctx: CanvasRenderingContext2D, v: View, annotations: boolean): Hotspot[] {
     const S = (p: Vec) => this.toScreen(p, v);
     const sk = this.sketch;
 
-    // Rutnät (samma steg som snäppet, även i förstoringsglaset)
+    // Grid (the same step as snapping, also in the magnifier)
     const g = this.gridStep();
     const tl = this.toWorld({ x: 0, y: 0 }, v), br = this.toWorld({ x: this.w, y: this.h }, v);
     const lines = (step: number, color: string) => {
@@ -1577,7 +1579,7 @@ export class SketchEditor {
     ctx.lineTo(o.x, this.h);
     ctx.stroke();
 
-    // Modellens kanter i planet (skissa på en yta).
+    // The model's edges in the plane (sketch on a face).
     if (this.reference?.segments.length) {
       ctx.beginPath();
       for (const [a, b] of this.reference.segments) {
@@ -1591,7 +1593,7 @@ export class SketchEditor {
       ctx.stroke();
     }
 
-    // Regioner (material) fylls; hål lämnas tomma.
+    // Regions (material) are filled; holes are left empty.
     ctx.fillStyle = this.C.region;
     this.loops.forEach((l, i) => {
       if (l.depth % 2) return;
@@ -1607,7 +1609,7 @@ export class SketchEditor {
       ctx.fill(path, 'evenodd');
     });
 
-    // Kurvor: blå = kan röra sig, svart = fullt bestämd.
+    // Curves: blue = can move, black = fully defined.
     for (const [id, e] of Object.entries(sk.entities)) {
       const sel = this.selection.has(`e:${id}`);
       ctx.strokeStyle = sel ? this.C.selected : e.construction ? this.C.construction : this.isFree('e', id) ? this.C.free : this.C.defined;
@@ -1624,14 +1626,14 @@ export class SketchEditor {
       } else {
         const ag = arcGeom(sk, e);
         const c = S(ag.c);
-        // Skärmens y är nedåt: moturs i världen = medurs på skärmen.
+        // The screen's y points down: counterclockwise in the world = clockwise on the screen.
         ctx.arc(c.x, c.y, ag.r * v.scale, -ag.a0, -(ag.a0 + ag.sweep), true);
       }
       ctx.stroke();
     }
     ctx.setLineDash([]);
 
-    // Punkter
+    // Points
     for (const [id, p] of Object.entries(sk.points)) {
       const s = S(p);
       const sel = this.selection.has(`p:${id}`);
@@ -1646,7 +1648,7 @@ export class SketchEditor {
         ctx.arc(s.x, s.y, 6.5, 0, TAU);
         ctx.stroke();
       }
-      // Öppen ände (rött): kurvan hänger inte ihop med något i den änden.
+      // Open end (red): the curve is not connected to anything at that end.
       if (this.degrees.get(id) === 1) {
         ctx.strokeStyle = this.C.open;
         ctx.lineWidth = 2;
@@ -1655,14 +1657,14 @@ export class SketchEditor {
         ctx.stroke();
       }
     }
-    // Origo
+    // Origin
     ctx.strokeStyle = this.C.defined;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(o.x, o.y, 5, 0, TAU);
     ctx.stroke();
 
-    // Mått och villkorssymboler
+    // Dimensions and constraint symbols
     const spots: Hotspot[] = [];
     if (annotations) {
       const colorFor = (key: string) => (this.flash.has(key) ? this.C.conflict : this.selection.has(key) ? this.C.selected : this.C.dim);
@@ -1672,7 +1674,8 @@ export class SketchEditor {
         const h = drawDimension(ctx, sk, c, S, colorFor(key), this.C.label);
         if (h) spots.push(h);
       }
-      // Verktygens egna villkor (polygon, slits) visas bara när något av formen är markerat.
+      // The tools' own constraints (polygon, slot) are only shown when part of the shape is
+      // selected.
       const visible = (c: Constraint) => {
         if (!c.quiet || this.selection.has(`c:${c.id}`)) return true;
         const r = constraintRefs(c);
@@ -1739,8 +1742,9 @@ export class SketchEditor {
             const b = P[1];
             const r = slotRadius(a, b, cur) * v.scale;
             const p = S(a), q = S(b);
-            const ang = Math.atan2(-(q.y - p.y), q.x - p.x); // skärmens y är nedåt
-            // Moturs i skissen = medurs på skärmen: halvcirkel runt A bort från B och runt B bort från A.
+            const ang = Math.atan2(-(q.y - p.y), q.x - p.x); // the screen's y points down
+            // Counterclockwise in the sketch = clockwise on the screen: a half circle around A away
+            // from B and around B away from A.
             ctx.arc(p.x, p.y, r, -ang - Math.PI / 2, -ang + Math.PI / 2, true);
             ctx.arc(q.x, q.y, r, -ang + Math.PI / 2, -ang - Math.PI / 2, true);
             ctx.closePath();
@@ -1788,7 +1792,7 @@ export class SketchEditor {
     }
     ctx.stroke();
     ctx.setLineDash([]);
-    // Placerade punkter i pågående operation
+    // Placed points in the running operation
     for (const p of P) {
       const s = S(p);
       ctx.fillStyle = this.C.preview;
@@ -1796,7 +1800,7 @@ export class SketchEditor {
       ctx.arc(s.x, s.y, 4, 0, TAU);
       ctx.fill();
     }
-    // Snäppmarkör
+    // Snap marker
     if (cur) {
       const s = S(cur);
       ctx.strokeStyle = this.C.snap;
@@ -1819,7 +1823,7 @@ export class SketchEditor {
     }
   }
 
-  /** Mått och snäpptyp vid markören. */
+  /** Dimension and snap type at the marker. */
   private drawOverlay(ctx: CanvasRenderingContext2D) {
     const cur = this.cursor;
     if (!cur) return;
@@ -1845,7 +1849,7 @@ export class SketchEditor {
     if (cur.kind === 'curve') text += ` · ${t('snap.onCurve')}`;
     if (cur.kind === 'ref' || cur.kind === 'refEdge') text += ` · ${t('snap.model')}`;
     const s = this.toScreen(cur);
-    // Med finger: lägg texten under förstoringsglaset (fingret skymmer annars).
+    // With a finger: put the text below the magnifier (the finger hides it otherwise).
     let x = s.x + 14, y = s.y + 26;
     if (this.fingerScreen) {
       x = this.fingerScreen.x - 60;
@@ -1869,7 +1873,7 @@ export class SketchEditor {
   private loupeCenter(): Vec {
     const f = this.fingerScreen!;
     const R = 62;
-    // Ovanför fingret; om det inte får plats, till vänster/höger.
+    // Above the finger; if it does not fit, to the left/right.
     let x = f.x, y = f.y - 115;
     if (y - R < 4) {
       y = clamp(f.y, R + 4, this.h - R - 4);
@@ -1882,7 +1886,7 @@ export class SketchEditor {
     const R = 62, Z = 3;
     const c = this.loupeCenter();
     const target = this.cursor ?? this.toWorld(this.fingerScreen!);
-    // Vy där målpunkten hamnar mitt i glaset.
+    // View where the target point lands in the middle of the glass.
     const v: View = { scale: this.view.scale * Z, cx: 0, cy: 0 };
     v.cx = target.x - (c.x - this.w / 2) / v.scale;
     v.cy = target.y + (c.y - this.h / 2) / v.scale;

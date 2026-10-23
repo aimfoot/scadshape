@@ -1,4 +1,4 @@
-// Skisskurvor som 3D-polylinjer (för att visa skisser i 3D-vyn), på planet inkl. förskjutning.
+// Sketch curves as 3D polylines (to show sketches in the 3D view), on the plane incl. offset.
 
 import type { SketchFeature } from './doc';
 import { sketchFrame, toWorld, type Frame } from './frame';

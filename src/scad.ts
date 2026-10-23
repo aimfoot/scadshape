@@ -1,4 +1,4 @@
-// Klient för OpenSCAD-workern: render(src) → Promise med mesh-data och logg.
+// Client for the OpenSCAD worker: render(src) → Promise with mesh data and log.
 
 import { fontsFor } from './fonts';
 import { librariesFor } from './libs';
@@ -6,7 +6,7 @@ import { getBlob, importPath, importsIn } from './blobs';
 
 export type ExportFormat = 'binstl' | 'off' | '3mf' | 'csg' | 'svg';
 
-/** Utfilens ändelse för ett format. */
+/** The output file's extension for a format. */
 export const EXT: Record<ExportFormat, string> = { binstl: 'stl', off: 'off', '3mf': '3mf', csg: 'csg', svg: 'svg' };
 
 export type WorkerRequest =
@@ -29,7 +29,7 @@ export type WorkerMessage =
 
 export class RenderCancelled extends Error {
   constructor() {
-    super('Renderingen avbröts');
+    super('The rendering was cancelled');
   }
 }
 
@@ -37,7 +37,7 @@ export class ScadEngine {
   private worker!: Worker;
   private seq = 0;
   private pending = new Map<number, { resolve: (r: RenderResult) => void; reject: (e: Error) => void }>();
-  /** Tid för att hämta och kompilera wasm (ms), när motorn är klar. */
+  /** Time to fetch and compile the wasm (ms), once the engine is ready. */
   loadMs: number | null = null;
   onLoaded?: (ms: number) => void;
   onFatal?: (error: string) => void;
@@ -63,14 +63,14 @@ export class ScadEngine {
       }
     };
     this.worker.onerror = ev => {
-      const msg = ev.message || 'Workern kraschade';
+      const msg = ev.message || 'The worker crashed';
       this.onFatal?.(msg);
       this.restart(new Error(msg));
     };
     this.worker.postMessage({ type: 'load' } satisfies WorkerRequest);
   }
 
-  /** Döda workern, låt väntande renderingar misslyckas med `reason` och starta en ny. */
+  /** Kill the worker, let pending renderings fail with `reason` and start a new one. */
   private restart(reason: Error) {
     this.worker.terminate();
     for (const p of this.pending.values()) p.reject(reason);
@@ -82,19 +82,19 @@ export class ScadEngine {
     return this.pending.size > 0;
   }
 
-  /** Rendera; efter `timeoutMs` (om satt) startas workern om och löftet avvisas. */
+  /** Render; after `timeoutMs` (if set) the worker is restarted and the promise rejected. */
   render(src: string, format: ExportFormat = 'binstl', files?: Record<string, string | Uint8Array>, timeoutMs?: number): Promise<RenderResult> {
     const id = ++this.seq;
     return new Promise((resolve, reject) => {
       const timer = timeoutMs
-        ? setTimeout(() => this.pending.has(id) && this.restart(new Error(`Inget svar på ${Math.round(timeoutMs / 1000)} s`)), timeoutMs)
+        ? setTimeout(() => this.pending.has(id) && this.restart(new Error(`No answer in ${Math.round(timeoutMs / 1000)} s`)), timeoutMs)
         : undefined;
       const done = () => clearTimeout(timer);
       this.pending.set(id, { resolve: r => (done(), resolve(r)), reject: e => (done(), reject(e)) });
-      // Importerade STL-filer (blobs.ts) skrivs till /imports/ i motorns filsystem.
+      // Imported STL files (blobs.ts) are written to /imports/ in the engine's file system.
       importedFiles(src).then(
         imported => {
-          if (!this.pending.has(id)) return; // avbruten medan filerna lästes
+          if (!this.pending.has(id)) return; // cancelled while the files were being read
           this.worker.postMessage({ type: 'render', id, src, format, files: { ...files, ...imported }, fonts: fontsFor(src), libs: librariesFor(src) } satisfies WorkerRequest);
         },
         e => {
@@ -106,7 +106,7 @@ export class ScadEngine {
     });
   }
 
-  /** Avbryt pågående rendering(ar): workern dödas och startas om. */
+  /** Cancel the running rendering(s): the worker is killed and restarted. */
   cancel() {
     this.restart(new RenderCancelled());
   }
@@ -121,7 +121,7 @@ async function importedFiles(src: string): Promise<Record<string, Uint8Array>> {
   return out;
 }
 
-/** Plocka ut ERROR/WARNING-rader ur OpenSCADs logg. */
+/** Pick out ERROR/WARNING lines from OpenSCAD's log. */
 export function logProblems(log: string[]) {
   return log.filter(l => /^(ERROR|WARNING|TRACE)|Parser error|syntax error|abort/i.test(l));
 }

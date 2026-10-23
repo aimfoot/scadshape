@@ -1,5 +1,6 @@
-// Extruderad yta: en rund yta (cylindermantel, avrundning, kon …) förtjockas utåt eller skärs in
-// längs sina egna normaler. Ytan är en kopia av modellens facetter när den valdes (ingen skiss).
+// Extruded face: a round surface (cylinder wall, fillet, cone …) is thickened outwards or cut in
+// along its own normals. The surface is a copy of the model's facets when it was chosen (no
+// sketch).
 
 import { resolveCurveRef, type CurveRef } from '../faceref';
 import { t } from '../i18n';
@@ -8,10 +9,10 @@ import { FieldReader, num, OP_LABEL, type FeatureBase, type FeatureKind } from '
 
 export interface SurfaceFeature extends FeatureBase {
   type: 'surface';
-  sketch: ''; // ingen skiss
-  /** Ytans trianglar i världen, 9 tal per triangel (utåtriktade): används om ref saknas eller inte går att lösa. */
+  sketch: ''; // no sketch
+  /** The surface's triangles in the world, 9 numbers per triangle (facing outwards): used if ref is missing or cannot be resolved. */
   tris: number[];
-  /** Sidan på en extruderad cirkel/båge: ytan byggs om ur den och följer dess mått. */
+  /** The side of an extruded circle/arc: the surface is rebuilt from it and follows its dimensions. */
   ref?: CurveRef;
   depth: string;
   op: 'add' | 'remove';
@@ -20,8 +21,9 @@ export interface SurfaceFeature extends FeatureBase {
 type V3 = [number, number, number];
 
 /**
- * Sluten kropp mellan ytan och en kopia förskjuten längs hörnens normaler: utåt `out` mm och
- * inåt `inn` mm. Sidorna följer ytans kant. Som OpenSCAD-polyhedron (medurs sett utifrån).
+ * Closed body between the surface and a copy offset along the vertex normals: `out` mm outwards and
+ * `inn` mm inwards. The sides follow the surface's edge. As an OpenSCAD polyhedron (clockwise seen
+ * from outside).
  */
 export function thickenScad(tris: number[], out: number, inn: number): string {
   const idx = new Map<string, number>();
@@ -44,7 +46,7 @@ export function thickenScad(tris: number[], out: number, inn: number): string {
     const f = q.map(vi) as [number, number, number];
     if (f[0] === f[1] || f[1] === f[2] || f[0] === f[2]) continue;
     const u = q[1].map((v, i) => v - q[0][i]), w = q[2].map((v, i) => v - q[0][i]);
-    const n: V3 = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]; // längd = 2·area: viktat
+    const n: V3 = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]; // length = 2·area: weighted
     for (const i of f) for (let a = 0; a < 3; a++) normals[i][a] += n[a];
     faces.push(f);
   }
@@ -55,14 +57,14 @@ export function thickenScad(tris: number[], out: number, inn: number): string {
   });
   const at = (i: number, d: number) => `[${pts[i].map((v, a) => num(v + unitN[i][a] * d)).join(', ')}]`;
   const points = [...pts.map((_, i) => at(i, out)), ...pts.map((_, i) => at(i, -inn))];
-  // Utsidan (moturs sett utifrån i STL:en) → OpenSCAD vill ha medurs: vänd.
+  // The outside (counterclockwise seen from outside in the STL) → OpenSCAD wants clockwise: flip.
   const poly: number[][] = [];
   const directed = new Set(faces.flatMap(([a, b, c]) => [`${a}>${b}`, `${b}>${c}`, `${c}>${a}`]));
   for (const [a, b, c] of faces) {
-    poly.push([a, c, b]); // ovansidan
-    poly.push([a + N, b + N, c + N]); // undersidan (vänd utåt nedåt)
+    poly.push([a, c, b]); // the top side
+    poly.push([a + N, b + N, c + N]); // the underside (flipped to face outwards)
     for (const [p, q] of [[a, b], [b, c], [c, a]])
-      if (!directed.has(`${q}>${p}`)) poly.push([p, q, q + N, p + N]); // kant: sidovägg
+      if (!directed.has(`${q}>${p}`)) poly.push([p, q, q + N, p + N]); // edge: side wall
   }
   return `polyhedron(points = [${points.join(', ')}], faces = [${poly.map(f => `[${f.join(', ')}]`).join(', ')}], convexity = 10);`;
 }
@@ -96,9 +98,10 @@ export const surface: FeatureKind<SurfaceFeature> = {
     if (r.error) return { error: r.error };
     const side = f.ref && ctx.doc ? resolveCurveRef(ctx.doc, f.ref, ctx.vars, f.id) : null;
     if (side) {
-      // En ring (eller ringsektor för en båge) kring cirkelns centrum, lika hög som extruderingen.
-      // Samma $fn som skissens cirkel och 0,02 mm marginal: överlappar sidan rent (cirkeln avviker högst 0,01).
-      const out = f.op === 'add' !== f.ref!.inside; // växer utåt från centrum
+      // A ring (or ring sector for an arc) around the circle's center, as tall as the extrude. The
+      // same $fn as the sketch circle and a 0.02 mm margin: overlaps the side cleanly (the circle
+      // deviates at most 0.01).
+      const out = f.op === 'add' !== f.ref!.inside; // grows outwards from the center
       const m = 0.02;
       const [rin, rout] = out ? [side.r - m, side.r + d.v] : [side.r - d.v, side.r + m];
       if (!(rin > 0)) return { error: t('err.surfaceTooDeep') };
@@ -109,7 +112,7 @@ export const surface: FeatureKind<SurfaceFeature> = {
       return { code: `module ${ctx.module}() {\n  ${ctx.place(side.sketch)}${body}\n}`, tools: [{ op: f.op, call: `${ctx.module}();` }] };
     }
     if (!f.tris.length) return { error: t('err.noSurface') };
-    // En hundradels överlapp mot kroppen så att det smälter ihop (lägg till) eller skär rent (ta bort).
+    // A hundredth of overlap with the body so it fuses (add) or cuts cleanly (remove).
     const body = f.op === 'add' ? thickenScad(f.tris, d.v, 0.01) : thickenScad(f.tris, 0.01, d.v);
     return { code: `module ${ctx.module}() {\n  ${body}\n}`, tools: [{ op: f.op, call: `${ctx.module}();` }] };
   },

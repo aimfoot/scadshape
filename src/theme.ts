@@ -1,5 +1,5 @@
-// Ljust/mörkt tema: valet (auto = som telefonen) sparas; det lösta temat sätts som
-// data-theme på <html> (CSS-variablerna i style.css) och meddelas canvas/3D-vyn.
+// Light/dark theme: the choice (auto = like the phone) is saved; the resolved theme is set as
+// data-theme on <html> (the CSS variables in style.css) and announced to the canvas/3D view.
 
 export type ThemeChoice = 'auto' | 'light' | 'dark';
 export type Theme = 'light' | 'dark';
@@ -13,7 +13,7 @@ export function themeChoice(): ThemeChoice {
     const v = localStorage.getItem(KEY);
     if (v === 'light' || v === 'dark') return v;
   } catch {
-    /* blockerad lagring */
+    /* blocked storage */
   }
   return 'auto';
 }
@@ -23,7 +23,7 @@ export const currentTheme = (): Theme => {
   return c === 'auto' ? (media?.matches ? 'dark' : 'light') : c;
 };
 
-/** Statusradens färg i webbläsaren (samma som verktygsraden). */
+/** The browser's status bar color (the same as the toolbar). */
 const BAR: Record<Theme, string> = { light: '#ffffff', dark: '#1b2229' };
 
 export function applyTheme() {
@@ -38,7 +38,7 @@ export function setThemeChoice(c: ThemeChoice) {
     if (c === 'auto') localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, c);
   } catch {
-    /* blockerad lagring: gäller bara den här sessionen */
+    /* blocked storage: only applies to this session */
   }
   applyTheme();
 }

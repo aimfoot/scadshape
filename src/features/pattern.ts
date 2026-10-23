@@ -1,6 +1,6 @@
-// Upprepa: varje feature kan upprepas linjärt, i rutnät, runt en axel eller speglas.
-// Egenskaperna ligger direkt på featuren (rep*) så att panelen visar dem som vanliga fält;
-// model3d.ts lägger mönstret runt featurens verktyg (lägg till/ta bort/snitt).
+// Repeat: every feature can be repeated linearly, in a grid, around an axis or mirrored. The
+// properties live directly on the feature (rep*) so the panel shows them as ordinary fields;
+// model3d.ts wraps the pattern around the feature's tool (add/remove/intersect).
 
 import { t } from '../i18n';
 import { FieldReader, num, type BuildCtx, type Field, type FieldCtx, type SketchFeature, type Tool } from './common';
@@ -11,16 +11,16 @@ export type Axis = 'x' | 'y' | 'z';
 
 export interface Repeat {
   rep?: RepKind;
-  repAxis?: Axis; // linjärt/rutnät: första riktningen
-  repRotAxis?: Axis | 'circle'; // runt axel: rotationsaxeln (genom origo) eller en cirkels centrum
-  repCircle?: string; // runt cirkel: "skiss-id/entitets-id" (cirkel eller båge i en tidigare skiss)
+  repAxis?: Axis; // linear/grid: the first direction
+  repRotAxis?: Axis | 'circle'; // around axis: the rotation axis (through the origin) or a circle's center
+  repCircle?: string; // around circle: "sketch id/entity id" (circle or arc in an earlier sketch)
   repCount?: string;
-  repSpacing?: string; // mm (negativt = åt andra hållet)
-  repAxis2?: Axis; // rutnät: andra riktningen
+  repSpacing?: string; // mm (negative = the other way)
+  repAxis2?: Axis; // grid: the second direction
   repCount2?: string;
   repSpacing2?: string;
-  repAngle?: string; // cirkulärt: total vinkel (360 = jämnt runt)
-  repPlane?: 'yz' | 'xz' | 'xy'; // spegla: planet genom origo
+  repAngle?: string; // circular: total angle (360 = evenly around)
+  repPlane?: 'yz' | 'xz' | 'xy'; // mirror: the plane through the origin
 }
 
 const AXIS_VEC: Record<Axis, string> = { x: '[1, 0, 0]', y: '[0, 1, 0]', z: '[0, 0, 1]' };
@@ -35,13 +35,13 @@ const axisChoice = (key: 'repAxis' | 'repAxis2' | 'repRotAxis'): Field<Repeat> =
     { value: 'z', label: 'rep.z' },
   ],
 });
-/** Axel genom en cirkels centrum, längs skissplanets normal (i världen). */
+/** Axis through a circle's center, along the sketch plane's normal (in the world). */
 export interface CircleAxis {
   c: V3;
   n: V3;
 }
 
-/** Cirklar och bågar i skisserna före featuren – kandidater för "runt cirkel". */
+/** Circles and arcs in the sketches before the feature – candidates for "around circle". */
 export function repeatCircles(ctx: FieldCtx): { value: string; label: string }[] {
   const out: { value: string; label: string }[] = [];
   for (const f of ctx.doc.features.slice(0, ctx.before)) {
@@ -58,7 +58,7 @@ export function repeatCircles(ctx: FieldCtx): { value: string; label: string }[]
 
 const when = (...kinds: RepKind[]) => (f: Repeat) => kinds.includes(f.rep ?? 'none');
 
-/** Fälten i panelens "Upprepa"-del (gemensamma för alla features). */
+/** The fields in the panel's "Repeat" section (shared by all features). */
 export const REPEAT_FIELDS: Field<Repeat>[] = [
   { kind: 'heading', label: 'rep.title' },
   {
@@ -114,7 +114,7 @@ export const REPEAT_FIELDS: Field<Repeat>[] = [
   },
 ];
 
-/** Standardvärden när man väljer ett mönster första gången. */
+/** Default values when a pattern is chosen for the first time. */
 export function repeatDefaults(f: Repeat) {
   f.repAxis ??= 'x';
   f.repCount ??= '3';
@@ -127,7 +127,7 @@ export function repeatDefaults(f: Repeat) {
   f.repRotAxis ??= 'z';
 }
 
-/** Kort text för trädet ("× 4", "speglad"). */
+/** Short text for the tree ("× 4", "mirrored"). */
 export function repeatDetail(f: Repeat): string {
   switch (f.rep ?? 'none') {
     case 'none':
@@ -141,7 +141,7 @@ export function repeatDetail(f: Repeat): string {
   }
 }
 
-/** Lägg mönstret runt verktygen; fel om värdena är ogiltiga. */
+/** Wrap the pattern around the tools; an error if the values are invalid. */
 export function applyRepeat(
   f: Repeat,
   tools: Tool[],
@@ -154,7 +154,7 @@ export function applyRepeat(
   const count = (src: string | undefined) => r.read(t('rep.count'), src ?? '', v => Number.isInteger(v) && v >= 1 && v <= 500, t('err.count'));
   let wrap: (call: string) => string;
   if (kind === 'mirror') {
-    // En spegling vänder gängornas riktning – det blir vänstergänga.
+    // A mirror reverses the threads' direction – they would become left-handed.
     if (/twist/.test(code)) return { error: t('err.mirrorThread') };
     const n = PLANE_NORMAL[f.repPlane ?? 'yz'];
     wrap = call => `union() {\n  ${call}\n  mirror(${n}) ${call}\n}`;
@@ -162,7 +162,7 @@ export function applyRepeat(
     const n = count(f.repCount);
     const ang = r.read(t('rep.angle'), f.repAngle ?? '360', v => v > 0 && v <= 360, t('err.angle360'));
     if (r.error) return { error: r.error };
-    // Hela varvet: n jämnt fördelade; annars första och sista på vinkelns ändar.
+    // A full turn: n evenly spaced; otherwise the first and last at the ends of the angle.
     const step = Math.abs(ang.v - 360) < 1e-9 ? `${ang.code} / ${n.code}` : n.v > 1 ? `${ang.code} / (${n.code} - 1)` : '0';
     if (f.repRotAxis === 'circle') {
       const ax = f.repCircle ? ctx.circleAxis?.(f.repCircle) : null;

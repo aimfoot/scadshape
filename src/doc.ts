@@ -1,5 +1,6 @@
-// Dokumentet: features i ordning (skisser och features som bygger på dem), variabler och rollback.
-// OpenSCAD-koden genereras ur det (model3d.ts); varje feature-typ beskrivs i features/.
+// The document: features in order (sketches and the features built on them), variables and
+// rollback. The OpenSCAD code is generated from it (model3d.ts); each feature type is described in
+// features/.
 
 import { t } from './i18n';
 import type { Param } from './params';
@@ -17,7 +18,7 @@ export interface Doc {
   v: 2;
   features: Feature[];
   params: Param[];
-  /** Antal features som byggs (rollback-markören); null = alla. */
+  /** Number of features that are built (the rollback marker); null = all. */
   rollback: number | null;
 }
 
@@ -25,7 +26,7 @@ export const emptyDoc = (): Doc => ({ v: 2, features: [], params: [], rollback: 
 
 const typeLabel = (type: Feature['type']) => t(type === 'sketch' ? 'feat.sketch' : KINDS[type].label);
 
-/** "Extrudera 1", "Extrudera 2" … (på aktuellt språk). */
+/** "Extrude 1", "Extrude 2" … (in the current language). */
 export function uniqueName(doc: Doc, type: Feature['type']) {
   const base = typeLabel(type);
   let n = 1;
@@ -33,7 +34,7 @@ export function uniqueName(doc: Doc, type: Feature['type']) {
   return `${base} ${n}`;
 }
 
-/** Byt standardnamn ("Skiss 3" ↔ "Sketch 3") till aktuellt språk; egna namn lämnas orörda. */
+/** Change default names ("Skiss 3" ↔ "Sketch 3") to the current language; custom names are left alone. */
 export function localizeDefaultNames(doc: Doc, labelsInAllLangs: (type: Feature['type']) => string[]) {
   for (const f of doc.features) {
     const m = /^(.+) (\d+)$/.exec(f.name);
@@ -49,7 +50,7 @@ export function newSketch(doc: Doc, plane: Plane): SketchFeature {
   return { type: 'sketch', id: newFeatureId(), name: uniqueName(doc, 'sketch'), plane, ...emptySketch() };
 }
 
-/** Ny feature av en typ, med standardvärden för skissen. */
+/** New feature of a type, with default values for the sketch. */
 export function newFeature<T extends SolidFeature['type']>(doc: Doc, type: T, sketch: SketchFeature): Extract<SolidFeature, { type: T }> {
   return KINDS[type].create(newFeatureId(), uniqueName(doc, type), sketch as SketchFeature) as Extract<SolidFeature, { type: T }>;
 }
@@ -59,10 +60,10 @@ export const newExtrude = (doc: Doc, sketch: string): ExtrudeFeature => newFeatu
 export const newRevolve = (doc: Doc, sketch: string): RevolveFeature => newFeature(doc, 'revolve', sketchById(doc, sketch));
 export const newHole = (doc: Doc, sketch: string): HoleFeature => newFeature(doc, 'hole', sketchById(doc, sketch));
 
-/** Antal features som är aktiva (före rollback-markören). */
+/** Number of active features (before the rollback marker). */
 export const activeCount = (doc: Doc) => (doc.rollback === null ? doc.features.length : Math.min(doc.rollback, doc.features.length));
 
-/** Lägg in en feature vid rollback-markören (eller sist) och flytta markören förbi den. */
+/** Insert a feature at the rollback marker (or last) and move the marker past it. */
 export function insertFeature(doc: Doc, f: Feature) {
   const at = activeCount(doc);
   doc.features.splice(at, 0, f);
@@ -75,20 +76,20 @@ export function removeFeature(doc: Doc, f: Feature) {
   if (i < 0) return;
   doc.features.splice(i, 1);
   if (doc.rollback !== null && i < doc.rollback) doc.rollback--;
-  // Features som byggde på en borttagen skiss tas också bort.
+  // Features that were built on a removed sketch are removed too.
   if (f.type === 'sketch') for (const g of dependents(doc, f.id)) removeFeature(doc, g);
 }
 
-/** Features som använder skissen. */
+/** Features that use the sketch. */
 export const dependents = (doc: Doc, sketchId: string) => doc.features.filter(f => isSolidFeature(f) && f.sketch === sketchId);
 
-/** Aktiva, ej undertryckta skisser före position `before`. */
+/** Active, unsuppressed sketches before position `before`. */
 export const usableSketches = (doc: Doc, before = activeCount(doc)) =>
   doc.features.slice(0, before).filter((f): f is SketchFeature => f.type === 'sketch' && !f.suppressed);
 
-// ---- Migrering (lagringen finns i projects.ts) ---------------------------------------------------------
+// ---- Migration (the storage is in projects.ts) ---------------------------------------------------------
 
-/** v1 (fas 1–2): bara skisser + en gemensam förhandsvisningshöjd → v2 med en extrudering per skiss. */
+/** v1 (phases 1–2): only sketches + a shared preview height → v2 with one extrude per sketch. */
 export function migrate(d: unknown): Doc | null {
   const o = d as { v?: number; features?: Feature[]; previewHeight?: number; params?: Param[]; rollback?: number | null };
   if (!o || !Array.isArray(o.features)) return null;

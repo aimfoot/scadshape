@@ -1,14 +1,14 @@
-// Android-appen (android/): MainActivity lägger in window.ScadshapeAndroid innan sidan laddas.
-// I webbläsaren finns den inte – då är android null och allt går som vanligt.
+// The Android app (android/): MainActivity adds window.ScadshapeAndroid before the page loads. In
+// the browser it does not exist – then android is null and everything works as usual.
 
 type Bridge = {
-  /** Sparar filen i Hämtade filer. "" = klart, annars felet. */
+  /** Saves the file in Downloads. "" = done, otherwise the error. */
   saveFile(name: string, mime: string, base64: string): string;
-  /** Öppnar Androids dela-meny med filen. "" = klart, annars felet. */
+  /** Opens Android's share menu with the file. "" = done, otherwise the error. */
   shareFile(name: string, mime: string, base64: string): string;
-  /** Systemradernas bakgrund och om ikonerna ska vara ljusa (mörkt tema). */
+  /** The system bars' background and whether the icons should be light (dark theme). */
   setBars(color: string, dark: boolean): void;
-  /** Fil som en annan app öppnade/delade till appen: JSON { name, data (base64) }, eller "". */
+  /** A file that another app opened/shared to the app: JSON { name, data (base64) }, or "". */
   takeFile(): string;
 };
 

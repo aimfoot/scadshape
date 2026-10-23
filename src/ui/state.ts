@@ -1,4 +1,4 @@
-// Appens gemensamma tillstånd och händelser mellan UI-modulerna.
+// The app's shared state and events between the UI modules.
 
 import { emptyDoc, type Doc } from '../doc';
 import { t } from '../i18n';
@@ -8,36 +8,40 @@ import { evalParams } from '../params';
 import type { SketchSolver } from '../sketch/solver';
 import { store } from './dom';
 
+/** Source ids saved before 2026-10-23 (Swedish) → the current ids. */
+const LEGACY_SOURCE: Record<string, string> = { egen: 'custom', plattan: 'plate', kopp: 'cup', tung: 'heavy', kub: 'cube' };
+const savedSource = store.get('source');
+
 export const app = {
-  /** Aktuell modell (projects.ts); läses in av initState(). */
+  /** The current model (projects.ts); loaded by initState(). */
   projectId: '',
   doc: emptyDoc() as Doc,
-  /** Dokumentet med en feature under redigering (förhandsvisning), annars null. */
+  /** The document with a feature being edited (preview), otherwise null. */
   previewDoc: null as Doc | null,
-  /** 'model' (features), ett exempel-id eller 'egen' (fritt redigerad kod). */
-  source: store.get('source') ?? 'model',
+  /** 'model' (features), an example id or 'custom' (freely edited code). */
+  source: (savedSource && LEGACY_SOURCE[savedSource]) || savedSource || 'model',
   model: null as unknown as Model,
   solver: null as SketchSolver | null,
 };
 
-/** Läser in aktuell modell ur lagringen (main.ts, efter openStorage()). */
+/** Loads the current model from the storage (main.ts, after openStorage()). */
 export function initState() {
   app.projectId = currentProjectId(t('project.default'));
   app.doc = loadProject(app.projectId);
   app.model = buildModel(app.doc);
 }
 
-/** Spara aktuell modell. */
+/** Save the current model. */
 export const saveDoc = () => saveProject(app.projectId, app.doc);
 
 export const vars = () => evalParams(app.doc.params).vars;
 
 type Events = {
-  /** Dokumentet har ändrats (spara, rita om trädet, rendera). */
+  /** The document has changed (save, redraw the tree, render). */
   docChanged: void;
-  /** Rendera om (t.ex. ny förhandsvisning). */
+  /** Render again (e.g. a new preview). */
   render: void;
-  /** Lösaren har laddats. */
+  /** The solver has been loaded. */
   solver: SketchSolver;
 };
 const handlers = new Map<keyof Events, ((v: never) => void)[]>();

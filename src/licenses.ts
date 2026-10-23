@@ -1,12 +1,12 @@
-// Allt som följer med appen och dess licenser ("Om scadshape", src/ui/about.ts). Texterna ligger i
-// dist/licenses/ (vendor/licenses/ via tools/licenses.sh, plus LICENSE-filerna som build.mjs kopierar).
-// OpenSCAD-WASM:ens innehåll: github.com/openscad/openscad-wasm, Makefile.
+// Everything bundled with the app and its licences ("About scadshape", src/ui/about.ts). The texts
+// are in dist/licenses/ (vendor/licenses/ via tools/licenses.sh, plus the LICENSE files that
+// build.mjs copies). The OpenSCAD WASM's contents: github.com/openscad/openscad-wasm, Makefile.
 
 import type { Key } from './i18n';
 
 export type Part = { name: string; version?: string; license: string; url: string; files: string[] };
 
-/** Var scadshapes källkod finns (tom = inte publicerad än, länken visas inte). */
+/** Where scadshape's source code is (empty = not published yet, the link is hidden). */
 export const SOURCE_URL = 'https://github.com/aimfoot/scadshape';
 
 const L = (f: string) => `licenses/${f}.txt`;

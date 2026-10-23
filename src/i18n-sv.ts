@@ -1,7 +1,9 @@
-// Svenska texter (grundspråk – alla nycklar definieras här).
+// Swedish texts (must contain every key in i18n-en.ts – checked by TypeScript).
 
-export const sv = {
-  // Allmänt
+import type { en } from './i18n-en';
+
+export const sv: Record<keyof typeof en, string> = {
+  // General
   'ui.features': 'Features',
   'ui.source': 'Källa',
   'ui.done': 'Klar',
@@ -61,7 +63,7 @@ export const sv = {
   'example.heavy': 'Exempel: tung (144 sfärer)',
   'example.cube': 'Exempel: kub',
 
-  // Vyer
+  // Views
   'view.iso': 'Iso',
   'view.top': 'Topp',
   'view.front': 'Fram',
@@ -261,7 +263,7 @@ export const sv = {
   'thread.externalShort': 'utvändig',
   'thread.internalShort': 'invändig',
 
-  // Val i vyn
+  // Picking in the view
   'pick.modeRegions': 'Välj regioner',
   'pick.modeAxis': 'Välj axel',
   'pick.default': 'Standard',
@@ -278,7 +280,7 @@ export const sv = {
   'pick.noPoints': 'Skissen har inga punkter – rita dem med Punkt',
   'pick.noCircles': 'Skissen har inga cirklar',
 
-  // Fel i features
+  // Feature errors
   'err.mustBePositive': 'måste vara större än noll',
   'err.notNegative': 'får inte vara negativt',
   'err.noRegions': 'Inga regioner valda',
@@ -298,12 +300,12 @@ export const sv = {
   'err.parse': 'Kunde inte tolka värdet',
   'err.conflict': 'Går inte – krockar med andra villkor',
 
-  // Kod
+  // Code
   'code.header': '// scadshape – genererad kod (ändra i modellen, inte här)',
   'code.variables': '// Variabler',
   'code.model': '// Modell',
 
-  // Uttryck och variabler
+  // Expressions and variables
   'expr.unknownVar': 'Okänd variabel: {name}',
   'expr.expected': 'Väntade ett tal eller en variabel',
   'expr.missingParen': 'Saknar )',
@@ -323,7 +325,7 @@ export const sv = {
   'params.dimNotPositive': '{sketch}: måttet "{expr}" blir {value} (måste vara > 0)',
   'params.dimConflict': '{sketch}: de nya måtten går inte ihop',
 
-  // Trädet
+  // Tree
   'tree.empty': 'Tomt. Börja med Skiss i verktygsfältet och välj ett plan.',
   'tree.toEnd': 'Till slutet',
   'tree.rolledBack': 'Tillbakarullad',
@@ -336,7 +338,7 @@ export const sv = {
   'tree.deleteOne': 'Ta bort {name}?',
   'tree.deleteWithDeps': '{name} används av {deps}. Ta bort alla?',
 
-  // Notiser
+  // Toasts
   'toast.solverFailed': 'Villkorslösaren kunde inte laddas – ritar utan villkor',
   'toast.needClosed': 'Rita en skiss med en sluten form först',
   'toast.needPoints': 'Rita punkter med Punkt i en skiss först (eller cirklar vars centrum ska få hål)',
@@ -344,7 +346,7 @@ export const sv = {
   'toast.makeSolid': 'Tryck Extrudera eller Revolve för att göra {name} till en solid',
   'toast.makeHoles': 'Tryck Hål för att borra i punkterna i {name}',
 
-  // Plan
+  // Planes
   'plane.title': 'Ny skiss – välj plan',
   'plane.top': 'Topp',
   'plane.front': 'Fram',
@@ -356,7 +358,7 @@ export const sv = {
   'plane.noModel': 'Det finns ingen modell att välja en yta på än',
   'plane.offsetHint': 'Förskjutning längs planets normal, t.ex. höjden på en platta för att skissa på dess ovansida.',
 
-  // Skissverktyg
+  // Sketch tools
   'tool.select': 'Markera',
   'tool.point': 'Punkt',
   'tool.line': 'Linje',
@@ -402,7 +404,7 @@ export const sv = {
   'sketch.oneDof': '1 frihetsgrad',
   'sketch.dofs': '{n} frihetsgrader',
 
-  // Villkor och mått
+  // Constraints and dimensions
   'act.deleteConstraint': 'Ta bort villkoret',
   'act.deleteConstraints': 'Ta bort villkoren',
   'act.editDimension': 'Ändra mått',
@@ -465,7 +467,7 @@ export const sv = {
   'dim.angle': 'Vinkel',
   'dim.hint': 'Uttryck och variabler går bra, t.ex. 40/2+5 eller bredd/2.',
 
-  // Mätning
+  // Benchmark
   'bench.title': 'Mätning',
   'bench.model': 'Modell',
   'bench.time': 'Tid',

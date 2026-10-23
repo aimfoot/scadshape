@@ -1,5 +1,5 @@
-// Sidans del av Android-appen (se src/android.ts och android/): bakåtknappen, systemradernas färg
-// efter temat och filer som andra appar öppnar/delar till appen.
+// The page's part of the Android app (see src/android.ts and android/): the back button, the system
+// bars' color by theme and files that other apps open/share to the app.
 
 import { android, fromBase64 } from '../android';
 import { onThemeChange, currentTheme, type Theme } from '../theme';
@@ -15,17 +15,17 @@ const visible = (sel: string) => {
 };
 
 /**
- * Bakåtknappen: stänger det översta som är öppet med appens egna knappar (samma logik som ett
- * tryck). true = hanterat; false = inget öppet, då lägger Android appen i bakgrunden.
+ * The back button: closes the topmost open thing with the app's own buttons (the same logic as a
+ * tap). true = handled; false = nothing open, then Android sends the app to the background.
  */
 function back(): boolean {
   const dialogs = document.querySelectorAll<HTMLDialogElement & { requestClose?: () => void }>('dialog[open]');
   const top = dialogs[dialogs.length - 1];
   if (top) {
-    // En synlig tillbaka-knapp i dialogen (t.ex. licenstexten i "Om") går ett steg bakåt.
+    // A visible back button in the dialog (e.g. the licence text in "About") goes one step back.
     const stepBack = [...top.querySelectorAll<HTMLElement>('[data-back]')].find(b => b.offsetParent);
     if (stepBack) return stepBack.click(), true;
-    // requestClose skickar 'cancel' först, som Esc – dialoger som ångrar något får veta det.
+    // requestClose sends 'cancel' first, like Esc – dialogs that undo something get to know.
     if (top.requestClose) top.requestClose();
     else top.close();
     return true;
@@ -43,7 +43,7 @@ function setBars(th: Theme) {
   android!.setBars(color, th === 'dark');
 }
 
-/** Hämtar en fil som väntar hos appen (öppnad/delad från en annan app) och öppnar den. */
+/** Fetches a file waiting in the app (opened/shared from another app) and opens it. */
 async function openPending() {
   const json = android!.takeFile();
   if (!json) return;

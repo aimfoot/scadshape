@@ -1,5 +1,5 @@
-// Skiss → OpenSCAD (2D). Profiler på jämnt djup blir material, deras direkta
-// barn (udda djup) dras bort: union(material_i − hål_i).
+// Sketch → OpenSCAD (2D). Profiles at even depth become material, their direct children (odd depth)
+// are subtracted: union(material_i − holes_i).
 
 import { segmentsFor } from './geom';
 import type { Loop, Region } from './regions';
@@ -18,7 +18,7 @@ function loopScad(l: Loop): string {
   return `polygon([${l.pts.map(p => `[${num(p.x)}, ${num(p.y)}]`).join(', ')}]);`;
 }
 
-/** 2D-kod för valda regioner (slinga minus hål), eller null om inget är valt. */
+/** 2D code for chosen regions (loop minus holes), or null if nothing is chosen. */
 export function selectedRegionsScad(loops: Loop[], regions: Region[], selected: number[], indent = '  '): string | null {
   const parts = selected.map(i => {
     const r = regions[i];
@@ -33,7 +33,7 @@ export function selectedRegionsScad(loops: Loop[], regions: Region[], selected: 
   return parts.length ? parts.join('\n') : null;
 }
 
-/** 2D-kod för alla slutna profiler, eller null om det inte finns några. */
+/** 2D code for all closed profiles, or null if there are none. */
 export function regionsScad(loops: Loop[], indent = '  '): string | null {
   const parts: string[] = [];
   loops.forEach((l, i) => {

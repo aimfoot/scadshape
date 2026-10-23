@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="sv">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
@@ -13,15 +13,15 @@
 </head>
 <body data-mode="part" class="loading">
 <header class="bar">
-  <!-- Delläge -->
+  <!-- Part mode -->
   <button id="btnTree" class="icon part-only" data-i18n-aria="ui.features" aria-pressed="false">
     <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
   </button>
   <span class="brand part-only">scad<b>shape</b></span>
   <select id="source" class="part-only" data-i18n-aria="ui.source"></select>
-  <!-- Skissläge -->
+  <!-- Sketch mode -->
   <button id="btnDone" class="primary sketch-only" hidden>
-    <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span data-i18n="ui.done">Klar</span>
+    <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span data-i18n="ui.done">Done</span>
   </button>
   <span id="sketchTitle" class="title sketch-only" hidden></span>
 
@@ -30,8 +30,8 @@
   <button id="btnExport" class="icon part-only" data-i18n-aria="export.title" data-i18n-title="export.title">
     <svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
   </button>
-  <button id="btnCode" class="part-only" aria-pressed="false" data-i18n="ui.code">Kod</button>
-  <button id="btnRender" class="primary part-only" data-i18n="ui.render">Rendera</button>
+  <button id="btnCode" class="part-only" aria-pressed="false" data-i18n="ui.code">Code</button>
+  <button id="btnRender" class="primary part-only" data-i18n="ui.render">Render</button>
   <button id="btnUndo" class="icon sketch-only" data-i18n-aria="ui.undo" hidden>
     <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
   </button>
@@ -41,30 +41,30 @@
 </header>
 <main>
   <aside id="tree" class="drawer" hidden>
-    <button id="btnProjects" class="projbtn" type="button"><span id="projName"></span><small data-i18n="project.all">Alla modeller ›</small></button>
+    <button id="btnProjects" class="projbtn" type="button"><span id="projName"></span><small data-i18n="project.all">All models ›</small></button>
     <h2 data-i18n="ui.features">Features</h2>
     <ul id="featureList"></ul>
     <p id="treeEmpty" class="muted" data-i18n="tree.empty"></p>
     <span class="spacer"></span>
-    <button id="btnStart" data-i18n="ui.start">Kom igång</button>
+    <button id="btnStart" data-i18n="ui.start">Getting started</button>
     <label class="field">
-      <span data-i18n="ui.language">Språk</span>
+      <span data-i18n="ui.language">Language</span>
       <select id="lang"></select>
     </label>
     <label class="field">
-      <span data-i18n="ui.theme">Tema</span>
+      <span data-i18n="ui.theme">Theme</span>
       <select id="theme">
-        <option value="auto" data-i18n="theme.auto">Som telefonen</option>
-        <option value="light" data-i18n="theme.light">Ljust</option>
-        <option value="dark" data-i18n="theme.dark">Mörkt</option>
+        <option value="auto" data-i18n="theme.auto">Same as the phone</option>
+        <option value="light" data-i18n="theme.light">Light</option>
+        <option value="dark" data-i18n="theme.dark">Dark</option>
       </select>
     </label>
-    <button id="btnBench" data-i18n="ui.bench">Mät prestanda</button>
-    <button id="btnAbout" data-i18n="about.title">Om scadshape</button>
+    <button id="btnBench" data-i18n="ui.bench">Benchmark</button>
+    <button id="btnAbout" data-i18n="about.title">About scadshape</button>
   </aside>
   <aside id="codePanel" hidden>
     <div id="codeBar" class="codebar" hidden>
-      <button type="button" id="btnConvert"><svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><path d="M14 20h6M17 17v6" transform="translate(0 -3)"/></svg><span data-i18n="convert.button">Gör om till skisser</span></button>
+      <button type="button" id="btnConvert"><svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><path d="M14 20h6M17 17v6" transform="translate(0 -3)"/></svg><span data-i18n="convert.button">Convert to sketches</span></button>
     </div>
     <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" data-i18n-aria="ui.code"></textarea>
     <div id="log"></div>
@@ -72,40 +72,40 @@
   <section id="partArea">
     <nav id="partToolbar" class="toolbar part-only" data-i18n-aria="ui.features">
       <button id="btnNewSketch" data-i18n-title="feat.sketch">
-        <svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><circle class="dot" cx="4" cy="18" r="1.8"/><circle class="dot" cx="10" cy="6" r="1.8"/><circle class="dot" cx="20" cy="14" r="1.8"/></svg><span data-i18n="feat.sketch">Skiss</span>
+        <svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><circle class="dot" cx="4" cy="18" r="1.8"/><circle class="dot" cx="10" cy="6" r="1.8"/><circle class="dot" cx="20" cy="14" r="1.8"/></svg><span data-i18n="feat.sketch">Sketch</span>
       </button>
       <button id="btnExtrude" data-i18n-title="feat.extrude">
-        <svg viewBox="0 0 24 24"><path d="M5 17l7 3 7-3M5 17V9l7 3 7-3v8M12 12v8M5 9l7-3 7 3"/><path d="M12 2v4" stroke-dasharray="1.5 1.5"/></svg><span data-i18n="feat.extrude">Extrudera</span>
+        <svg viewBox="0 0 24 24"><path d="M5 17l7 3 7-3M5 17V9l7 3 7-3v8M12 12v8M5 9l7-3 7 3"/><path d="M12 2v4" stroke-dasharray="1.5 1.5"/></svg><span data-i18n="feat.extrude">Extrude</span>
       </button>
       <button id="btnRevolve" data-i18n-title="feat.revolve">
         <svg viewBox="0 0 24 24"><ellipse cx="12" cy="17" rx="7" ry="2.5"/><path d="M5 17V8M19 17V8"/><ellipse cx="12" cy="8" rx="7" ry="2.5"/><path d="M12 3v18" stroke-dasharray="2 2"/></svg><span data-i18n="feat.revolve">Revolve</span>
       </button>
       <button id="btnHole" data-i18n-title="feat.hole">
-        <svg viewBox="0 0 24 24"><path d="M4 9l8-4 8 4-8 4z"/><path d="M4 9v7l8 4 8-4V9"/><ellipse cx="12" cy="9" rx="2.6" ry="1.3"/><path d="M9.4 9v4.5M14.6 9v4.5" stroke-dasharray="1.5 1.5"/></svg><span data-i18n="feat.hole">Hål</span>
+        <svg viewBox="0 0 24 24"><path d="M4 9l8-4 8 4-8 4z"/><path d="M4 9v7l8 4 8-4V9"/><ellipse cx="12" cy="9" rx="2.6" ry="1.3"/><path d="M9.4 9v4.5M14.6 9v4.5" stroke-dasharray="1.5 1.5"/></svg><span data-i18n="feat.hole">Hole</span>
       </button>
       <button id="btnThread" data-i18n-title="feat.thread">
-        <svg viewBox="0 0 24 24"><path d="M8 3v18M16 3v18"/><path d="M6 6l12 3M6 10l12 3M6 14l12 3M6 18l12 3"/></svg><span data-i18n="feat.thread">Gänga</span>
+        <svg viewBox="0 0 24 24"><path d="M8 3v18M16 3v18"/><path d="M6 6l12 3M6 10l12 3M6 14l12 3M6 18l12 3"/></svg><span data-i18n="feat.thread">Thread</span>
       </button>
       <button id="btnContainer" data-i18n-title="feat.container">
-        <svg viewBox="0 0 24 24"><path d="M5 9v9l7 3 7-3V9"/><path d="M5 9l7 3 7-3-7-3z"/><path d="M8 9.2l4 1.6 4-1.6"/><path d="M4 5.5l8-3 8 3" stroke-dasharray="2 1.5"/></svg><span data-i18n="feat.container">Behållare</span>
+        <svg viewBox="0 0 24 24"><path d="M5 9v9l7 3 7-3V9"/><path d="M5 9l7 3 7-3-7-3z"/><path d="M8 9.2l4 1.6 4-1.6"/><path d="M4 5.5l8-3 8 3" stroke-dasharray="2 1.5"/></svg><span data-i18n="feat.container">Container</span>
       </button>
       <button id="btnText" data-i18n-title="feat.text">
         <svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span data-i18n="feat.text">Text</span>
       </button>
       <button id="btnSnap" data-i18n-title="feat.snap">
-        <svg viewBox="0 0 24 24"><path d="M4 21h16"/><path d="M9 21v-3l1-1V6l-1-1V3h3l4 4-2.5 1.5H12V17l1 1v3"/></svg><span data-i18n="feat.snap">Snäpphake</span>
+        <svg viewBox="0 0 24 24"><path d="M4 21h16"/><path d="M9 21v-3l1-1V6l-1-1V3h3l4 4-2.5 1.5H12V17l1 1v3"/></svg><span data-i18n="feat.snap">Snap hook</span>
       </button>
       <button id="btnImport" data-i18n-title="import.title">
-        <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5"/><path d="M4 15v4h16v-4"/></svg><span data-i18n="import.button">Importera</span>
+        <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5"/><path d="M4 15v4h16v-4"/></svg><span data-i18n="import.button">Import</span>
       </button>
-      <!-- Inget accept-filter: Android känner inte alltid igen .stl/.svg. -->
+      <!-- No accept filter: Android does not always recognise .stl/.svg. -->
       <input id="importFile" type="file" hidden>
       <span class="sep"></span>
       <button id="btnMeasure" data-i18n-title="measure.title" aria-pressed="false">
-        <svg viewBox="0 0 24 24"><path d="M3 16l13-13 5 5-13 13z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2M8.5 10.5l1 1M11.5 7.5l1 1"/></svg><span data-i18n="measure.button">Mät</span>
+        <svg viewBox="0 0 24 24"><path d="M3 16l13-13 5 5-13 13z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2M8.5 10.5l1 1M11.5 7.5l1 1"/></svg><span data-i18n="measure.button">Measure</span>
       </button>
       <button id="btnParams" data-i18n-title="ui.variables">
-        <svg viewBox="0 0 24 24"><path d="M7 20c3 0 2.5-16 6-16M6 10h8"/><path d="M14 13l5 6M19 13l-5 6"/></svg><span data-i18n="ui.variables">Variabler</span>
+        <svg viewBox="0 0 24 24"><path d="M7 20c3 0 2.5-16 6-16M6 10h8"/><path d="M14 13l5 6M19 13l-5 6"/></svg><span data-i18n="ui.variables">Variables</span>
       </button>
     </nav>
     <section id="viewport">
@@ -119,26 +119,26 @@
       </div>
       <div class="views">
         <button data-view="iso" data-i18n="view.iso">Iso</button>
-        <button data-view="top" data-i18n="view.top">Topp</button>
-        <button data-view="front" data-i18n="view.front">Fram</button>
-        <button data-view="right" data-i18n="view.right">Höger</button>
+        <button data-view="top" data-i18n="view.top">Top</button>
+        <button data-view="front" data-i18n="view.front">Front</button>
+        <button data-view="right" data-i18n="view.right">Right</button>
         <button id="btnFit" data-i18n-aria="view.fit">⤢</button>
       </div>
       <div id="status" class="status busy"></div>
       <div id="measureBar" class="hintbar measurebar" hidden>
         <span class="mtext"><b id="measureMain"></b><small id="measureDetail"></small></span>
-        <button id="measureClear" data-i18n="measure.clear" hidden>Rensa</button>
-        <button id="measureDone" data-i18n="measure.done">Klar</button>
+        <button id="measureClear" data-i18n="measure.clear" hidden>Clear</button>
+        <button id="measureDone" data-i18n="measure.done">Done</button>
       </div>
       <div id="faceBar" class="hintbar" hidden>
-        <span data-i18n="plane.pickFaceHint">Tryck på en plan yta på modellen</span>
-        <button id="faceCancel" data-i18n="ui.cancel">Avbryt</button>
+        <span data-i18n="plane.pickFaceHint">Tap a flat face on the model</span>
+        <button id="faceCancel" data-i18n="ui.cancel">Cancel</button>
       </div>
       <section id="startCard" class="startcard" hidden>
         <button type="button" id="startClose" class="icon startclose" data-i18n-aria="ui.close">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
-        <h2 data-i18n="start.title">Välkommen till scadshape</h2>
+        <h2 data-i18n="start.title">Welcome to scadshape</h2>
         <p data-i18n="start.intro"></p>
         <ol class="steps">
           <li data-i18n="start.step1"></li>
@@ -146,24 +146,24 @@
           <li data-i18n="start.step3"></li>
           <li data-i18n="start.step4"></li>
         </ol>
-        <h3 data-i18n="start.examples">Eller börja med ett exempel</h3>
+        <h3 data-i18n="start.examples">Or start from an example</h3>
         <div id="startExamples" class="examples"></div>
         <p class="muted small" data-i18n="start.tip"></p>
       </section>
 
       <div id="featPanel" class="featpanel" hidden>
         <div class="fp-head"><b id="fpTitle"></b><span id="fpBusy" class="spinner" hidden></span></div>
-        <label class="fp-row"><span data-i18n="feat.sketch">Skiss</span> <select id="fpSketch"></select></label>
-        <button type="button" id="fpFace" class="link" hidden data-i18n="face.pick">Välj en yta på modellen att extrudera</button>
+        <label class="fp-row"><span data-i18n="feat.sketch">Sketch</span> <select id="fpSketch"></select></label>
+        <button type="button" id="fpFace" class="link" hidden data-i18n="face.pick">Pick a face on the model to extrude</button>
         <div id="fpPick" class="segmented small" hidden>
-          <button type="button" data-pick="regions" data-i18n="pick.modeRegions">Välj regioner</button>
-          <button type="button" data-pick="axis" data-i18n="pick.modeAxis">Välj axel</button>
+          <button type="button" data-pick="regions" data-i18n="pick.modeRegions">Pick regions</button>
+          <button type="button" data-pick="axis" data-i18n="pick.modeAxis">Pick axis</button>
         </div>
-        <p class="fp-row muted"><span id="fpRegions"></span> <button type="button" id="fpDefault" class="link" data-i18n="pick.default">Standard</button></p>
+        <p class="fp-row muted"><span id="fpRegions"></span> <button type="button" id="fpDefault" class="link" data-i18n="pick.default">Default</button></p>
         <div id="fpFields"></div>
         <p id="fpError" class="err small" hidden></p>
         <div class="fp-buttons">
-          <button type="button" id="fpCancel" data-i18n="ui.cancel">Avbryt</button>
+          <button type="button" id="fpCancel" data-i18n="ui.cancel">Cancel</button>
           <button type="button" id="fpOk" class="primary" data-i18n="ui.ok">OK</button>
         </div>
       </div>
@@ -172,59 +172,59 @@
   <section id="sketchArea" hidden>
     <nav id="toolbar" class="toolbar" data-i18n-aria="ui.sketchTools">
       <button data-tool="select" data-i18n-title="tool.select">
-        <svg viewBox="0 0 24 24"><path d="M6 3l12 9-5.5 1.2L15 20l-2.5 1-2.6-6.6L6 18z"/></svg><span data-i18n="tool.select">Markera</span>
+        <svg viewBox="0 0 24 24"><path d="M6 3l12 9-5.5 1.2L15 20l-2.5 1-2.6-6.6L6 18z"/></svg><span data-i18n="tool.select">Select</span>
       </button>
       <button data-tool="point" data-i18n-title="tool.point">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><circle class="dot" cx="12" cy="12" r="2"/></svg><span data-i18n="tool.point">Punkt</span>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><circle class="dot" cx="12" cy="12" r="2"/></svg><span data-i18n="tool.point">Point</span>
       </button>
       <button data-tool="line" data-i18n-title="tool.line">
-        <svg viewBox="0 0 24 24"><path d="M5 19L19 5"/><circle class="dot" cx="5" cy="19" r="2"/><circle class="dot" cx="19" cy="5" r="2"/></svg><span data-i18n="tool.line">Linje</span>
+        <svg viewBox="0 0 24 24"><path d="M5 19L19 5"/><circle class="dot" cx="5" cy="19" r="2"/><circle class="dot" cx="19" cy="5" r="2"/></svg><span data-i18n="tool.line">Line</span>
       </button>
       <button data-tool="rect" data-i18n-title="tool.rect">
-        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/><circle class="dot" cx="4" cy="6" r="2"/><circle class="dot" cx="20" cy="18" r="2"/></svg><span data-i18n="tool.rect">Rektangel</span>
+        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/><circle class="dot" cx="4" cy="6" r="2"/><circle class="dot" cx="20" cy="18" r="2"/></svg><span data-i18n="tool.rect">Rectangle</span>
       </button>
       <button data-tool="rectc" data-i18n-title="tool.rectc">
-        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/><path d="M4 6l16 12" stroke-dasharray="2 2"/><circle class="dot" cx="12" cy="12" r="2"/><circle class="dot" cx="20" cy="18" r="2"/></svg><span data-i18n="tool.rectcShort">Mittp.-rekt.</span>
+        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/><path d="M4 6l16 12" stroke-dasharray="2 2"/><circle class="dot" cx="12" cy="12" r="2"/><circle class="dot" cx="20" cy="18" r="2"/></svg><span data-i18n="tool.rectcShort">Center rect.</span>
       </button>
       <button data-tool="circle" data-i18n-title="tool.circle">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle class="dot" cx="12" cy="12" r="1.8"/></svg><span data-i18n="tool.circle">Cirkel</span>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle class="dot" cx="12" cy="12" r="1.8"/></svg><span data-i18n="tool.circle">Circle</span>
       </button>
       <button data-tool="polygon" data-i18n-title="tool.polygon">
         <svg viewBox="0 0 24 24"><path d="M12 3.5l7.4 4.25v8.5L12 20.5l-7.4-4.25v-8.5z"/><circle class="dot" cx="12" cy="12" r="1.8"/></svg><span data-i18n="tool.polygon">Polygon</span>
       </button>
       <button data-tool="slot" data-i18n-title="tool.slot">
-        <svg viewBox="0 0 24 24"><path d="M8 8h8a4 4 0 0 1 0 8H8a4 4 0 0 1 0-8z"/><circle class="dot" cx="8" cy="12" r="1.6"/><circle class="dot" cx="16" cy="12" r="1.6"/></svg><span data-i18n="tool.slotShort">Slits</span>
+        <svg viewBox="0 0 24 24"><path d="M8 8h8a4 4 0 0 1 0 8H8a4 4 0 0 1 0-8z"/><circle class="dot" cx="8" cy="12" r="1.6"/><circle class="dot" cx="16" cy="12" r="1.6"/></svg><span data-i18n="tool.slotShort">Slot</span>
       </button>
       <button data-tool="arc3" data-i18n-title="tool.arc3">
-        <svg viewBox="0 0 24 24"><path d="M4 18A9 9 0 0 1 20 18"/><circle class="dot" cx="4" cy="18" r="2"/><circle class="dot" cx="20" cy="18" r="2"/><circle class="dot" cx="12" cy="9.9" r="2"/></svg><span data-i18n="tool.arc3">3p-båge</span>
+        <svg viewBox="0 0 24 24"><path d="M4 18A9 9 0 0 1 20 18"/><circle class="dot" cx="4" cy="18" r="2"/><circle class="dot" cx="20" cy="18" r="2"/><circle class="dot" cx="12" cy="9.9" r="2"/></svg><span data-i18n="tool.arc3">3-pt arc</span>
       </button>
       <button data-tool="arcc" data-i18n-title="tool.arcc">
-        <svg viewBox="0 0 24 24"><path d="M20 15A8 8 0 0 0 7 7.5"/><path d="M12 15h8" stroke-dasharray="2 2"/><circle class="dot" cx="12" cy="15" r="1.8"/></svg><span data-i18n="tool.arcc">Mittp.-båge</span>
+        <svg viewBox="0 0 24 24"><path d="M20 15A8 8 0 0 0 7 7.5"/><path d="M12 15h8" stroke-dasharray="2 2"/><circle class="dot" cx="12" cy="15" r="1.8"/></svg><span data-i18n="tool.arcc">Center arc</span>
       </button>
       <span class="sep"></span>
       <button id="btnConstruction" data-i18n-title="tool.construction">
-        <svg viewBox="0 0 24 24"><path d="M4 20L20 4" stroke-dasharray="3 3"/></svg><span data-i18n="tool.constructionShort">Konstr.</span>
+        <svg viewBox="0 0 24 24"><path d="M4 20L20 4" stroke-dasharray="3 3"/></svg><span data-i18n="tool.constructionShort">Constr.</span>
       </button>
       <button id="btnDelete" data-i18n-title="tool.delete">
-        <svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg><span data-i18n="tool.delete">Ta bort</span>
+        <svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg><span data-i18n="tool.delete">Delete</span>
       </button>
       <button id="btnGlyphs" data-i18n-title="tool.constraints">
-        <svg viewBox="0 0 24 24"><rect x="4" y="7" width="9" height="9" rx="2"/><path d="M7 11.5h3M15 6l5 5M20 6l-5 5"/></svg><span data-i18n="tool.constraintsShort">Villkor</span>
+        <svg viewBox="0 0 24 24"><rect x="4" y="7" width="9" height="9" rx="2"/><path d="M7 11.5h3M15 6l5 5M20 6l-5 5"/></svg><span data-i18n="tool.constraintsShort">Constraints</span>
       </button>
       <button id="btnGrid" data-i18n-title="tool.grid">
-        <svg viewBox="0 0 24 24"><path d="M4 9h16M4 15h16M9 4v16M15 4v16"/></svg><span data-i18n="tool.gridShort">Rutnät</span>
+        <svg viewBox="0 0 24 24"><path d="M4 9h16M4 15h16M9 4v16M15 4v16"/></svg><span data-i18n="tool.gridShort">Grid</span>
       </button>
       <button id="btnSketchFit" data-i18n-title="view.fit">
-        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg><span data-i18n="view.fitShort">Anpassa</span>
+        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg><span data-i18n="view.fitShort">Fit</span>
       </button>
     </nav>
     <div id="sketchHost">
       <div class="hintbar">
         <span id="hintText"></span>
-        <button id="btnFinish" hidden data-i18n="ui.finish">Avsluta</button>
+        <button id="btnFinish" hidden data-i18n="ui.finish">Finish</button>
       </div>
       <div id="sidesBar" class="sidesbar" hidden>
-        <span data-i18n="tool.sides">Sidor</span>
+        <span data-i18n="tool.sides">Sides</span>
         <div class="segmented small">
           <button type="button" data-sides="3">3</button><button type="button" data-sides="4">4</button><button type="button" data-sides="5">5</button><button type="button" data-sides="6">6</button><button type="button" data-sides="8">8</button>
         </div>
@@ -239,37 +239,37 @@
 <div id="partToast" class="toast" role="status" hidden></div>
 
 <dialog id="planeDlg">
-  <h2 data-i18n="plane.title">Ny skiss – välj plan</h2>
-  <label class="fp-row"><span data-i18n="field.offset">Förskjutning</span> <input id="planeOffset" autocapitalize="off" autocomplete="off" spellcheck="false"> mm</label>
+  <h2 data-i18n="plane.title">New sketch – choose a plane</h2>
+  <label class="fp-row"><span data-i18n="field.offset">Offset</span> <input id="planeOffset" autocapitalize="off" autocomplete="off" spellcheck="false"> mm</label>
   <div id="planeChips"></div>
   <p class="muted small" data-i18n="plane.offsetHint"></p>
   <p id="planeError" class="err small" hidden></p>
   <div class="planes">
-    <button data-plane="XY"><svg viewBox="0 0 24 24"><path d="M3 15l9-5 9 5-9 5z"/></svg><b data-i18n="plane.top">Topp</b><small>XY</small></button>
-    <button data-plane="XZ"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14"/></svg><b data-i18n="plane.front">Fram</b><small>XZ</small></button>
-    <button data-plane="YZ"><svg viewBox="0 0 24 24"><path d="M7 4l10 4v12L7 16z"/></svg><b data-i18n="plane.right">Höger</b><small>YZ</small></button>
+    <button data-plane="XY"><svg viewBox="0 0 24 24"><path d="M3 15l9-5 9 5-9 5z"/></svg><b data-i18n="plane.top">Top</b><small>XY</small></button>
+    <button data-plane="XZ"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14"/></svg><b data-i18n="plane.front">Front</b><small>XZ</small></button>
+    <button data-plane="YZ"><svg viewBox="0 0 24 24"><path d="M7 4l10 4v12L7 16z"/></svg><b data-i18n="plane.right">Right</b><small>YZ</small></button>
   </div>
-  <button type="button" id="btnPickFace" class="pickface"><svg viewBox="0 0 24 24"><path d="M4 9l8-4 8 4-8 4z"/><path d="M4 9v7l8 4 8-4V9"/><path d="M9 8.5l3 1.5 3-1.5" stroke-dasharray="1.5 1.5"/></svg><span data-i18n="plane.pickFace">Välj yta på modellen</span></button>
-  <form method="dialog"><button data-i18n="ui.cancel">Avbryt</button></form>
+  <button type="button" id="btnPickFace" class="pickface"><svg viewBox="0 0 24 24"><path d="M4 9l8-4 8 4-8 4z"/><path d="M4 9v7l8 4 8-4V9"/><path d="M9 8.5l3 1.5 3-1.5" stroke-dasharray="1.5 1.5"/></svg><span data-i18n="plane.pickFace">Pick a face on the model</span></button>
+  <form method="dialog"><button data-i18n="ui.cancel">Cancel</button></form>
 </dialog>
 
 <dialog id="svgDlg">
-  <h2 data-i18n="import.svgTitle">Importera SVG</h2>
+  <h2 data-i18n="import.svgTitle">Import SVG</h2>
   <p class="muted small"><b id="svgName"></b> · <span id="svgSize"></span></p>
-  <div class="fp-row"><label class="fp-row" for="svgWidth" data-i18n="import.svgWidth">Bredd</label> <input id="svgWidth" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false"> mm <span id="svgHeight" class="muted"></span>
-    <button type="button" id="svgSizeReset" class="link" data-i18n="import.svgSizeReset">Originalstorlek</button></div>
+  <div class="fp-row"><label class="fp-row" for="svgWidth" data-i18n="import.svgWidth">Width</label> <input id="svgWidth" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false"> mm <span id="svgHeight" class="muted"></span>
+    <button type="button" id="svgSizeReset" class="link" data-i18n="import.svgSizeReset">Original size</button></div>
   <div id="svgOrigin" class="segmented small">
-    <button type="button" data-origin="corner" data-i18n="import.svgCorner">Hörnet i origo</button>
-    <button type="button" data-origin="center" data-i18n="import.svgCenter">Mitten i origo</button>
+    <button type="button" data-origin="corner" data-i18n="import.svgCorner">Corner at origin</button>
+    <button type="button" data-origin="center" data-i18n="import.svgCenter">Center at origin</button>
   </div>
-  <label class="fp-check"><input type="checkbox" id="svgLock"> <span data-i18n="import.svgLock">Lås geometrin</span></label>
+  <label class="fp-check"><input type="checkbox" id="svgLock"> <span data-i18n="import.svgLock">Lock the geometry (fixed points)</span></label>
   <p class="muted small" data-i18n="import.svgLockHint"></p>
   <p id="svgStats" class="small"></p>
   <p id="svgIgnored" class="muted small" hidden></p>
   <p id="svgError" class="err small" hidden></p>
   <div class="fp-buttons">
-    <form method="dialog"><button data-i18n="ui.cancel">Avbryt</button></form>
-    <button type="button" id="svgOk" class="primary" data-i18n="import.svgChoosePlane">Välj plan …</button>
+    <form method="dialog"><button data-i18n="ui.cancel">Cancel</button></form>
+    <button type="button" id="svgOk" class="primary" data-i18n="import.svgChoosePlane">Choose plane …</button>
   </div>
 </dialog>
 
@@ -277,38 +277,38 @@
   <h2 id="fmTitle"></h2>
   <p id="fmError" class="err small" hidden></p>
   <div class="menu">
-    <button type="button" data-fm="edit" data-i18n="tree.edit">Redigera</button>
-    <button type="button" data-fm="suppress" data-i18n="tree.suppress">Undertryck</button>
-    <button type="button" data-fm="rollback" data-i18n="tree.rollback">Rulla tillbaka hit</button>
-    <button type="button" data-fm="delete" class="danger" data-i18n="tree.delete">Ta bort</button>
+    <button type="button" data-fm="edit" data-i18n="tree.edit">Edit</button>
+    <button type="button" data-fm="suppress" data-i18n="tree.suppress">Suppress</button>
+    <button type="button" data-fm="rollback" data-i18n="tree.rollback">Roll back to here</button>
+    <button type="button" data-fm="delete" class="danger" data-i18n="tree.delete">Delete</button>
   </div>
-  <form method="dialog"><button data-i18n="ui.close">Stäng</button></form>
+  <form method="dialog"><button data-i18n="ui.close">Close</button></form>
 </dialog>
 
 <dialog id="paramsDlg">
-  <h2 data-i18n="ui.variables">Variabler</h2>
+  <h2 data-i18n="ui.variables">Variables</h2>
   <p class="muted small" data-i18n="params.hint"></p>
   <div id="paramList" class="params"></div>
   <form id="paramAdd" class="paramadd">
     <input id="paramName" data-i18n-placeholder="params.name" autocapitalize="off" autocomplete="off" spellcheck="false" data-i18n-aria="params.name">
     <span>=</span>
     <input id="paramExpr" data-i18n-placeholder="params.value" autocapitalize="off" autocomplete="off" spellcheck="false" data-i18n-aria="params.value">
-    <button class="primary" type="submit" data-i18n="params.add">Lägg till</button>
+    <button class="primary" type="submit" data-i18n="params.add">Add</button>
   </form>
   <p id="paramError" class="err small" hidden></p>
-  <form method="dialog"><button data-i18n="ui.close">Stäng</button></form>
+  <form method="dialog"><button data-i18n="ui.close">Close</button></form>
 </dialog>
 
 <dialog id="dimDlg">
   <form id="dimForm" method="dialog">
     <h2 id="dimTitle"></h2>
     <div id="dimDir" class="segmented" hidden>
-      <button type="button" data-dir="aligned" data-i18n="dim.aligned">Längs</button>
-      <button type="button" data-dir="h" data-i18n="dim.horizontal">Vågrätt</button>
-      <button type="button" data-dir="v" data-i18n="dim.vertical">Lodrätt</button>
+      <button type="button" data-dir="aligned" data-i18n="dim.aligned">Aligned</button>
+      <button type="button" data-dir="h" data-i18n="dim.horizontal">Horizontal</button>
+      <button type="button" data-dir="v" data-i18n="dim.vertical">Vertical</button>
     </div>
     <div id="dimRd" class="segmented" hidden>
-      <button type="button" data-rd="radius" data-i18n="dim.radius">Radie</button>
+      <button type="button" data-rd="radius" data-i18n="dim.radius">Radius</button>
       <button type="button" data-rd="diameter" data-i18n="dim.diameter">Diameter</button>
     </div>
     <label class="dimfield"><input id="dimValue" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><span id="dimUnit">mm</span></label>
@@ -316,72 +316,72 @@
     <p id="dimError" class="muted err" hidden></p>
     <p class="muted small" data-i18n="dim.hint"></p>
     <div class="dimbuttons">
-      <button type="button" id="dimDelete" class="danger" data-i18n="tool.delete">Ta bort</button>
+      <button type="button" id="dimDelete" class="danger" data-i18n="tool.delete">Delete</button>
       <span class="spacer"></span>
-      <button type="button" id="dimCancel" data-i18n="ui.cancel">Avbryt</button>
+      <button type="button" id="dimCancel" data-i18n="ui.cancel">Cancel</button>
       <button type="submit" class="primary" data-i18n="ui.ok">OK</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="projDlg">
-  <h2 data-i18n="project.title">Modeller</h2>
+  <h2 data-i18n="project.title">Models</h2>
   <ul id="projList" class="projlist"></ul>
   <div class="projactions">
-    <button type="button" id="projNew" class="primary" data-i18n="project.new">Ny modell</button>
-    <button type="button" id="projImport" data-i18n="project.import">Öppna fil</button>
-    <button type="button" id="projExport" data-i18n="project.export">Spara som fil</button>
-    <!-- Inget accept-filter: Android känner inte igen .scad och gråar annars ut filerna. -->
+    <button type="button" id="projNew" class="primary" data-i18n="project.new">New model</button>
+    <button type="button" id="projImport" data-i18n="project.import">Open file</button>
+    <button type="button" id="projExport" data-i18n="project.export">Save as file</button>
+    <!-- No accept filter: Android does not recognise .scad and would grey the files out. -->
     <input id="projFile" type="file" hidden>
   </div>
-  <form method="dialog"><button data-i18n="ui.close">Stäng</button></form>
+  <form method="dialog"><button data-i18n="ui.close">Close</button></form>
 </dialog>
 <dialog id="exportDlg">
-  <h2 data-i18n="export.title">Exportera</h2>
+  <h2 data-i18n="export.title">Export</h2>
   <div id="exFormat" class="segmented">
     <button type="button" data-format="3mf">3MF</button>
     <button type="button" data-format="stl">STL</button>
     <button type="button" data-format="scad">OpenSCAD</button>
   </div>
-  <label class="field exname"><span data-i18n="export.name">Filnamn</span><input id="exName" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+  <label class="field exname"><span data-i18n="export.name">File name</span><input id="exName" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
   <p id="exInfo" class="muted"></p>
   <p class="muted" data-i18n="export.hint"></p>
   <form method="dialog" class="exbuttons">
-    <button data-i18n="ui.close">Stäng</button>
-    <button type="button" id="exShare" hidden data-i18n="export.share">Dela</button>
-    <button type="button" id="exDownload" class="primary" data-i18n="export.download">Ladda ner</button>
+    <button data-i18n="ui.close">Close</button>
+    <button type="button" id="exShare" hidden data-i18n="export.share">Share</button>
+    <button type="button" id="exDownload" class="primary" data-i18n="export.download">Download</button>
   </form>
 </dialog>
 <dialog id="aboutDlg">
   <div id="aboutMain" class="about">
-    <h2 data-i18n="about.title">Om scadshape</h2>
+    <h2 data-i18n="about.title">About scadshape</h2>
     <p id="aboutVersion" class="muted"></p>
     <p data-i18n="about.intro"></p>
     <p data-i18n="about.license"></p>
-    <p><button type="button" id="aboutLicense" class="link" data-i18n="about.showLicense">Visa licensen</button>
-      <a id="aboutSource" target="_blank" rel="noopener" data-i18n="about.source" hidden>Källkod</a></p>
-    <h3 data-i18n="about.builtWith">Byggt med</h3>
+    <p><button type="button" id="aboutLicense" class="link" data-i18n="about.showLicense">Show the license (GPL-3.0)</button>
+      <a id="aboutSource" target="_blank" rel="noopener" data-i18n="about.source" hidden>Source code</a></p>
+    <h3 data-i18n="about.builtWith">Built with</h3>
     <p class="muted small" data-i18n="about.engineSource"></p>
     <div id="aboutParts"></div>
-    <form method="dialog"><button data-i18n="ui.close">Stäng</button></form>
+    <form method="dialog"><button data-i18n="ui.close">Close</button></form>
   </div>
   <div id="aboutText" class="about" hidden>
     <h2 id="aboutTextTitle"></h2>
     <pre id="aboutTextBody"></pre>
-    <div class="aboutback"><button type="button" id="aboutBack" data-back data-i18n="about.back">Tillbaka</button></div>
+    <div class="aboutback"><button type="button" id="aboutBack" data-back data-i18n="about.back">Back</button></div>
   </div>
 </dialog>
 <dialog id="benchDlg">
-  <h2 data-i18n="bench.title">Mätning</h2>
+  <h2 data-i18n="bench.title">Benchmark</h2>
   <p id="benchInfo" class="muted"></p>
   <div class="tablewrap">
     <table>
-      <thead><tr><th data-i18n="bench.model">Modell</th><th>#</th><th data-i18n="bench.time">Tid</th><th data-i18n="bench.triangles">Trianglar</th></tr></thead>
+      <thead><tr><th data-i18n="bench.model">Model</th><th>#</th><th data-i18n="bench.time">Time</th><th data-i18n="bench.triangles">Triangles</th></tr></thead>
       <tbody id="benchBody"></tbody>
     </table>
   </div>
   <p id="benchSummary" class="muted"></p>
-  <form method="dialog"><button data-i18n="ui.close">Stäng</button></form>
+  <form method="dialog"><button data-i18n="ui.close">Close</button></form>
 </dialog>
 </body>
 </html>

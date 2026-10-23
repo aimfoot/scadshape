@@ -1,6 +1,7 @@
-// Skissa på en yta: vilket skissplan en tryckt yta ligger i (grundplan eller snett), modellens kontur i ett skissplan
-// (referens att snäppa till i skissen) och ett förskjutningsuttryck som följer featuren som
-// skapade ytan (bara grundplan; en sned yta ligger fast i rummet).
+// Sketch on a face: which sketch plane a tapped face lies in (base plane or slanted), the model's
+// outline in a sketch plane (a reference to snap to in the sketch) and an offset expression that
+// follows the feature that created the face (base planes only; a slanted face stays fixed in
+// space).
 
 import { activeCount, type Doc, type SketchFeature } from './doc';
 import { parseExpr } from './expr';
@@ -13,7 +14,7 @@ import type { ExtrudeFeature } from './features/extrude';
 import { arcGeom } from './sketch/model';
 import { ccwSweep } from './sketch/geom';
 
-/** Planets förskjutningsriktning i världen (XY: +Z, XZ: −Y, YZ: +X; samma som model3d). */
+/** The plane's offset direction in the world (XY: +Z, XZ: −Y, YZ: +X; the same as model3d). */
 const AXIS: Record<Plane, { i: 0 | 1 | 2; sign: 1 | -1; u: 0 | 1 | 2; v: 0 | 1 | 2 }> = {
   XY: { i: 2, sign: 1, u: 0, v: 1 },
   XZ: { i: 1, sign: -1, u: 0, v: 2 },
@@ -23,11 +24,11 @@ const AXIS: Record<Plane, { i: 0 | 1 | 2; sign: 1 | -1; u: 0 | 1 | 2; v: 0 | 1 |
 export interface FacePlane {
   plane: Plane;
   offset: number;
-  /** Ytan pekar mot planets negativa normal (t.ex. en undersida). */
+  /** The face points along the plane's negative normal (e.g. an underside). */
   flipped: boolean;
 }
 
-/** Skissplan för en yta med normalen `n` genom punkten `p`; null om ytan är sned. */
+/** Sketch plane for a face with normal `n` through the point `p`; null if the face is slanted. */
 export function facePlane(n: [number, number, number], p: [number, number, number]): FacePlane | null {
   for (const plane of ['XY', 'XZ', 'YZ'] as Plane[]) {
     const a = AXIS[plane];
@@ -37,22 +38,22 @@ export function facePlane(n: [number, number, number], p: [number, number, numbe
   return null;
 }
 
-/** Avrunda bort float32-brus (STL:en har 32-bitars koordinater). */
+/** Round away float32 noise (the STL has 32-bit coordinates). */
 const tidy = (v: number) => {
   const r = Math.round(v * 1000) / 1000;
   return Object.is(r, -0) ? 0 : r;
 };
 
 export interface Reference {
-  /** Ytornas kantlinjer i skissens (u, v). */
+  /** The faces' boundary lines in the sketch's (u, v). */
   segments: [Vec, Vec][];
-  /** Hörn (där kanten byter riktning) och mittpunkter på runda hål/tappar. */
+  /** Corners (where the edge changes direction) and centers of round holes/bosses. */
   snaps: Vec[];
 }
 
 /**
- * Konturen av modellens ytor som ligger i skissplanet: kanter som bara en av de plana
- * trianglarna har (inre diagonaler tar ut varandra).
+ * The outline of the model's faces that lie in the sketch plane: edges that only one of the flat
+ * triangles has (inner diagonals cancel out).
  */
 export function planeReference(positions: Float32Array, frame: Frame): Reference {
   const tol = 1e-3 + Math.hypot(...frame.o) * 1e-5;
@@ -80,24 +81,25 @@ export function planeReference(positions: Float32Array, frame: Frame): Reference
   return { segments, snaps: referenceSnaps(segments) };
 }
 
-/** Grannfacetter med mindre vinkel än så här räknas till samma (runda) yta. */
+/** Neighbouring facets with a smaller angle than this count as the same (round) surface. */
 const SMOOTH = Math.cos((30 * Math.PI) / 180);
 
 /**
- * Referensen i en skiss: konturen i planet (planeReference) plus hela den yta som planet
- * tangerar, projicerad på planet. En rund eller sned yta (cylindermantel, avrundning, kon)
- * växer från facetterna som ligger i planet över mjuka kanter, men bara på den sida som vetter
- * mot skissen; konturen är ytans kanter och siluetten där den vänder bort.
+ * The reference in a sketch: the outline in the plane (planeReference) plus the whole surface that
+ * the plane touches, projected onto the plane. A round or slanted surface (cylinder wall, fillet,
+ * cone) grows from the facets lying in the plane across smooth edges, but only on the side facing
+ * the sketch; the outline is the surface's edges and the silhouette where it turns away.
  */
 export function sketchReference(positions: Float32Array, frame: Frame): Reference {
   const base = planeReference(positions, frame);
   const k = (p: Vec) => `${Math.round(p.x * 1000)},${Math.round(p.y * 1000)}`;
   const sk = ([a, b]: [Vec, Vec]) => (k(a) < k(b) ? `${k(a)}|${k(b)}` : `${k(b)}|${k(a)}`);
   const surf = surfaceOutline(positions, frame);
-  // På en rund yta är facetterna i planet bara en smal remsa: visa beröringslinjen i stället för remsans kanter.
+  // On a round surface the facets in the plane are only a narrow strip: show the line of contact
+  // instead of the strip's edges.
   const strip = new Set(surf.strip.map(sk));
   const segments = [...base.segments.filter(s => !strip.has(sk(s))), ...surf.outline];
-  // Samma kant kan komma från båda: ta bort dubbletter.
+  // The same edge can come from both: remove duplicates.
   const seen = new Set<string>();
   const uniq = segments.filter(([a, b]) => {
     const id = k(a) < k(b) ? `${k(a)}|${k(b)}` : `${k(b)}|${k(a)}`;
@@ -109,8 +111,9 @@ export function sketchReference(positions: Float32Array, frame: Frame): Referenc
 }
 
 /**
- * Konturen (i planets u, v) av den mjuka ytan som tangerar planet, med beröringslinjen; tom om
- * ingen facett ligger i planet eller ytan är plan. strip: kanterna på facetterna i planet.
+ * The outline (in the plane's u, v) of the smooth surface that touches the plane, with the line of
+ * contact; empty if no facet lies in the plane or the surface is flat. strip: the edges of the
+ * facets in the plane.
  */
 function smoothPatch(positions: Float32Array, frame: Frame) {
   const tol = 1e-3 + Math.hypot(...frame.o) * 1e-5;
@@ -121,7 +124,8 @@ function smoothPatch(positions: Float32Array, frame: Frame) {
     const a = V(t, 0);
     normals.push(unit(cross(sub(V(t, 1), a), sub(V(t, 2), a))));
   }
-  // Startfacetter: i planet. Ytans utsida bestäms av dem (en undersida pekar mot −normalen).
+  // Start facets: in the plane. The surface's outside is determined by them (an underside points
+  // along −normal).
   const seeds: number[] = [];
   let side = 0;
   for (let t = 0; t < nTri; t++) {
@@ -134,7 +138,7 @@ function smoothPatch(positions: Float32Array, frame: Frame) {
   }
   if (!seeds.length) return null;
   const sn = scale(frame.n, side >= 0 ? 1 : -1);
-  // Kanter → facetter (hörn avrundade så att float32-brus inte delar kanter).
+  // Edges → facets (corners rounded so float32 noise does not split edges).
   const vk = (p: V3) => `${Math.round(p[0] * 1e4)},${Math.round(p[1] * 1e4)},${Math.round(p[2] * 1e4)}`;
   const edges = new Map<string, number[]>();
   const edgeKey = (t: number, k: number) => {
@@ -160,11 +164,11 @@ function smoothPatch(positions: Float32Array, frame: Frame) {
         queue.push(u);
       }
   }
-  if (inPatch.size === seeds.length) return null; // bara plana facetter
+  if (inPatch.size === seeds.length) return null; // only flat facets
   return { V, vk, edges, edgeKey, seeds, inPatch, sn };
 }
 
-/** Hur långt (mm) den runda ytan faller bort under planet inom området box (planets u, v); 0 för en plan yta. */
+/** How far (mm) the round surface falls away below the plane within the area box (the plane's u, v); 0 for a flat surface. */
 export function surfaceDepth(positions: Float32Array, frame: Frame, box: { x0: number; y0: number; x1: number; y1: number }): number {
   const patch = smoothPatch(positions, frame);
   if (!patch) return 0;
@@ -195,9 +199,10 @@ function surfaceOutline(positions: Float32Array, frame: Frame): { outline: [Vec,
       const a = uv(V(t, k)), b = uv(V(t, (k + 1) % 3));
       if (Math.hypot(a.x - b.x, a.y - b.y) > 1e-6) out.push([a, b]);
     }
-  // Beröringslinjen: genom remsans mitt längs dess huvudriktning, så lång som remsan.
+  // The line of contact: through the middle of the strip along its main direction, as long as the
+  // strip.
   const strip: [Vec, Vec][] = [];
-  const corners = new Map<string, Vec>(); // varje hörn en gång (delade hörn skulle snedvrida riktningen)
+  const corners = new Map<string, Vec>(); // each corner once (shared corners would skew the direction)
   for (const t of seeds)
     for (let k = 0; k < 3; k++) {
       const a = uv(V(t, k));
@@ -221,15 +226,16 @@ function surfaceOutline(positions: Float32Array, frame: Frame): { outline: [Vec,
 }
 
 export interface SlantedFace {
-  /** Närmaste grundplan (för namnet). */
+  /** Nearest base plane (for the name). */
   plane: Plane;
   face: { o: V3; u: V3; v: V3 };
 }
 
 /**
- * Plan för en sned yta: normalen och läget ur alla trianglar i samma plan som den tryckta
- * (viktat med arean – en enda smal triangel ger en onoggrann normal). u ligger vågrätt längs
- * ytan, v uppför lutningen och normalen pekar ut ur kroppen; origo i ytans nedre vänstra hörn.
+ * Plane for a slanted face: the normal and position from all triangles in the same plane as the
+ * tapped one (weighted by area – a single thin triangle gives an inaccurate normal). u runs
+ * horizontally along the face, v up the slope and the normal points out of the body; origin in the
+ * face's lower left corner.
  */
 export function slantedFace(positions: Float32Array, n0: V3, p0: V3): SlantedFace {
   n0 = unit(n0);
@@ -252,7 +258,7 @@ export function slantedFace(positions: Float32Array, n0: V3, p0: V3): SlantedFac
   let u = cross([0, 0, 1], n);
   u = Math.hypot(...u) < 1e-6 ? [1, 0, 0] : unit(u);
   const v = cross(n, u);
-  // Origo: först i ytans plan genom tyngdpunkten, sedan flyttat till nedre vänstra hörnet.
+  // Origin: first in the face's plane through the centroid, then moved to the lower left corner.
   const o0 = c, frame = { o: o0, u, v, n };
   const ref = planeReference(positions, frame);
   const corners = ref.snaps.length ? ref.snaps : ref.segments.flat();
@@ -265,7 +271,7 @@ export function slantedFace(positions: Float32Array, n0: V3, p0: V3): SlantedFac
   return { plane, face: { o: o.map(r4) as V3, u, v } };
 }
 
-/** Hörn och cirkelmittpunkter i en kontur. */
+/** Corners and circle centers in an outline. */
 function referenceSnaps(segments: [Vec, Vec][]): Vec[] {
   const key = (p: Vec) => `${Math.round(p.x * 1000)},${Math.round(p.y * 1000)}`;
   const adj = new Map<string, { p: Vec; nb: Vec[] }>();
@@ -287,7 +293,8 @@ function referenceSnaps(segments: [Vec, Vec][]): Vec[] {
     if (turn > Math.PI) turn = 2 * Math.PI - turn;
     if (turn > (20 * Math.PI) / 180) snaps.push(p);
   }
-  // Slutna slingor med många lika långt från mitten belägna punkter = cirklar: snäpp till mitten.
+  // Closed loops with many points at the same distance from the middle = circles: snap to the
+  // center.
   const seen = new Set<string>();
   for (const [k0, start] of adj) {
     if (seen.has(k0) || start.nb.length !== 2) continue;
@@ -318,7 +325,7 @@ const isZero = (s: string) => {
   const r = parseExpr(s);
   return r.value === 0 && !r.uses.length;
 };
-/** "a + b" / "a - (b)" utan onödiga nollor. */
+/** "a + b" / "a - (b)" without needless zeros. */
 const plus = (a: string, sign: '+' | '-', b: string) => {
   b = b.trim();
   const nb = sign === '-' && !/^[\p{L}\p{N}_.,]+$/u.test(b) ? `(${b})` : b;
@@ -328,8 +335,9 @@ const plus = (a: string, sign: '+' | '-', b: string) => {
 const half = (d: string) => (/^[\p{L}\p{N}_.,]+$/u.test(d.trim()) ? `${d.trim()} / 2` : `(${d.trim()}) / 2`);
 
 /**
- * Förskjutning för en ny skiss på ytan: helst ett uttryck från featuren som skapade ytan
- * (skissplanets förskjutning ± djupet) så att skissen följer med när måttet ändras, annars talet.
+ * Offset for a new sketch on the face: preferably an expression from the feature that created the
+ * face (the sketch plane's offset ± the depth) so the sketch follows when the dimension changes,
+ * otherwise the number.
  */
 export function offsetExpr(doc: Doc, plane: Plane, value: number, vars: Vars): string {
   const active = doc.features.slice(0, activeCount(doc)).filter(f => !f.suppressed);
@@ -355,9 +363,9 @@ export function offsetExpr(doc: Doc, plane: Plane, value: number, vars: Vars): s
 }
 
 /**
- * Vilken extrudering (sidoyta från en linje eller ändyta) en sned yta kommer från, så att
- * skissen kan följa måtten. Senaste featuren först; null om ingen passar (t.ex. upprepade
- * kopior, kodblock) – då ligger skissen fast i rummet.
+ * Which extrude (side face from a line, or end face) a slanted face comes from, so the sketch can
+ * follow the dimensions. Latest feature first; null if none fits (e.g. repeated copies, code
+ * blocks) – then the sketch stays fixed in space.
  */
 export function findFaceRef(doc: Doc, vars: Vars, n: V3, p: V3): FaceRef | null {
   n = unit(n);
@@ -376,7 +384,7 @@ export function findFaceRef(doc: Doc, vars: Vars, n: V3, p: V3): FaceRef | null 
       if (Math.abs(d) < 0.9999) continue;
       if (Math.abs(dot(sub(p, g.point), g.n)) > 0.01) continue;
       if (g.corners) {
-        // Träffen måste ligga inom sidoytans rektangel.
+        // The hit must lie within the side face's rectangle.
         const [P0, P1, , P3] = g.corners;
         const a = sub(P1, P0), b = sub(P3, P0), q = sub(p, P0);
         const s = dot(q, a) / dot(a, a), t = dot(q, b) / dot(b, b);
@@ -388,16 +396,16 @@ export function findFaceRef(doc: Doc, vars: Vars, n: V3, p: V3): FaceRef | null 
   return null;
 }
 
-// ---- Runda sidor på extruderingar (en extruderad yta som följer cylindern) ----------------------
+// ---- Round sides of extrudes (an extruded face that follows the cylinder) -----------------------
 
-/** Den runda sidan som en cirkel/båge i en extrudering sveper upp. inside: ett hål (ytan vetter mot centrum). */
+/** The round side that a circle/arc in an extrude sweeps out. inside: a hole (the face looks towards the center). */
 export interface CurveRef {
   feature: string;
   entity: string;
   inside: boolean;
 }
 
-/** Cirkelns/bågens sida i skissens frame: centrum, radie, vinklar (rad) och höjd längs normalen. */
+/** The circle's/arc's side in the sketch's frame: center, radius, angles (rad) and height along the normal. */
 export interface CurveSide {
   sketch: SketchFeature;
   c: Vec;
@@ -416,7 +424,7 @@ function curveSide(sk: SketchFeature, f: ExtrudeFeature, entity: string, vars?: 
   return { sketch: sk, c: g.c, r: g.r, a0: g.a0, sweep: g.sweep, span };
 }
 
-/** Vilken extruderad cirkels/bågs sida en träff (punkt p, normal n) ligger på, eller null. */
+/** Which extruded circle's/arc's side a hit (point p, normal n) lies on, or null. */
 export function findCurveRef(doc: Doc, vars: Vars, n: V3, p: V3): CurveRef | null {
   n = unit(n);
   const active = doc.features.slice(0, activeCount(doc)).filter(f => !f.suppressed);
@@ -425,7 +433,7 @@ export function findCurveRef(doc: Doc, vars: Vars, n: V3, p: V3): CurveRef | nul
     const sk = active.find((g): g is SketchFeature => g.type === 'sketch' && g.id === f.sketch);
     if (!sk) continue;
     const fs = sketchFrame(sk, vars, doc);
-    if (Math.abs(dot(n, fs.n)) > 0.05) continue; // sidan är vinkelrät mot skissen
+    if (Math.abs(dot(n, fs.n)) > 0.05) continue; // the side is perpendicular to the sketch
     const q = toPlane(fs, p);
     for (const entity of Object.keys(sk.entities)) {
       const side = curveSide(sk, f, entity, vars);
@@ -442,7 +450,7 @@ export function findCurveRef(doc: Doc, vars: Vars, n: V3, p: V3): CurveRef | nul
   return null;
 }
 
-/** Lös en CurveRef (extruderingen måste vara aktiv och ligga före `before`, om den ges). */
+/** Resolve a CurveRef (the extrude must be active and come before `before`, if given). */
 export function resolveCurveRef(doc: Doc, ref: CurveRef, vars: Vars | undefined, before?: string): CurveSide | null {
   const fi = doc.features.findIndex(f => f.id === ref.feature);
   const f = doc.features[fi];

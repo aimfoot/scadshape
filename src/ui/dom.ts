@@ -1,9 +1,9 @@
-// Små DOM-hjälpare och lagring.
+// Small DOM helpers and storage.
 
 export const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector(sel) as T;
 export const $$ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)];
 
-/** Skapa ett element med egenskaper och barn. */
+/** Create an element with properties and children. */
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   props: Partial<HTMLElementTagNameMap[K]> & { dataset?: Record<string, string> } = {},
@@ -16,7 +16,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return e;
 }
 
-/** localStorage med prefix; tål att lagring saknas (privat läge). */
+/** localStorage with a prefix; tolerates missing storage (private mode). */
 export const store = {
   get(k: string) {
     try {
@@ -29,7 +29,7 @@ export const store = {
     try {
       localStorage.setItem(`scadshape.${k}`, v);
     } catch {
-      /* privat läge o.d. */
+      /* private mode etc. */
     }
   },
 };
@@ -38,7 +38,7 @@ export const fmtMs = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(m
 export const fmtInt = (n: number) => n.toLocaleString('sv-SE');
 export const fmtInput = (v: number) => String(Math.round(v * 1000) / 1000).replace('.', ',');
 
-/** Ät upp nästa klick (touch skickar ett klick efter pointerup – det skulle annars träffa en nyss öppnad dialog). */
+/** Swallow the next click (touch sends a click after pointerup – it would otherwise hit a freshly opened dialog). */
 export function swallowNextClick(ms = 500) {
   const eat = (e: Event) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-// Alla feature-typer (utom skiss) samlade: lägg till en ny typ här och i Feature-unionen.
+// All feature types (except sketch) collected: add a new type here and in the Feature union.
 
 import { code, type CodeFeature } from './code';
 import { container, type ContainerFeature } from './container';
@@ -27,7 +27,7 @@ export const KINDS: { [T in SolidFeature['type']]: FeatureKind<Extract<SolidFeat
   surface,
 };
 
-/** Typens beskrivning (med lös typning för generisk kod som panel och träd). */
+/** The type's description (loosely typed for generic code such as the panel and the tree). */
 export const kindOf = (f: SolidFeature) => KINDS[f.type] as unknown as FeatureKind<SolidFeature>;
 
 export type { SurfaceFeature, SnapFeature, MeshFeature, CodeFeature, ContainerFeature, TextFeature, ExtrudeFeature, HoleFeature, RevolveFeature, ThreadFeature };

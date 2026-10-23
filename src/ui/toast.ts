@@ -1,4 +1,4 @@
-// Korta notiser (i skissläget i skissytan, annars över 3D-vyn).
+// Short notices (in sketch mode over the sketch area, otherwise over the 3D view).
 
 import { remoteLog } from '../remote';
 import { $, $$ } from './dom';

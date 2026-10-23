@@ -1,4 +1,4 @@
-// Binär STL → positioner och normaler (en normal per triangel, platt skuggning).
+// Binary STL → positions and normals (one normal per triangle, flat shading).
 
 export interface Mesh {
   positions: Float32Array;
@@ -10,14 +10,14 @@ export function parseBinaryStl(buf: ArrayBuffer): Mesh {
   if (buf.byteLength < 84) return { positions: new Float32Array(0), normals: new Float32Array(0), triangles: 0 };
   const dv = new DataView(buf);
   const n = dv.getUint32(80, true);
-  if (84 + n * 50 > buf.byteLength) throw new Error(`Trasig STL: ${n} trianglar men ${buf.byteLength} byte`);
+  if (84 + n * 50 > buf.byteLength) throw new Error(`Broken STL: ${n} triangles but ${buf.byteLength} bytes`);
   const pos = new Float32Array(n * 9);
   const nrm = new Float32Array(n * 9);
   for (let t = 0; t < n; t++) {
     const o = 84 + t * 50 + 12;
     const p = t * 9;
     for (let k = 0; k < 9; k++) pos[p + k] = dv.getFloat32(o + k * 4, true);
-    // Normalen räknas ur hörnen (tål filer med nollade normaler).
+    // The normal is computed from the corners (tolerates files with zeroed normals).
     const ax = pos[p + 3] - pos[p], ay = pos[p + 4] - pos[p + 1], az = pos[p + 5] - pos[p + 2];
     const bx = pos[p + 6] - pos[p], by = pos[p + 7] - pos[p + 1], bz = pos[p + 8] - pos[p + 2];
     let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
@@ -38,7 +38,7 @@ export interface StlInfo {
   max: [number, number, number];
 }
 
-/** Binär eller ASCII-STL: antal trianglar och omfång, eller null om filen inte är en STL. */
+/** Binary or ASCII STL: number of triangles and extent, or null if the file is not an STL. */
 export function stlInfo(bytes: Uint8Array): StlInfo | null {
   const min: [number, number, number] = [Infinity, Infinity, Infinity], max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
   const add = (x: number, y: number, z: number) => {
@@ -47,7 +47,7 @@ export function stlInfo(bytes: Uint8Array): StlInfo | null {
     max[0] = Math.max(max[0], x); max[1] = Math.max(max[1], y); max[2] = Math.max(max[2], z);
   };
   const done = (n: number) => (n > 0 && Number.isFinite(min[0]) ? { triangles: n, min, max } : null);
-  // Binär: storleken stämmer med antalet trianglar (ASCII-filer kan också börja med "solid").
+  // Binary: the size matches the number of triangles (ASCII files can also start with "solid").
   if (bytes.length >= 84) {
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const n = dv.getUint32(80, true);

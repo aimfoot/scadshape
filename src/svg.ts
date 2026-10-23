@@ -1,7 +1,7 @@
-// SVG → skissgeometri. En egen liten XML-läsare (samma i webbläsaren och i Node-testerna),
-// transformer, path-data och grundformerna. Resultatet är former i mm med y uppåt:
-// linjer och cirkelbågar exakt (när transformen bevarar cirklar), Bézierkurvor som kurvor
-// som plattas ut först när storleken är bestämd (toleransen gäller den färdiga skissen).
+// SVG → sketch geometry. A small XML reader of our own (the same in the browser and the Node
+// tests), transforms, path data and the basic shapes. The result is shapes in mm with y up: lines
+// and circular arcs exactly (when the transform preserves circles), Bézier curves as curves that
+// are flattened only once the size is decided (the tolerance applies to the finished sketch).
 
 import type { Vec } from './sketch/geom';
 import { newId, type SketchData } from './sketch/model';
@@ -9,21 +9,21 @@ import { newId, type SketchData } from './sketch/model';
 export type Seg =
   | { t: 'L'; a: Vec; b: Vec }
   | { t: 'C'; a: Vec; c1: Vec; c2: Vec; b: Vec }
-  /** Cirkelbåge från a till b runt c; sweep i radianer, positiv = moturs (y uppåt). */
+  /** Circular arc from a to b around c; sweep in radians, positive = counterclockwise (y up). */
   | { t: 'A'; a: Vec; b: Vec; c: Vec; r: number; sweep: number };
 
 export type Shape = { kind: 'path'; segs: Seg[]; closed: boolean } | { kind: 'circle'; c: Vec; r: number };
 
 export interface SvgDrawing {
   shapes: Shape[];
-  /** Omslutande rektangel (mm). */
+  /** Bounding rectangle (mm). */
   min: Vec;
   max: Vec;
-  /** Element som inte kan bli geometri (text, bilder …), antal per tagg. */
+  /** Elements that cannot become geometry (text, images …), count per tag. */
   ignored: Record<string, number>;
 }
 
-// ---- Matriser: [a, b, c, d, e, f] → x' = a·x + c·y + e, y' = b·x + d·y + f ---------------------------
+// ---- Matrices: [a, b, c, d, e, f] → x' = a·x + c·y + e, y' = b·x + d·y + f ---------------------------
 
 type M = [number, number, number, number, number, number];
 const ID: M = [1, 0, 0, 1, 0, 0];
@@ -34,7 +34,7 @@ const mul = (m: M, n: M): M => [
 ];
 const apply = (m: M, p: Vec): Vec => ({ x: m[0] * p.x + m[2] * p.y + m[4], y: m[1] * p.x + m[3] * p.y + m[5] });
 const det = (m: M) => m[0] * m[3] - m[1] * m[2];
-/** Likformig (rotation/spegling + lika skala i alla riktningar)? Då förblir cirklar cirklar. */
+/** Uniform (rotation/mirror + equal scale in all directions)? Then circles stay circles. */
 function similarity(m: M): number | null {
   const sx = Math.hypot(m[0], m[1]), sy = Math.hypot(m[2], m[3]);
   const dot = m[0] * m[2] + m[1] * m[3];
@@ -78,7 +78,7 @@ function parseTransform(s: string | undefined): M {
 const NUM = /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
 const numbers = (s: string | undefined) => (s?.match(NUM) ?? []).map(Number);
 
-/** Längd med enhet → mm (px = 1/96 tum, som i CSS). */
+/** Length with a unit → mm (px = 1/96 inch, as in CSS). */
 function lengthMm(s: string | undefined): number | null {
   const m = /^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*(mm|cm|in|pt|pc|px|q)?\s*$/i.exec(s ?? '');
   if (!m) return null;
@@ -117,7 +117,7 @@ function* tags(xml: string): Generator<Tag> {
       i = e + 1;
       continue;
     }
-    // Hitta slutet på taggen utan att lura sig av '>' inne i attributvärden.
+    // Find the end of the tag without being fooled by '>' inside attribute values.
     let j = lt + 1, q = '';
     for (; j < xml.length; j++) {
       const ch = xml[j];
@@ -137,7 +137,7 @@ function* tags(xml: string): Generator<Tag> {
   }
 }
 
-/** Värde från attribut eller style="…" (style går före). */
+/** Value from an attribute or style="…" (style takes precedence). */
 function prop(attrs: Record<string, string>, key: string): string | undefined {
   const m = new RegExp(`(?:^|;)\\s*${key}\\s*:\\s*([^;]+)`).exec(attrs.style ?? '');
   return m ? m[1].trim() : attrs[key];
@@ -145,7 +145,7 @@ function prop(attrs: Record<string, string>, key: string): string | undefined {
 
 // ---- Path-data --------------------------------------------------------------------------------------
 
-/** Tolka path-data till delbanor i elementets koordinater (bågar som ändpunktsbågar). */
+/** Parse path data into subpaths in the element's coordinates (arcs as endpoint arcs). */
 type RawSeg =
   | { t: 'L'; a: Vec; b: Vec }
   | { t: 'C'; a: Vec; c1: Vec; c2: Vec; b: Vec }
@@ -218,7 +218,7 @@ function parsePathData(d: string): RawPath[] {
       if (C === 'M') {
         const p = P(n(), n());
         begin(p);
-        cmd = rel ? 'l' : 'L'; // följande par är linjer
+        cmd = rel ? 'l' : 'L'; // the following pairs are lines
       } else if (C === 'L') push({ t: 'L', a: cur, b: P(n(), n()) });
       else if (C === 'H') {
         const x = n();
@@ -246,12 +246,12 @@ function parsePathData(d: string): RawPath[] {
         if (large === null || sweep === null) throw new Error('bad');
         const b = P(n(), n());
         if (Math.hypot(b.x - cur.x, b.y - cur.y) < 1e-12) {
-          /* noll-båge: hoppa över */
+          /* zero arc: skip */
         } else if (rx < 1e-12 || ry < 1e-12) push({ t: 'L', a: cur, b });
         else push({ t: 'E', a: cur, b, rx, ry, phi: (phi * Math.PI) / 180, large, sweep });
-      } else break; // okänt kommando
+      } else break; // unknown command
     } catch {
-      break; // trasig data: behåll det som lästs
+      break; // broken data: keep what has been read
     }
     lastC = prevC;
     lastQ = prevQ;
@@ -260,7 +260,7 @@ function parsePathData(d: string): RawPath[] {
   return out;
 }
 
-/** Ändpunktsbåge → centrum, radier och vinklar (SVG-specens appendix F.6.5). */
+/** Endpoint arc → center, radii and angles (the SVG spec's appendix F.6.5). */
 function arcCenter(s: Extract<RawSeg, { t: 'E' }>) {
   let { rx, ry } = s;
   const cos = Math.cos(s.phi), sin = Math.sin(s.phi);
@@ -283,7 +283,7 @@ function arcCenter(s: Extract<RawSeg, { t: 'E' }>) {
   return { c, rx, ry, cos, sin, t1, dt };
 }
 
-/** Elliptisk båge som kubiska Bézier (högst 90° per bit), i elementets koordinater. */
+/** Elliptical arc as cubic Béziers (at most 90° per piece), in the element's coordinates. */
 function ellipseToCubics(s: Extract<RawSeg, { t: 'E' }>): RawSeg[] {
   const { c, rx, ry, cos, sin, t1, dt } = arcCenter(s);
   const n = Math.max(1, Math.ceil(Math.abs(dt) / (Math.PI / 2) - 1e-9));
@@ -300,7 +300,7 @@ function ellipseToCubics(s: Extract<RawSeg, { t: 'E' }>): RawSeg[] {
   return out;
 }
 
-/** Elementets delbanor → former i ritningens koordinater (matrisen m). */
+/** The element's subpaths → shapes in the drawing's coordinates (the matrix m). */
 function placePaths(paths: RawPath[], m: MatrixLike): Shape[] {
   const s = similarity(m);
   const flip = det(m) < 0 ? -1 : 1;
@@ -370,7 +370,7 @@ function elementPaths(name: string, a: Record<string, string>): RawPath[] | 'cir
   }
 }
 
-/** Läs en SVG-fil. Kastar Error om den inte är en SVG. */
+/** Read an SVG file. Throws Error if it is not an SVG. */
 export function parseSvg(xml: string): SvgDrawing {
   const shapes: Shape[] = [];
   const ignored: Record<string, number> = {};
@@ -378,7 +378,7 @@ export function parseSvg(xml: string): SvgDrawing {
   let root = false;
   for (const tag of tags(xml)) {
     if (tag.close) {
-      // Stäng till och med närmaste tagg med samma namn (tål slarvig XML).
+      // Close up to and including the nearest tag with the same name (tolerates sloppy XML).
       const i = stack.map(s => s.name).lastIndexOf(tag.name);
       if (i >= 0) stack.length = i;
       continue;
@@ -389,7 +389,7 @@ export function parseSvg(xml: string): SvgDrawing {
     let skip = !!parent?.skip || SKIP.has(tag.name) || prop(a, 'display') === 'none' || prop(a, 'visibility') === 'hidden';
     if (tag.name === 'svg' && !root) {
       root = true;
-      // Rotelementet: viewBox och bredd/höjd → mm, y uppåt.
+      // The root element: viewBox and width/height → mm, y up.
       const vb = numbers(a.viewBox);
       const W = lengthMm(a.width), H = lengthMm(a.height);
       const px = 25.4 / 96;
@@ -398,7 +398,7 @@ export function parseSvg(xml: string): SvgDrawing {
         sx = W !== null ? W / vb[2] : H !== null ? H / vb[3] : px;
         sy = H !== null ? H / vb[3] : sx;
         if (W !== null && H === null) sy = sx;
-        // preserveAspectRatio ignoreras: samma skala åt båda håll (den mindre, som "meet").
+        // preserveAspectRatio is ignored: the same scale both ways (the smaller, like "meet").
         const s = Math.min(sx, sy);
         sx = sy = s;
         tx = -vb[0];
@@ -406,7 +406,7 @@ export function parseSvg(xml: string): SvgDrawing {
       }
       m = mul([sx, 0, 0, -sy, 0, 0], [1, 0, 0, 1, tx, ty]);
     } else if (!root) {
-      continue; // något före <svg>
+      continue; // something before <svg>
     }
     m = mul(m, parseTransform(a.transform));
     if (!skip && IGNORED.has(tag.name)) {
@@ -430,7 +430,7 @@ export function parseSvg(xml: string): SvgDrawing {
   return { shapes: nonEmpty, min, max, ignored };
 }
 
-// ---- Omfång, placering och utplattning --------------------------------------------------------------------
+// ---- Extent, placement and flattening ---------------------------------------------------------------------
 
 function cubicAt(s: Extract<Seg, { t: 'C' }>, t: number): Vec {
   const u = 1 - t;
@@ -466,7 +466,7 @@ function bounds(shapes: Shape[]) {
   return { min: { x: x0, y: y0 }, max: { x: x1, y: y1 } };
 }
 
-/** Skala likformigt kring ref och flytta ref till origo (ref = nedre vänstra hörnet eller mitten). */
+/** Scale uniformly around ref and move ref to the origin (ref = the lower left corner or the middle). */
 export function placeDrawing(d: SvgDrawing, scale: number, origin: 'corner' | 'center'): Shape[] {
   const ref = origin === 'corner' ? d.min : { x: (d.min.x + d.max.x) / 2, y: (d.min.y + d.max.y) / 2 };
   const P = (p: Vec): Vec => ({ x: (p.x - ref.x) * scale, y: (p.y - ref.y) * scale });
@@ -485,7 +485,7 @@ export function placeDrawing(d: SvgDrawing, scale: number, origin: 'corner' | 'c
   );
 }
 
-/** Kubisk Bézier → punkter (utan startpunkten) så att avvikelsen håller sig under tol. */
+/** Cubic Bézier → points (without the start point) so the deviation stays below tol. */
 function flattenCubic(g: Extract<Seg, { t: 'C' }>, tol: number, out: Vec[], depth = 0) {
   const dx = g.b.x - g.a.x, dy = g.b.y - g.a.y;
   const L = Math.hypot(dx, dy);
@@ -505,8 +505,8 @@ export interface SketchStats {
 }
 
 /**
- * Lägg formerna i skissen: linjer, bågar och cirklar; Bézier plattas ut till linjer (tol mm).
- * Ändpunkter som sammanfaller blir samma punkt. lock = alla punkter fixeras (stora ritningar).
+ * Put the shapes in the sketch: lines, arcs and circles; Béziers are flattened to lines (tol mm).
+ * End points that coincide become the same point. lock = all points are fixed (large drawings).
  */
 export function addShapesToSketch(sk: SketchData, shapes: Shape[], opts: { tol?: number; lock?: boolean } = {}): SketchStats {
   const tol = opts.tol ?? 0.02;
@@ -552,12 +552,12 @@ export function addShapesToSketch(sk: SketchData, shapes: Shape[], opts: { tol?:
         sk.entities[newId(sk, 'e')] = { type: 'circle', c: point(g.c, false), r: g.r };
         stats.circles++;
       } else {
-        // Skissens bågar går moturs från p1 till p2.
+        // The sketch's arcs go counterclockwise from p1 to p2.
         const [from, to] = g.sweep > 0 ? [g.a, g.b] : [g.b, g.a];
         const p1 = point(from), p2 = point(to);
         if (p1 === p2) continue;
-        // Centrum på mittpunktsnormalen, så att båda ändarna ligger exakt på radien (filens
-        // avrundade koordinater stämmer annars inte, och med låsta punkter går den inte att lösa).
+        // Center on the perpendicular bisector, so both ends lie exactly on the radius (the file's
+        // rounded coordinates do not fit otherwise, and with locked points it cannot be solved).
         const A = sk.points[p1], B = sk.points[p2];
         const m = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 }, n = { x: -(B.y - A.y), y: B.x - A.x };
         const k = ((g.c.x - m.x) * n.x + (g.c.y - m.y) * n.y) / (n.x * n.x + n.y * n.y);

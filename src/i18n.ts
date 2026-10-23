@@ -1,12 +1,12 @@
-// Språk (svenska/engelska). Texter i koden hämtas med t('nyckel', {parametrar});
-// texter i HTML märks med data-i18n="nyckel" (även -title, -aria, -placeholder).
-// Ordböckerna ligger i i18n-sv.ts och i18n-en.ts.
+// Languages (Swedish/English). Texts in code are fetched with t('key', {params}); texts in HTML are
+// marked with data-i18n="key" (also -title, -aria, -placeholder). The dictionaries are in
+// i18n-en.ts and i18n-sv.ts.
 
 import { sv } from './i18n-sv';
 import { en } from './i18n-en';
 
 export type Lang = 'sv' | 'en';
-export type Key = keyof typeof sv;
+export type Key = keyof typeof en;
 export const LANGS: Record<Lang, string> = { sv: 'Svenska', en: 'English' };
 
 const DICTS: Record<Lang, Record<Key, string>> = { sv, en };
@@ -17,9 +17,9 @@ function initialLang(): Lang {
     const saved = globalThis.localStorage?.getItem(STORE_KEY);
     if (saved === 'sv' || saved === 'en') return saved;
   } catch {
-    /* ingen lagring */
+    /* no storage */
   }
-  const nav = globalThis.navigator?.language ?? 'sv';
+  const nav = globalThis.navigator?.language ?? 'en';
   return nav.toLowerCase().startsWith('sv') ? 'sv' : 'en';
 }
 
@@ -34,7 +34,7 @@ export function setLang(l: Lang) {
   try {
     globalThis.localStorage?.setItem(STORE_KEY, l);
   } catch {
-    /* privat läge o.d. */
+    /* private mode etc. */
   }
   if (globalThis.document) {
     document.documentElement.lang = l;
@@ -43,22 +43,22 @@ export function setLang(l: Lang) {
   for (const cb of listeners) cb();
 }
 
-/** Anropas när språket byts (för att rita om dynamiska texter). */
+/** Called when the language changes (to redraw dynamic texts). */
 export function onLangChange(cb: () => void) {
   listeners.add(cb);
 }
 
-/** En text på alla språk (t.ex. för att känna igen standardnamn). */
+/** A text in all languages (e.g. to recognise default names). */
 export const allLangs = (key: Key) => Object.values(DICTS).map(d => d[key]);
 
-/** Översätt; {namn} i texten ersätts med params.namn. */
+/** Translate; {name} in the text is replaced by params.name. */
 export function t(key: Key, params?: Record<string, string | number>): string {
-  let s = DICTS[lang][key] ?? DICTS.sv[key] ?? key;
+  let s = DICTS[lang][key] ?? DICTS.en[key] ?? key;
   if (params) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m));
   return s;
 }
 
-/** Sätt texter på element märkta med data-i18n*. */
+/** Set texts on elements marked with data-i18n*. */
 export function applyI18n(root: ParentNode = document) {
   for (const el of root.querySelectorAll<HTMLElement>('[data-i18n]')) el.textContent = t(el.dataset.i18n as Key);
   for (const el of root.querySelectorAll<HTMLElement>('[data-i18n-title]')) el.title = t(el.dataset.i18nTitle as Key);

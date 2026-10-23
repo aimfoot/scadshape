@@ -1,6 +1,6 @@
-// Konstanter som build.mjs sätter (esbuild define).
+// Constants set by build.mjs (esbuild define).
 
-/** Appens version; sätts bara av android/build.sh (SCADSHAPE_VERSION), annars ''. */
+/** The app's version; only set by android/build.sh (SCADSHAPE_VERSION), otherwise ''. */
 declare const __APP_VERSION__: string;
-/** Utvecklarverktyg: mätknappen och loggning till servern. false i appbygget – koden tas då bort. */
+/** Developer tools: the benchmark button and logging to the server. false in the app build – the code is then removed. */
 declare const __DEV_TOOLS__: boolean;

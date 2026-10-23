@@ -1,6 +1,6 @@
-// Web Worker som kör OpenSCAD (WASM, Manifold-backend).
-// wasm-modulen kompileras en gång; varje rendering får en ny, ren instans
-// (OpenSCADs main() är inte gjord för att köras flera gånger i samma process).
+// Web Worker that runs OpenSCAD (WASM, Manifold backend). The wasm module is compiled once; each
+// rendering gets a new, clean instance (OpenSCAD's main() is not made to run several times in the
+// same process).
 
 import { EXT, type WorkerRequest, type WorkerMessage } from './scad';
 
@@ -21,7 +21,7 @@ function load() {
     const t0 = performance.now();
     const wasmUrl = new URL('openscad.wasm', base);
     const compile = WebAssembly.compileStreaming(fetch(wasmUrl)).catch(async () =>
-      // Fel MIME-typ eller liknande: kompilera från buffer i stället.
+      // Wrong MIME type or similar: compile from a buffer instead.
       WebAssembly.compile(await (await fetch(wasmUrl)).arrayBuffer()),
     );
     const [module, js] = await Promise.all([compile, import(new URL('openscad.js', base).href)]);
@@ -31,7 +31,7 @@ function load() {
   return ready;
 }
 
-/** Typsnitt hämtas en gång per worker (dist/fonts/) och skrivs till varje instans. */
+/** Fonts are fetched once per worker (dist/fonts/) and written to each instance. */
 const fontCache = new Map<string, Promise<Uint8Array>>();
 const FONTS_CONF = '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig><dir>/fonts</dir></fontconfig>\n';
 function fetchFont(file: string) {
@@ -40,13 +40,13 @@ function fetchFont(file: string) {
       if (!r.ok) throw new Error(`${file}: ${r.status}`);
       return new Uint8Array(await r.arrayBuffer());
     });
-    p.catch(() => fontCache.delete(file)); // försök igen nästa gång
+    p.catch(() => fontCache.delete(file)); // try again next time
     fontCache.set(file, p);
   }
   return fontCache.get(file)!;
 }
 
-/** Bibliotek (dist/libs/<namn>.json) hämtas en gång per worker och skrivs till /libraries i varje instans. */
+/** Libraries (dist/libs/<name>.json) are fetched once per worker and written to /libraries in each instance. */
 const libCache = new Map<string, Promise<Record<string, string>>>();
 function fetchLibrary(name: string) {
   if (!libCache.has(name)) {
@@ -54,7 +54,7 @@ function fetchLibrary(name: string) {
       if (!r.ok) throw new Error(`${name}: ${r.status}`);
       return (await r.json()) as Record<string, string>;
     });
-    p.catch(() => libCache.delete(name)); // försök igen nästa gång
+    p.catch(() => libCache.delete(name)); // try again next time
     libCache.set(name, p);
   }
   return libCache.get(name)!;
@@ -69,7 +69,7 @@ async function render(req: Extract<WorkerRequest, { type: 'render' }>) {
   const t0 = performance.now();
   const inst = await factory({
     noInitialRun: true,
-    // fontconfig läser sin konfiguration när programmet startar.
+    // fontconfig reads its configuration when the program starts.
     preRun: [
       (m: { ENV: Record<string, string> }) => {
         if (fonts.length) m.ENV.FONTCONFIG_FILE = '/fonts/fonts.conf';
@@ -115,7 +115,7 @@ async function render(req: Extract<WorkerRequest, { type: 'render' }>) {
   try {
     data = (inst.FS.readFile(out) as Uint8Array).slice().buffer;
   } catch {
-    /* ingen utfil (t.ex. tom modell eller fel) */
+    /* no output file (e.g. empty model or an error) */
   }
   ctx.postMessage(
     { type: 'result', id: req.id, ok: rc === 0 && data !== null, rc, data, log, initMs: t1 - t0, renderMs: t2 - t1 },

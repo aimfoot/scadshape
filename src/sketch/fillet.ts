@@ -1,10 +1,10 @@
-// Avrunda (fillet) och fasa (chamfer) skisshörn: ett hörn är en punkt där exakt två
-// linjer möts. Linjerna trimmas till tangentpunkterna och hörnet ersätts av en tangent
-// båge (radiemått) resp. en rak linje (mått på benet).
+// Fillet and chamfer sketch corners: a corner is a point where exactly two lines meet. The lines
+// are trimmed to the tangent points and the corner is replaced by a tangent arc (radius dimension)
+// or a straight line (leg dimension).
 //
-// Virtuellt hörn: har hörnpunkten mått/villkor (eller är origo) behålls den på
-// linjernas förlängning, så att de måtten fortsätter gälla. En linje med Lika/Mittpunkt
-// blir konstruktion i full längd (villkoren gäller hela sidan) och får en trimmad kopia.
+// Virtual corner: if the corner point has dimensions/constraints (or is the origin) it is kept on
+// the lines' extensions, so those dimensions keep applying. A line with Equal/Midpoint becomes
+// construction at full length (the constraints apply to the whole side) and gets a trimmed copy.
 
 import { angleOf, ccwSweep, dist, type Vec } from './geom';
 import { constraintRefs, entityPointIds, newId, ORIGIN, removeEntities, type Constraint, type LineE, type NewConstraint, type SketchData } from './model';
@@ -23,7 +23,7 @@ const unit = (a: Vec, b: Vec): Vec => {
   return { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
 };
 
-/** Hörnet i punkten p, eller null (fler/färre än två linjer, båge i punkten, parallella linjer). */
+/** The corner at the point p, or null (more/fewer than two lines, an arc at the point, parallel lines). */
 export function cornerAt(sk: SketchData, p: string): Corner | null {
   const at = Object.entries(sk.entities).filter(([, e]) => !e.construction && entityPointIds(e).includes(p));
   if (at.length !== 2 || at.some(([, e]) => e.type !== 'line')) return null;
@@ -31,11 +31,11 @@ export function cornerAt(sk: SketchData, p: string): Corner | null {
   const P = sk.points[p], A = sk.points[other(e1, p)], B = sk.points[other(e2, p)];
   if (!P || dist(P, A) < 1e-9 || dist(P, B) < 1e-9) return null;
   const u1 = unit(P, A), u2 = unit(P, B);
-  if (Math.abs(u1.x * u2.y - u1.y * u2.x) < 0.01) return null; // (nästan) raka eller vikta tillbaka
+  if (Math.abs(u1.x * u2.y - u1.y * u2.x) < 0.01) return null; // (almost) straight or folded back
   return { p, l1, l2 };
 }
 
-/** Hörnen i en markering: markerade hörnpunkter, eller punkter som två markerade linjer delar. */
+/** The corners in a selection: selected corner points, or points shared by two selected lines. */
 export function cornersFor(sk: SketchData, points: string[], lines: string[]): Corner[] {
   if (points.length) {
     const cs = points.map(p => cornerAt(sk, p));
@@ -46,7 +46,7 @@ export function cornersFor(sk: SketchData, points: string[], lines: string[]): C
   return [...ends].map(p => cornerAt(sk, p)).filter((c): c is Corner => !!c && sel.has(c.l1) && sel.has(c.l2));
 }
 
-/** Hörnets vinkel (0..π) och de båda linjernas längder. */
+/** The corner's angle (0..π) and the lengths of both lines. */
 function cornerGeom(sk: SketchData, c: Corner) {
   const l1 = sk.entities[c.l1] as LineE, l2 = sk.entities[c.l2] as LineE;
   const P = sk.points[c.p], A = sk.points[other(l1, c.p)], B = sk.points[other(l2, c.p)];
@@ -55,10 +55,10 @@ function cornerGeom(sk: SketchData, c: Corner) {
   return { P, u1, u2, theta, len1: dist(P, A), len2: dist(P, B) };
 }
 
-/** Avståndet från hörnet längs linjerna till tangentpunkten för en radie/fasning. */
+/** The distance from the corner along the lines to the tangent point for a radius/chamfer. */
 const legFor = (kind: CornerKind, size: number, theta: number) => (kind === 'fillet' ? size / Math.tan(theta / 2) : size);
 
-/** Ett jämnt förslag som får plats i alla hörnen (ungefär en fjärdedel av kortaste sidan). */
+/** An even suggestion that fits in all the corners (roughly a quarter of the shortest side). */
 export function defaultCornerSize(sk: SketchData, corners: Corner[], kind: CornerKind): number {
   let best = Infinity;
   for (const c of corners) {
@@ -77,13 +77,13 @@ function niceDown(v: number) {
 }
 
 /**
- * Ersätt hörnen med bågar/fasningar av storleken size (radie resp. benlängd).
- * Hörnen behandlas ett i taget från aktuell geometri (en linje kan ha hörn i båda ändar).
- * Returnerar id för måttet, eller null om något hörn inte längre går (eller inte får plats).
+ * Replace the corners with arcs/chamfers of the size size (radius or leg length). The corners are
+ * handled one at a time from the current geometry (a line can have corners at both ends). Returns
+ * the dimension's id, or null if some corner no longer works (or does not fit).
  */
 export function cutCorners(sk: SketchData, points: string[], kind: CornerKind, size: number): string | null {
   let dim: string | null = null;
-  let first: string | null = null; // första bågen (fillet) resp. första benet (chamfer)
+  let first: string | null = null; // the first arc (fillet) or the first leg (chamfer)
   const add = (c: NewConstraint) => {
     const id = newId(sk, 'c');
     sk.constraints.push({ ...c, id } as Constraint);
@@ -133,7 +133,8 @@ export function cutCorners(sk: SketchData, points: string[], kind: CornerKind, s
       const bis = unit({ x: 0, y: 0 }, { x: g.u1.x + g.u2.x, y: g.u1.y + g.u2.y });
       const c = newId(sk, 'p');
       sk.points[c] = { x: P.x + (bis.x * size) / Math.sin(half), y: P.y + (bis.y * size) / Math.sin(half) };
-      // Bågen går moturs från p1 till p2 – välj ordning så att den blir den korta (< 180°).
+      // The arc goes counterclockwise from p1 to p2 – choose the order so it becomes the short one
+      // (< 180°).
       const C = sk.points[c];
       let [p1, p2] = T;
       if (ccwSweep(angleOf(C, sk.points[p1]), angleOf(C, sk.points[p2])) > Math.PI) [p1, p2] = [p2, p1];

@@ -1,4 +1,4 @@
-// Extrudera: valda regioner i en skiss dras ut längs planets normal.
+// Extrude: chosen regions in a sketch are pulled out along the plane's normal.
 
 import { t } from '../i18n';
 import { selectedRegionsScad } from '../sketch/codegen';
@@ -7,25 +7,25 @@ import { FieldReader, fnFor, inwardOf, num, OP_LABEL, outwardOf, type FeatureBas
 
 export interface ExtrudeFeature extends FeatureBase {
   type: 'extrude';
-  sketch: string; // skissens feature-id
-  regions: Vec[] | null; // frön (punkter i valda regioner); null = standard
-  depth: string; // uttryck (mm)
+  sketch: string; // the sketch's feature id
+  regions: Vec[] | null; // seeds (points in chosen regions); null = default
+  depth: string; // expression (mm)
   direction: 'normal' | 'reverse' | 'symmetric';
   op: Op;
-  /** Radie för profilens hörn (lodräta kanter); tom/0 = skarpa. */
+  /** Radius for the profile's corners (vertical edges); empty/0 = sharp. */
   radius?: string;
-  /** Kantform vid ändarna. */
+  /** Edge shape at the ends. */
   edge?: 'none' | 'fillet' | 'chamfer';
   edgeSize?: string;
   edgeWhere?: 'far' | 'near' | 'both';
 }
 
-/** Antal lager för en avrundad/fasad kant – ungefär ett per 0,2 mm (ett utskriftslager). */
+/** Number of layers for a rounded/chamfered edge – about one per 0.2 mm (one print layer). */
 const edgeLayers = (e: number) => Math.min(20, Math.max(4, Math.ceil(e / 0.2)));
 
 /**
- * Kroppen från z = 0 till h med avrundade/fasade kanter, byggd av tunna lager där profilen
- * dras in (OpenSCAD har ingen riktig avrundning av 3D-kanter).
+ * The body from z = 0 to h with rounded/chamfered edges, built from thin layers where the profile
+ * is inset (OpenSCAD has no real rounding of 3D edges).
  */
 function edgedBody(profile: string, h: { v: number; code: string }, kind: 'fillet' | 'chamfer', e: number, near: boolean, far: boolean): string {
   const N = edgeLayers(e);
@@ -36,9 +36,9 @@ function edgedBody(profile: string, h: { v: number; code: string }, kind: 'fille
   if (middle) parts.push(`translate([0, 0, ${num(zb)}]) linear_extrude(height = ${h.code} - ${num(zb + zt)}) ${profile};`);
   const slab = (z0: string, height: number, u: number) => `translate([0, 0, ${z0}]) linear_extrude(height = ${num(height)}) offset(r = -${num(inset(u))}, $fn = ${fnFor(2 * Math.max(inset(u), 0.5))}) ${profile};`;
   for (let k = 0; k < N; k++) {
-    const u = (k + 0.5) / N; // andel in i kanten (mitt i lagret)
-    // Varje lager överlappar 0,01 mm mot lagret under så att inga ytor bara nuddar
-    // (utom det första lagret om det börjar på z = 0).
+    const u = (k + 0.5) / N; // fraction into the edge (middle of the layer)
+    // Each layer overlaps the layer below by 0.01 mm so no faces merely touch (except the first
+    // layer if it starts at z = 0).
     const ov = k === 0 && !middle && !near ? 0 : 0.01;
     if (far) parts.push(slab(`${h.code} - ${num(e - (k * e) / N + ov)}`, e / N + ov, u));
     if (near) parts.push(slab(num((e * (N - 1 - k)) / N), e / N + 0.01, u));
@@ -112,7 +112,7 @@ export const extrude: FeatureKind<ExtrudeFeature> = {
   usable: () => true,
 
   changed(f, key, sk) {
-    // Skiss på en yta: lägg till utåt, ta bort inåt i kroppen (symmetrisk lämnas).
+    // Sketch on a face: add outwards, remove inwards into the body (symmetric is left alone).
     if (key === 'op' && sk?.outward && f.direction !== 'symmetric') f.direction = f.op === 'remove' ? inwardOf(sk) : outwardOf(sk);
   },
 
@@ -130,14 +130,14 @@ export const extrude: FeatureKind<ExtrudeFeature> = {
     if (e && e.v * (where === 'both' ? 2 : 1) > h.v + 1e-9) return { error: t('err.edgeTooLarge') };
     const shape = selectedRegionsScad(loops, regions, sel, '    ')!;
     const m = ctx.module;
-    // Hörnradie: runda både utåt- och inåtgående hörn.
+    // Corner radius: round both convex and concave corners.
     const profile =
       rad.v > 0
         ? `  offset(r = ${rad.code}, $fn = ${fnFor(2 * rad.v)}) offset(delta = -${rad.code}) offset(r = -${rad.code}, $fn = ${fnFor(2 * rad.v)}) offset(delta = ${rad.code}) {\n${shape}\n  }`
         : `  union() {\n${shape}\n  }`;
     const body = e && edge !== 'none' ? edgedBody(`${m}_profile()`, h, edge, e.v, where !== 'far', where !== 'near') : `linear_extrude(height = ${h.code}) ${m}_profile();`;
     const dir = f.direction === 'symmetric' ? `translate([0, 0, -${h.code} / 2]) ` : f.direction === 'reverse' ? 'mirror([0, 0, 1]) ' : '';
-    // Utåt från en rund yta: förläng in till ytan (sätet) så att det inte blir en springa.
+    // Outwards from a round face: extend in to the surface (the seat) so there is no gap.
     const seat = f.op === 'add' && sk.seat && f.direction === outwardOf(sk) ? sk.seat : 0;
     const solid = seat ? `union() {\n    ${body}\n    translate([0, 0, -${num(seat)}]) linear_extrude(height = ${num(seat + 0.01)}) ${m}_profile();\n  }` : body;
     const code = `module ${m}_profile() {\n${profile}\n}\nmodule ${m}() {\n  ${ctx.place(sk)}${dir}${solid}\n}`;

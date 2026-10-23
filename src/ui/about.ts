@@ -1,5 +1,5 @@
-// "Om scadshape" (☰): version, licensen och allt som följer med (src/licenses.ts). Licenstexterna
-// hämtas ur appens egna filer när man trycker på dem, så det fungerar offline.
+// "About scadshape" (☰): version, the licence and everything bundled (src/licenses.ts). The licence
+// texts are fetched from the app's own files when tapped, so it works offline.
 
 import { t } from '../i18n';
 import { PARTS, SCADSHAPE_LICENSE, SOURCE_URL, type Part } from '../licenses';
@@ -59,7 +59,7 @@ export function initAbout() {
   });
   $('#aboutLicense').addEventListener('click', () => void showText('scadshape', [SCADSHAPE_LICENSE]));
   $('#aboutBack').addEventListener('click', showList);
-  // Esc/bakåt i en licenstext går tillbaka till listan i stället för att stänga.
+  // Esc/back in a licence text goes back to the list instead of closing.
   dlg().addEventListener('cancel', e => {
     if ($('#aboutText').hidden) return;
     e.preventDefault();

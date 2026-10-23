@@ -1,5 +1,5 @@
-// Uttryck i mått- och featurefält: tal (komma eller punkt), variabler, + − * / och parenteser.
-// "bredd/2 + 5" → värde. Samma syntax är giltig OpenSCAD (efter komma → punkt).
+// Expressions in dimension and feature fields: numbers (comma or point), variables, + − * / and
+// parentheses. "width/2 + 5" → value. The same syntax is valid OpenSCAD (after comma → point).
 
 import { t } from './i18n';
 
@@ -11,7 +11,7 @@ export const isIdentifier = (s: string) => IDENT.test(s) && IDENT.exec(s)![0] ==
 export interface ExprResult {
   value: number | null;
   error?: string;
-  /** Variabler som uttrycket använder. */
+  /** Variables that the expression uses. */
   uses: string[];
 }
 
@@ -86,12 +86,12 @@ export function parseExpr(src: string, vars: Vars = new Map()): ExprResult {
   return { value: error ? null : v, error, uses: [...uses] };
 }
 
-/** Värdet eller null (bakåtkompatibelt). */
+/** The value or null (backwards compatible). */
 export function evalExpr(src: string, vars?: Vars): number | null {
   return parseExpr(src, vars).value;
 }
 
-/** Uttrycket som OpenSCAD-kod (decimalkomma → punkt, variabelnamn via `names`). */
+/** The expression as OpenSCAD code (decimal comma → point, variable names via `names`). */
 export function exprToScad(src: string, names?: ReadonlyMap<string, string>): string {
   const s = src.trim().replace(/(\d),(\d)/g, '$1.$2');
   if (!names) return s;
@@ -99,13 +99,13 @@ export function exprToScad(src: string, names?: ReadonlyMap<string, string>): st
 }
 
 /**
- * OpenSCAD tillåter bara a–z, 0–9 och _ i namn: översätt (höjd → hojd) och gör unika.
- * `taken` är namn som redan används i koden.
+ * OpenSCAD only allows a–z, 0–9 and _ in names: transliterate (höjd → hojd) and make them unique.
+ * `taken` are names already used in the code.
  */
 export function scadNames(names: string[], taken: Iterable<string> = []): Map<string, string> {
   const used = new Set(taken);
   const out = new Map<string, string>();
-  // Namn som redan är giltiga behåller sitt namn; de översatta får ge vika vid krock.
+  // Names that are already valid keep their name; the transliterated ones give way on a clash.
   const valid = (n: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n);
   for (const n of names) if (valid(n) && !used.has(n)) {
     used.add(n);
@@ -123,5 +123,5 @@ export function scadNames(names: string[], taken: Iterable<string> = []): Map<st
   return out;
 }
 
-/** Innehåller uttrycket variabler (och är alltså mer än ett tal)? */
+/** Does the expression contain variables (and is therefore more than a number)? */
 export const isParametric = (src: string) => parseExpr(src).uses.length > 0;

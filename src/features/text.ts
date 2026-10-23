@@ -1,5 +1,5 @@
-// Text: upphöjd eller ingraverad text vid valda punkter i en skiss (eller i skissens origo).
-// Typsnitten finns i fonts.ts; motorn får bara de typsnitt som används.
+// Text: raised or engraved text at chosen points in a sketch (or at the sketch's origin). The fonts
+// are in fonts.ts; the engine only gets the fonts that are used.
 
 import { fontById, FONTS } from '../fonts';
 import { t } from '../i18n';
@@ -9,26 +9,26 @@ import { holeCandidates } from './hole';
 export interface TextFeature extends FeatureBase {
   type: 'text';
   sketch: string;
-  points: string[] | null; // ankarpunkter; null = alla fristående punkter (eller origo om det inte finns några)
+  points: string[] | null; // anchor points; null = all standalone points (or the origin if there are none)
   text: string;
-  font: string; // id i FONTS
-  size: string; // bokstavshöjd (mm, ungefär versalhöjden)
+  font: string; // id in FONTS
+  size: string; // letter height (mm, roughly the cap height)
   halign: 'left' | 'center' | 'right';
-  angle: string; // grader moturs
+  angle: string; // degrees counterclockwise
   depth: string;
   direction: 'normal' | 'reverse';
   op: Op;
-  /** Var texten börjar, mm längs normalen från skissplanet (t.ex. ovansidan av en kropp). */
+  /** Where the text starts, mm along the normal from the sketch plane (e.g. the top of a body). */
   start?: string;
 }
 
-/** Punkterna texten placeras vid (tom lista = origo). */
+/** The points the text is placed at (empty list = origin). */
 export function textAnchors(f: TextFeature, sk: SketchFeature): string[] {
   if (f.points) return f.points.filter(id => sk.points[id]);
   return Object.entries(sk.points).filter(([, p]) => p.standalone).map(([id]) => id);
 }
 
-/** Sträng som OpenSCAD-literal. */
+/** String as an OpenSCAD literal. */
 const scadString = (s: string) => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
 export const text: FeatureKind<TextFeature> = {
@@ -82,7 +82,8 @@ export const text: FeatureKind<TextFeature> = {
   usable: () => true,
 
   changed(f, key, sk) {
-    // Ingraverad text skärs oftast in i kroppen, upphöjd byggs utåt (uppåt om skissen inte ligger på en yta).
+    // Engraved text is usually cut into the body, raised text is built outwards (upwards if the
+    // sketch is not on a face).
     if (key === 'op') f.direction = f.op === 'remove' ? inwardOf(sk) : outwardOf(sk);
   },
 
@@ -97,7 +98,7 @@ export const text: FeatureKind<TextFeature> = {
     const ids = textAnchors(f, sk);
     const pts = ids.length ? ids.map(id => `[${num(sk.points[id].x)}, ${num(sk.points[id].y)}]`).join(', ') : '[0, 0]';
     const flip = f.direction === 'reverse' ? 'mirror([0, 0, 1]) ' : '';
-    // Ingraverad text börjar en hundradels mm utanför ytan så att inga ytor sammanfaller.
+    // Engraved text starts a hundredth of a mm outside the face so no faces coincide.
     const lift = f.op === 'remove' ? `translate([0, 0, -0.01]) ` : '';
     const h = f.op === 'remove' ? `${depth.code} + 0.01` : depth.code;
     const rot = angle.v ? `rotate(${angle.code}) ` : '';

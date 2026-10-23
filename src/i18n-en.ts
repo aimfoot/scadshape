@@ -1,8 +1,6 @@
-// English texts (must contain every key in i18n-sv.ts – checked by TypeScript).
+// English texts (the base language – every key is defined here).
 
-import type { sv } from './i18n-sv';
-
-export const en: Record<keyof typeof sv, string> = {
+export const en = {
   // General
   'ui.features': 'Features',
   'ui.source': 'Source',

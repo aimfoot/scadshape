@@ -1,5 +1,5 @@
-// Dokument → OpenSCAD. Varje feature bygger sin modul (features/*); här sätts modellen
-// ihop i trädets ordning: lägg till = union, ta bort = difference, snitt = intersection.
+// Document → OpenSCAD. Each feature builds its module (features/*); here the model is assembled in
+// tree order: add = union, remove = difference, intersect = intersection.
 
 import { activeCount, isSolidFeature, type Doc, type SketchFeature } from './doc';
 import { exprToScad, parseExpr, scadNames } from './expr';
@@ -16,13 +16,13 @@ import type { Plane } from './sketch/model';
 export { PLANE_ROTATE as PLANE_TRANSFORM };
 export { revolveAxis } from './features/revolve';
 
-/** Regioner i en skiss. */
+/** Regions in a sketch. */
 export function sketchRegions(sk: SketchFeature): SketchRegions {
   const { loops } = findLoops(sk);
   return { loops, regions: regionsOf(loops) };
 }
 
-/** Förskjutning längs planets normal (XY: +Z, XZ: −Y, YZ: +X). */
+/** Offset along the plane's normal (XY: +Z, XZ: −Y, YZ: +X). */
 const OFFSET_VEC: Record<Plane, (o: string) => string> = {
   XY: o => `[0, 0, ${o}]`,
   XZ: o => `[0, -${o}, 0]`,
@@ -31,17 +31,17 @@ const OFFSET_VEC: Record<Plane, (o: string) => string> = {
 
 export interface Model {
   code: string;
-  /** Antal features som bidrar med geometri. */
+  /** Number of features that contribute geometry. */
   solids: number;
-  /** Fel per feature-id (featuren hoppas över). */
+  /** Errors per feature id (the feature is skipped). */
   errors: Map<string, string>;
-  /** Variabelfel per namn. */
+  /** Variable errors by name. */
   paramErrors: Map<string, string>;
 }
 
 const indent = (s: string, by = '  ') => s.split('\n').map(l => (l ? by + l : l)).join('\n');
 
-/** Skissplanets förskjutning som tal (för 3D-vyn), 0 om den saknas eller är ogiltig. */
+/** The sketch plane's offset as a number (for the 3D view), 0 if it is missing or invalid. */
 export function sketchOffset(sk: SketchFeature, vars = evalParams([]).vars): number {
   return sk.offset ? (parseExpr(sk.offset, vars).value ?? 0) : 0;
 }
@@ -53,7 +53,7 @@ export function buildModel(doc: Doc): Model {
   const sketches = new Map<string, SketchFeature>();
   const regionCache = new Map<string, SketchRegions>();
   const modules: string[] = [];
-  const preamble = new Set<string>(); // include/use från kodfeatures
+  const preamble = new Set<string>(); // include/use from code features
   const tools: Tool[] = [];
 
   const out = [t('code.header'), ''];
@@ -126,7 +126,7 @@ export function buildModel(doc: Doc): Model {
     tools.push(...built.tools);
   }
 
-  // Bygg modellen: följd av "lägg till" slås ihop i en union.
+  // Build the model: a run of "add" is merged into a union.
   let model: string | null = null;
   let adds: string[] = [];
   const flush = () => {
@@ -150,7 +150,7 @@ export function buildModel(doc: Doc): Model {
   return { code: out.join('\n'), solids: modules.length, errors, paramErrors };
 }
 
-/** Skisser som inte används av någon aktiv feature (visas som linjer i 3D). */
+/** Sketches not used by any active feature (shown as lines in 3D). */
 export function looseSketches(doc: Doc): SketchFeature[] {
   const active = doc.features.slice(0, activeCount(doc)).filter(f => !f.suppressed);
   const used = new Set(active.filter(isSolidFeature).map(f => f.sketch));

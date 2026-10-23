@@ -1,6 +1,7 @@
-// Villkorslösare: skissen → planegcs (FreeCADs lösare, WASM) → tillbaka till skissen.
+// Constraint solver: the sketch → planegcs (FreeCAD's solver, WASM) → back to the sketch.
 //
-// Id i lösaren: punkter "p_<id>", entiteter "e_<id>", villkor "c_<id>", hjälpobjekt "x_…".
+// Ids in the solver: points "p_<id>", entities "e_<id>", constraints "c_<id>", helper objects
+// "x_…".
 
 import { DebugMode, GcsWrapper, SolveStatus, make_gcs_wrapper } from '@salusoft89/planegcs';
 import type { SketchPrimitive } from '@salusoft89/planegcs/dist/sketch/sketch_primitive';
@@ -10,12 +11,12 @@ import { ORIGIN, type Constraint, type Entity, type SketchData } from './model';
 export interface SolveResult {
   ok: boolean;
   dof: number;
-  /** Villkor (våra id) som krockar, om lösningen misslyckades. */
+  /** Constraints (our ids) that conflict, if solving failed. */
   conflicting: string[];
   redundant: string[];
 }
 
-/** Dra punkter mot mål (mm) och/eller en cirkel/båge mot en radie. */
+/** Drag points towards targets (mm) and/or a circle/arc towards a radius. */
 export interface Drag {
   points?: { id: string; x: number; y: number }[];
   radius?: { e: string; r: number };
@@ -32,7 +33,7 @@ export class SketchSolver {
     g.debug_mode = DebugMode.NoDebug;
   }
 
-  /** Geometri + villkor som planegcs-primitiver (punkter först: referenser måste peka bakåt). */
+  /** Geometry + constraints as planegcs primitives (points first: references must point backwards). */
   private primitives(sk: SketchData): SketchPrimitive[] {
     const fixed = new Set([ORIGIN, ...sk.constraints.filter(c => c.type === 'fix').map(c => (c as { p: string }).p)]);
     const out: SketchPrimitive[] = [];
@@ -83,9 +84,10 @@ export class SketchSolver {
         const order = { line: 0, circle: 1, arc: 2 } as const;
         if (order[kind(a)!] > order[kind(b)!]) [a, b] = [b, a];
         const pair = `${kind(a)}-${kind(b)}`;
-        // Tangens i en gemensam ändpunkt (som i FreeCAD): radien till punkten vinkelrät mot linjen,
-        // resp. punkten på linjen genom båda centrumen. Avståndsformen (tangent_la) har en dubbelrot
-        // just där, och då räknar planegcs fel antal frihetsgrader.
+        // Tangency at a shared end point (as in FreeCAD): the radius to the point perpendicular to
+        // the line, or the point on the line through both centers. The distance form (tangent_la)
+        // has a double root exactly there, and then planegcs counts the wrong number of degrees of
+        // freedom.
         const ea = ent(a), eb = ent(b);
         if (c.type === 'tangent' && ea && eb) {
           const ends = (e: Entity) => (e.type === 'circle' ? [] : [e.p1, e.p2]);
@@ -121,10 +123,10 @@ export class SketchSolver {
         return l?.type === 'line' ? [{ id, type: 'p2p_symmetric_ppp', p1_id: P(l.p1), p2_id: P(l.p2), p_id: P(c.p) }] : [];
       }
       case 'fix':
-        return []; // punkten markeras som fixerad i primitives()
+        return []; // the point is marked as fixed in primitives()
       case 'distance':
         if (c.dir === 'aligned') return [{ id, type: 'p2p_distance', p1_id: P(c.p1), p2_id: P(c.p2), distance: c.value }];
-        // planegcs: difference = param2 − param1, alltså p2 − p1 = sign·value.
+        // planegcs: difference = param2 − param1, so p2 − p1 = sign·value.
         return [{
           id, type: 'difference',
           param1: { o_id: P(c.p1), prop: c.dir === 'h' ? 'x' : 'y' },
@@ -178,7 +180,7 @@ export class SketchSolver {
     return st;
   }
 
-  /** Läs tillbaka punkter och radier från lösaren till skissen. */
+  /** Read the points and radii back from the solver into the sketch. */
   private writeBack(sk: SketchData) {
     for (const p of this.g.sketch_index.get_primitives()) {
       if (p.type === 'point' && p.id.startsWith('p_')) {
@@ -195,17 +197,17 @@ export class SketchSolver {
   }
 
   /**
-   * Lös skissen. Vid lyckad lösning uppdateras `sk`; annars lämnas den orörd.
-   * Med `drag` dras geometrin mot målen så långt villkoren tillåter.
+   * Solve the sketch. On success `sk` is updated; otherwise it is left untouched. With `drag` the
+   * geometry is pulled towards the targets as far as the constraints allow.
    */
   solve(sk: SketchData, drag?: Drag): SolveResult {
-    // 1. Lös (vid drag: med temporära villkor mot målen, SQP).
+    // 1. Solve (when dragging: with temporary constraints towards the targets, SQP).
     const st1 = this.run([...this.primitives(sk), ...(drag ? this.dragPrims(sk, drag) : [])]);
     if (!drag && !OK(st1)) return this.result(st1);
     const trial: SketchData = JSON.parse(JSON.stringify(sk));
     this.writeBack(trial);
-    // 2. Lös igen från den lösta geometrin: planegcs diagnostiserar (frihetsgrader,
-    //    överflödiga villkor) i startläget, och det är bara pålitligt när det redan stämmer.
+    // 2. Solve again from the solved geometry: planegcs diagnoses (degrees of freedom, redundant
+    // constraints) in the starting state, and that is only reliable when it already fits.
     const res = this.result(this.run(this.primitives(trial)));
     if (res.ok) this.writeBack(sk);
     return res;
@@ -218,9 +220,8 @@ export class SketchSolver {
   }
 
   /**
-   * Vilka punkter och radier kan fortfarande röra sig? Alla dras samtidigt åt
-   * slumpvisa håll med temporära villkor; det som flyttar sig är underbestämt.
-   * Skissen ändras inte.
+   * Which points and radii can still move? All are pulled at once in random directions with
+   * temporary constraints; whatever moves is under-defined. The sketch is not changed.
    */
   freedom(sk: SketchData): { points: Set<string>; radii: Set<string> } {
     const free = { points: new Set<string>(), radii: new Set<string>() };
@@ -231,7 +232,7 @@ export class SketchSolver {
     const tol = step * 1e-3;
     const fixedIds = new Set([ORIGIN, ...sk.constraints.filter(c => c.type === 'fix').map(c => (c as { p: string }).p)]);
     const drag: SketchPrimitive[] = [];
-    // Deterministisk "slump" (gyllene vinkeln) så att resultatet är stabilt.
+    // Deterministic "randomness" (the golden angle) so the result is stable.
     let k = 0;
     for (const [id, p] of Object.entries(sk.points)) {
       if (fixedIds.has(id)) continue;
@@ -257,7 +258,7 @@ export class SketchSolver {
 
 let loading: Promise<SketchSolver> | null = null;
 
-/** Ladda lösaren (wasm-filen ligger bredvid sidan, eller ges som sökväg i Node). */
+/** Load the solver (the wasm file is next to the page, or given as a path in Node). */
 export function loadSolver(wasmPath?: string): Promise<SketchSolver> {
   loading ??= make_gcs_wrapper(wasmPath ?? new URL('planegcs.wasm', document.baseURI).href).then(g => new SketchSolver(g));
   return loading;

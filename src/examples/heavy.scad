@@ -1,4 +1,4 @@
-// Tungt test: 144 överlappande sfärer minus ett gitter av skivor
+// Heavy test: 144 overlapping spheres minus a grid of slabs
 $fn = 32;
 difference() {
   union()

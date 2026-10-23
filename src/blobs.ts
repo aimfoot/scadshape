@@ -1,6 +1,6 @@
-// Importerade filer (STL) i webbläsarens IndexedDB, efter innehållshash. Dokumentet (kv.ts) sparar
-// bara hashen, så att modellen hålls liten. Motorn skriver filen till /imports/<hash>.stl
-// före renderingen (scad.ts). Utan IndexedDB (tester, privat läge) bara i minnet.
+// Imported files (STL) in the browser's IndexedDB, by content hash. The document (kv.ts) only
+// stores the hash, so the model stays small. The engine writes the file to /imports/<hash>.stl
+// before rendering (scad.ts). Without IndexedDB (tests, private mode) only in memory.
 
 const DB = 'scadshape-files';
 const STORE = 'files';
@@ -26,18 +26,18 @@ function db(): Promise<IDBDatabase | null> {
 
 const call = <T>(req: IDBRequest<T>) => new Promise<T>((res, rej) => ((req.onsuccess = () => res(req.result)), (req.onerror = () => rej(req.error))));
 
-/** Läs in vilka filer som finns (så att modellbygget vet om en fil saknas). */
+/** Load which files exist (so the model build knows if a file is missing). */
 export async function initBlobs() {
   const d = await db();
   if (d) for (const k of await call(d.transaction(STORE).objectStore(STORE).getAllKeys())) known.add(String(k));
   loaded = true;
 }
 
-/** Har listan över sparade filer lästs in? (Innan dess antas filerna finnas.) */
+/** Has the list of stored files been loaded? (Until then the files are assumed to exist.) */
 export const blobsLoaded = () => loaded;
 export const hasBlob = (hash: string) => known.has(hash) || mem.has(hash);
 
-/** Innehållshash (två 32-bitars FNV-varianter + längd; crypto.subtle finns inte över http). */
+/** Content hash (two 32-bit FNV variants + length; crypto.subtle is not available over http). */
 export function blobHash(b: Uint8Array): string {
   let h1 = 0x811c9dc5, h2 = 0x01000193 ^ b.length;
   for (let i = 0; i < b.length; i++) {
@@ -73,12 +73,12 @@ export async function getBlob(hash: string): Promise<Uint8Array | null> {
   return bytes;
 }
 
-/** Sökvägen i motorns filsystem. */
+/** The path in the engine's file system. */
 export const importPath = (hash: string) => `/imports/${hash}.stl`;
-/** Hashar som en OpenSCAD-kod importerar. */
+/** Hashes that OpenSCAD code imports. */
 export const importsIn = (src: string) => [...new Set([...src.matchAll(/\/imports\/([0-9a-f]{24})\.stl/g)].map(m => m[1]))];
 
-// ---- Inbäddning i .scadshape.json ----------------------------------------------------------------
+// ---- Embedding in .scadshape.json ----------------------------------------------------------------
 
 function toBase64(b: Uint8Array) {
   let s = '';
@@ -92,7 +92,7 @@ function fromBase64(s: string) {
   return out;
 }
 
-/** Lägg till de importerade filerna (base64) i en exporterad projektfil. */
+/** Add the imported files (base64) to an exported project file. */
 export async function embedBlobs(json: string): Promise<string> {
   const o = JSON.parse(json) as { doc?: { features?: { type: string; file?: string }[] }; files?: Record<string, string> };
   const hashes = [...new Set((o.doc?.features ?? []).filter(f => f.type === 'mesh' && f.file).map(f => f.file!))];
@@ -105,7 +105,7 @@ export async function embedBlobs(json: string): Promise<string> {
   return JSON.stringify(o, null, 1);
 }
 
-/** Spara filer som är inbäddade i en projektfil. */
+/** Store files that are embedded in a project file. */
 export async function storeEmbedded(text: string) {
   let o: { files?: Record<string, string> };
   try {

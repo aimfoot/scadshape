@@ -1,5 +1,5 @@
-// Featurepanelen: skapa/redigera en feature med förhandsvisning. Fälten byggs från
-// featurens beskrivning (features/*: fields); val i 3D-vyn sköts av pickers.ts.
+// The feature panel: create/edit a feature with a preview. The fields are built from the feature's
+// description (features/*: fields); picking in the 3D view is handled by pickers.ts.
 
 import { activeCount, dependents, insertFeature, newFeature, newSketch, removeFeature, usableSketches, type Doc, type SketchFeature, type SolidFeature } from '../doc';
 import { KINDS, kindOf, type Field } from '../features';
@@ -26,9 +26,9 @@ interface PanelState {
   f: SolidFeature; // arbetskopia
   existing: SolidFeature | null;
   mode: PickMode;
-  /** Featurens plats i trädet: skisser före den kan användas (t.ex. som mönsteraxel). */
+  /** The feature's place in the tree: sketches before it can be used (e.g. as a pattern axis). */
   before: number;
-  /** Mallskiss som skapades för featuren (tas bort om man avbryter). */
+  /** Template sketch created for the feature (removed if you cancel). */
   template?: SketchFeature;
 }
 
@@ -42,9 +42,9 @@ function panelSketch(): SketchFeature | undefined {
   return app.doc.features.find((f): f is SketchFeature => f.type === 'sketch' && f.id === panel?.f.sketch);
 }
 
-// ---- Fält ---------------------------------------------------------------------------------------
+// ---- Fields -------------------------------------------------------------------------------------
 
-/** Rendrade fält med funktioner för att synka dem mot featuren. */
+/** Rendered fields with functions to sync them with the feature. */
 let syncers: (() => void)[] = [];
 let lastExpr: HTMLInputElement | null = null;
 
@@ -71,7 +71,7 @@ function renderField(field: AnyField): HTMLElement {
       const isText = field.kind === 'text';
       const input = el('input', { id: `fp-${field.key}`, autocapitalize: isText ? 'sentences' : 'off', autocomplete: 'off', spellcheck: isText });
       input.dataset.key = field.key;
-      // Variabelchipsen skriver in i senaste uttrycksfältet, inte i fri text.
+      // The variable chips type into the last expression field, not into free text.
       input.addEventListener('focus', () => !isText && (lastExpr = input));
       input.addEventListener('input', () => {
         set(field.key, input.value);
@@ -118,7 +118,7 @@ function renderField(field: AnyField): HTMLElement {
         const opts = field.options(panel!.f, { doc: app.doc, before: panel!.before });
         if (select.options.length !== opts.length || opts.some((o, i) => select.options[i].value !== o.value))
           select.replaceChildren(...opts.map(o => new Option(o.label, o.value)));
-        select.value = String(get(field.key) ?? opts[0]?.value ?? ''); // saknat värde = första valet
+        select.value = String(get(field.key) ?? opts[0]?.value ?? ''); // missing value = the first choice
       });
       node = el('label', { className: 'fp-row' }, t(field.label), select);
       break;
@@ -173,7 +173,7 @@ function syncFields() {
   $('#fpRegions').parentElement!.hidden = noSketch;
 }
 
-// ---- Öppna / förhandsvisa / stäng -------------------------------------------------------------------
+// ---- Open / preview / close -------------------------------------------------------------------------
 
 export function openPanel(f: SolidFeature, existing: boolean) {
   if (document.body.dataset.mode !== 'part') return;
@@ -195,7 +195,8 @@ export function openPanel(f: SolidFeature, existing: boolean) {
   $('#fpFields').replaceChildren(...fields);
 
   panelEl().hidden = false;
-  // Panelen täcker högerkanten (liggande) eller nederkanten (stående) – centrera modellen i resten.
+  // The panel covers the right edge (landscape) or the bottom (portrait) – center the model in the
+  // rest.
   const landscape = innerWidth > innerHeight;
   viewer.setRightInset(landscape ? panelEl().offsetWidth + 16 : 0);
   viewer.setBottomInset(landscape ? 0 : panelEl().offsetHeight + 8);
@@ -205,17 +206,17 @@ export function openPanel(f: SolidFeature, existing: boolean) {
   renderOpts.hideSketch = panel.f.sketch;
   syncFields();
   updatePreview();
-  viewer.fit(); // se till att skissen man arbetar med syns
+  viewer.fit(); // make sure the sketch being worked on is visible
 }
 
-/** Skisslistan i panelen (skisser före featuren). */
+/** The sketch list in the panel (sketches before the feature). */
 function refreshSketchOptions() {
   if (!panel) return;
   sketchSel().replaceChildren(...usableSketches(app.doc, panel.before).map(s => new Option(`${s.name} (${planeLabel(s)})`, s.id)));
   sketchSel().value = panel.f.sketch;
 }
 
-/** Revolve: snabbval av axel (X/Y) eller "Linje" som växlar till axelval i vyn. */
+/** Revolve: quick choice of axis (X/Y) or "Line" that switches to picking the axis in the view. */
 function axisButtons() {
   const mk = (axis: string, label: string) => {
     const b = el('button', { type: 'button', textContent: label });
@@ -253,13 +254,13 @@ function updatePreview(delay = 0) {
       at = activeCount(app.doc);
       d.features.splice(at, 0, JSON.parse(JSON.stringify(panel.f)));
     }
-    d.rollback = at + 1 >= d.features.length ? null : at + 1; // visa modellen fram till featuren
+    d.rollback = at + 1 >= d.features.length ? null : at + 1; // show the model up to the feature
     app.previewDoc = d;
     emit('render');
   }, delay);
 }
 
-/** Efter varje rendering: visa featurens fel i panelen. */
+/** After every rendering: show the feature's error in the panel. */
 renderOpts.onRendered.push(() => {
   if (!panel) return;
   const err = app.model.errors.get(panel.f.id);
@@ -278,19 +279,20 @@ export function closePanel() {
   viewer.setBottomInset(0);
 }
 
-/** Standardskiss för en ny feature: senaste användbara skissen, helst en som inte redan används. */
+/** Default sketch for a new feature: the latest usable sketch, preferably one not already used. */
 function defaultSketch(type: SolidFeature['type']): SketchFeature | null {
   const cands = usableSketches(app.doc).filter(s => KINDS[type].usable(s));
   return [...cands].reverse().find(s => !dependents(app.doc, s.id).length) ?? cands[cands.length - 1] ?? null;
 }
 
 /**
- * Extrudera en yta: tryck på en plan yta → ny skiss på den med ytans kontur (låst), som används av
- * featuren. Utan öppen panel startar en ny extrudering; annars byter den öppna (nya) featuren skiss.
+ * Extrude a face: tap a flat face → a new sketch on it with the face's outline (locked), used by
+ * the feature. Without an open panel a new extrude starts; otherwise the open (new) feature
+ * switches sketch.
  */
 export function extrudeFace() {
   pickFaceThen(hit => {
-    // Rund yta: förtjocka/skär längs ytan (egen feature) i stället för en skiss.
+    // Round face: thicken/cut along the surface (its own feature) instead of a sketch.
     const tris = smoothFace(viewer.meshPositions!, hit.point, hit.normal);
     if (tris) {
       if (panel && !panel.existing) {
@@ -300,7 +302,7 @@ export function extrudeFace() {
       }
       const f = newFeature(app.doc, 'surface', WORLD_SKETCH);
       f.tris = tris;
-      // Sidan på en extruderad cirkel/båge: följ den (annars en fast kopia av ytan).
+      // The side of an extruded circle/arc: follow it (otherwise a fixed copy of the surface).
       f.ref = findCurveRef(app.doc, vars(), hit.normal, hit.point) ?? undefined;
       remoteLog('extrude-face', { curved: true, triangles: tris.length / 9, ref: f.ref });
       emit('docChanged');
@@ -338,17 +340,18 @@ export function extrudeFace() {
   });
 }
 
-/** Ny feature av typen (från verktygsfältet). */
+/** New feature of the type (from the toolbar). */
 export function startFeature(type: SolidFeature['type']) {
   if (KINDS[type].pick.kind === 'none') return openPanel(newFeature(app.doc, type, WORLD_SKETCH), false);
   const sk = defaultSketch(type);
-  // Extrudera utan sluten skiss men med en modell: välj en yta att extrudera.
+  // Extrude without a closed sketch but with a model: pick a face to extrude.
   if (!sk && type === 'extrude' && app.source === 'model' && viewer.meshPositions) {
     showToast(t('face.pickHint'), 'info');
     return extrudeFace();
   }
   if (!sk && (type === 'container' || type === 'text' || type === 'snap')) {
-    // Ingen skiss än: behållaren börjar med en rektangel med mått, text/snäpphake i origo på toppvyns plan.
+    // No sketch yet: the container starts with a rectangle with dimensions, text/snap hook at the
+    // origin on the top view's plane.
     const tpl = newSketch(app.doc, 'XY');
     if (type === 'container') containerTemplate(tpl);
     insertFeature(app.doc, tpl);
@@ -401,7 +404,7 @@ export function initPanel() {
       syncFields();
       updatePreview();
     });
-  // Tryck i 3D-vyn: välj regioner, axel, punkter eller cirklar.
+  // Tap in the 3D view: pick regions, axis, points or circles.
   viewer.onTap = p => {
     const sk = panelSketch();
     if (!panel || !sk) return;

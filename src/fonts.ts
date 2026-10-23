@@ -1,11 +1,11 @@
-// Typsnitt för text() i OpenSCAD. Filerna ligger i dist/fonts/ (OFL-licens, se LICENSE.txt där)
-// och skickas till motorn bara när koden använder dem.
+// Fonts for text() in OpenSCAD. The files are in dist/fonts/ (OFL licence, see LICENSE.txt there)
+// and are only sent to the engine when the code uses them.
 
 export interface FontInfo {
   id: string;
-  /** Namnet i listan. */
+  /** The name in the list. */
   label: string;
-  /** Namnet i OpenSCAD (fontconfig). */
+  /** The name in OpenSCAD (fontconfig). */
   family: string;
   file: string;
 }
@@ -16,9 +16,9 @@ export const FONTS: FontInfo[] = [
   { id: 'stencil', label: 'Allerta Stencil', family: 'Allerta Stencil', file: 'AllertaStencil-Regular.ttf' },
   { id: 'bebas', label: 'Bebas Neue', family: 'Bebas Neue', file: 'BebasNeue-Regular.ttf' },
   { id: 'script', label: 'Pacifico', family: 'Pacifico', file: 'Pacifico-Regular.ttf' },
-  // Orbitron-projektets egna statiska filer (v1.000), omodifierade: namnet är reserverat (OFL RFN),
-  // så egna instanser ur Google-versionens variabla fil får inte heta Orbitron. Ingen Regular – Medium
-  // heter "Orbitron" (stil Regular) i filen.
+  // The Orbitron project's own static files (v1.000), unmodified: the name is reserved (OFL RFN),
+  // so self-made instances of Google's variable font may not be called Orbitron. There is no
+  // Regular – Medium is named "Orbitron" (style Regular) in the file.
   { id: 'orbitron', label: 'Orbitron', family: 'Orbitron', file: 'Orbitron-Medium.ttf' },
   { id: 'orbitron-bold', label: 'Orbitron Bold', family: 'Orbitron:style=Bold', file: 'Orbitron-Bold.ttf' },
   { id: 'orbitron-black', label: 'Orbitron Black', family: 'Orbitron:style=Black', file: 'Orbitron-Black.ttf' },
@@ -29,8 +29,9 @@ export const fontById = (id: string) => FONTS.find(f => f.id === id) ?? FONTS[0]
 const familyOf = (f: FontInfo) => f.family.split(':')[0];
 
 /**
- * Typsnittsfiler som koden behöver: hela familjen när koden nämner den (t.ex. "Orbitron:style=Medium"
- * eller bara "Orbitron" – fontconfig väljer sedan vikten), plus OpenSCADs standard (Liberation Sans).
+ * Font files the code needs: the whole family when the code names it (e.g. "Orbitron:style=Medium"
+ * or just "Orbitron" – fontconfig then picks the weight), plus OpenSCAD's default (Liberation
+ * Sans).
  */
 export function fontsFor(src: string): string[] {
   if (!/\btext\s*\(/.test(src)) return [];

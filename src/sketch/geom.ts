@@ -1,4 +1,4 @@
-// 2D-geometri för skisser (mm, y uppåt).
+// 2D geometry for sketches (mm, y up).
 
 export interface Vec {
   x: number;
@@ -12,13 +12,13 @@ export const angleOf = (c: Vec, p: Vec) => Math.atan2(p.y - c.y, p.x - c.x);
 export const normAngle = (a: number) => ((a % TAU) + TAU) % TAU;
 export const polar = (c: Vec, r: number, a: number): Vec => ({ x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a) });
 
-/** Moturs vinkel från a0 till a1, i (0, 2π]. */
+/** Counterclockwise angle from a0 to a1, in (0, 2π]. */
 export function ccwSweep(a0: number, a1: number) {
   const s = normAngle(a1 - a0);
   return s < 1e-12 ? TAU : s;
 }
 
-/** Cirkel genom tre punkter (null om de ligger på linje). */
+/** Circle through three points (null if they are collinear). */
 export function circumcircle(a: Vec, b: Vec, c: Vec): { c: Vec; r: number } | null {
   const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
   const scale = Math.max(dist(a, b), dist(b, c), dist(a, c));
@@ -31,7 +31,7 @@ export function circumcircle(a: Vec, b: Vec, c: Vec): { c: Vec; r: number } | nu
   return { c: center, r: dist(center, a) };
 }
 
-/** Båge från start till slut genom mid: centrum, radie och om den går moturs. */
+/** Arc from start to end through mid: center, radius and whether it goes counterclockwise. */
 export function arcThrough(start: Vec, end: Vec, mid: Vec): { c: Vec; r: number; ccw: boolean } | null {
   const cc = circumcircle(start, mid, end);
   if (!cc) return null;
@@ -47,20 +47,20 @@ export function distToSegment(p: Vec, a: Vec, b: Vec) {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
-/** Avstånd till en moturs båge (c, r, från vinkel a0, svep sweep). */
+/** Distance to a counterclockwise arc (c, r, from angle a0, sweep sweep). */
 export function distToArc(p: Vec, c: Vec, r: number, a0: number, sweep: number) {
   if (ccwSweep(a0, angleOf(c, p)) <= sweep) return Math.abs(dist(p, c) - r);
   return Math.min(dist(p, polar(c, r, a0)), dist(p, polar(c, r, a0 + sweep)));
 }
 
-/** Antal segment för en båge så att kordafelet håller sig under tol (mm). */
+/** Number of segments for an arc so the chord error stays below tol (mm). */
 export function segmentsFor(r: number, sweep: number, tol = 0.01) {
   const step = 2 * Math.acos(Math.max(-1, 1 - tol / Math.max(r, 1e-9)));
   const full = Math.min(360, Math.max(16, Math.ceil(TAU / step)));
   return Math.max(2, Math.ceil((full * sweep) / TAU));
 }
 
-/** Punkter längs en moturs båge, inklusive båda ändpunkterna. */
+/** Points along a counterclockwise arc, including both end points. */
 export function arcPoints(c: Vec, r: number, a0: number, sweep: number, tol = 0.01): Vec[] {
   const n = segmentsFor(r, sweep, tol);
   const pts: Vec[] = [];
@@ -68,7 +68,7 @@ export function arcPoints(c: Vec, r: number, a0: number, sweep: number, tol = 0.
   return pts;
 }
 
-/** Shoelace: positiv för moturs polygon. */
+/** Shoelace: positive for a counterclockwise polygon. */
 export function signedArea(pts: Vec[]) {
   let a = 0;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j].x - pts[i].x) * (pts[j].y + pts[i].y);
@@ -84,7 +84,7 @@ export function pointInPolygon(p: Vec, poly: Vec[]) {
   return inside;
 }
 
-/** Svensk talformatering med högst `dec` decimaler. */
+/** Number formatting in Swedish style (decimal comma) with at most `dec` decimals. */
 export function fmtNum(n: number, dec = 2) {
   const s = (Math.round(n * 10 ** dec) / 10 ** dec).toFixed(dec).replace(/\.?0+$/, '');
   return (s === '-0' ? '0' : s).replace('.', ',');

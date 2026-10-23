@@ -1,5 +1,5 @@
-// Importerad kropp: en STL-fil (lagrad i blobs.ts) som läggs till, dras bort eller snittas.
-// Inte knuten till någon skiss. Ordning: (mitt på plattan) → skala → rotera → flytta.
+// Imported body: an STL file (stored in blobs.ts) that is added, subtracted or intersected. Not
+// tied to any sketch. Order: (centered on the plate) → scale → rotate → move.
 
 import { blobsLoaded, hasBlob, importPath } from '../blobs';
 import { t } from '../i18n';
@@ -7,15 +7,15 @@ import { FieldReader, num, OP_LABEL, type FeatureBase, type FeatureKind, type Op
 
 export interface MeshFeature extends FeatureBase {
   type: 'mesh';
-  sketch: ''; // ingen skiss
-  /** Filens hash i blobs.ts. */
+  sketch: ''; // no sketch
+  /** The file's hash in blobs.ts. */
   file: string;
   fileName: string;
   triangles: number;
-  /** Filens omfång (mm) – för "mitt på plattan". */
+  /** The file's extent (mm) – for "centered on the plate". */
   min: [number, number, number];
   max: [number, number, number];
-  /** Flytta kroppen så att botten ligger på Z = 0 med mitten i origo, före övriga transformer. */
+  /** Move the body so the bottom lies at Z = 0 with the middle at the origin, before the other transforms. */
   center: boolean;
   x: string;
   y: string;
@@ -23,7 +23,7 @@ export interface MeshFeature extends FeatureBase {
   rx: string;
   ry: string;
   rz: string;
-  /** Skala i procent. */
+  /** Scale in percent. */
   scale: string;
   op: Op;
 }

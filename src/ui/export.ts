@@ -1,6 +1,6 @@
-// Exportera modellen som 3MF, STL eller OpenSCAD-kod. Filen tas fram när dialogen öppnas
-// (och när formatet byts), så att "Ladda ner"/"Dela" fungerar direkt vid trycket –
-// Android kräver att delning startas direkt av ett tryck.
+// Export the model as 3MF, STL or OpenSCAD code. The file is prepared when the dialog opens (and
+// when the format changes), so "Download"/"Share" works right on the tap – Android requires sharing
+// to be started directly by a tap.
 
 import { t } from '../i18n';
 import { buildModel } from '../model3d';
@@ -24,10 +24,10 @@ let format: Format = (store.get('exportFormat') as Format) || '3mf';
 let file: File | null = null;
 let job = 0;
 
-/** Koden som exporteras: hela modellen (utan förhandsvisning från en öppen panel). */
+/** The code that is exported: the whole model (without a preview from an open panel). */
 const exportCode = () => (app.source === 'model' ? buildModel(app.doc).code : currentCode());
 
-/** I den nedladdade koden pekar import() på originalfilens namn (lägg filen bredvid .scad-filen). */
+/** In the downloaded code import() points to the original file's name (put the file next to the .scad file). */
 function scadForDownload(code: string) {
   const names = new Map(app.doc.features.filter((f): f is MeshFeature => f.type === 'mesh').map(f => [f.file, f.fileName]));
   return code.replace(/"\/imports\/([0-9a-f]{24})\.stl"/g, (m, h) => (names.has(h) ? JSON.stringify(names.get(h)) : m));
@@ -128,7 +128,7 @@ export function initExport() {
   $('#exDownload').addEventListener('click', () => void download());
   $('#exShare').addEventListener('click', () => void share());
   dlg().addEventListener('close', () => {
-    job++; // en pågående förberedelse ska inte längre visas
+    job++; // a running preparation should no longer be shown
     file = null;
   });
 }

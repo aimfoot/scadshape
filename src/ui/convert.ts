@@ -1,5 +1,6 @@
-// "Gör om till skisser": koden i Egen kod (eller ett exempel) blir en ny modell med skisser och
-// features (convert/scad2doc.ts). Efteråt jämförs volymen med originalet, så att man ser om det blev exakt.
+// "Convert to sketches": the code in Custom code (or an example) becomes a new model with sketches
+// and features (convert/scad2doc.ts). Afterwards the volume is compared with the original, so you
+// can see if it is exact.
 
 import { scadToDoc, type ConvertEngine } from '../convert/scad2doc';
 import { buildModel } from '../model3d';
@@ -20,7 +21,7 @@ const text = async (src: string, format: 'csg' | 'svg') => {
 };
 const convertEngine: ConvertEngine = { csg: src => text(src, 'csg'), svg: src => text(src, 'svg') };
 
-/** Volym (mm³) av en rendering, eller null. */
+/** Volume (mm³) of a rendering, or null. */
 async function volume(src: string): Promise<number | null> {
   const r = await engine.render(src, 'binstl', undefined, 120_000);
   if (!r.ok || !r.data) return null;
@@ -52,7 +53,7 @@ export async function convertCode() {
     ].filter(Boolean);
     showToast(`${t('convert.done')}: ${parts.join(', ')}`);
     remoteLog('convert', { sketches: r.sketches, extrudes: r.extrudes, revolves: r.revolves, code: r.codeBlocks, bytes: src.length });
-    // Kontroll: samma volym som originalet (cirklar utan $fn ritas fint i båda)?
+    // Check: the same volume as the original (circles without $fn are drawn finely in both)?
     const [a, b] = await Promise.all([volume(`${src}\n$fa = 1; $fs = 0.2;\n`), volume(buildModel(r.doc).code)]);
     if (a && b) {
       const d = Math.abs(a - b) / a;

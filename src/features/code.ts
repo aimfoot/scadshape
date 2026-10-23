@@ -1,20 +1,21 @@
-// OpenSCAD-kod som en feature: delar som inte kan bli skisser (t.ex. vid konvertering av en .scad-fil:
-// polyedrar från BOSL2, hull av kroppar) eller egen kod mitt i trädet. Inte knuten till någon skiss.
+// OpenSCAD code as a feature: parts that cannot become sketches (e.g. when converting a .scad file:
+// polyhedra from BOSL2, hulls of bodies) or custom code in the middle of the tree. Not tied to any
+// sketch.
 
 import { t } from '../i18n';
 import { OP_LABEL, type FeatureBase, type FeatureKind, type Op, type SketchFeature } from './common';
 
 export interface CodeFeature extends FeatureBase {
   type: 'code';
-  sketch: ''; // ingen skiss
+  sketch: ''; // no sketch
   code: string;
   op: Op;
 }
 
-/** Plats-hållare för features utan skiss (världens XY-plan). */
+/** Placeholder for features without a sketch (the world's XY plane). */
 export const WORLD_SKETCH: SketchFeature = { type: 'sketch', id: '', name: '', plane: 'XY', points: {}, entities: {}, constraints: [], nextId: 1 };
 
-/** include/use måste stå överst i filen – de lyfts ut ur modulen. */
+/** include/use must be at the top of the file – they are lifted out of the module. */
 const PREAMBLE = /^\s*(include|use)\s*<[^>]+>\s*;?\s*$/gm;
 
 export const code: FeatureKind<CodeFeature> = {

@@ -1,5 +1,5 @@
-// Extrudera en yta: den tryckta plana ytans kontur (bara den sammanhängande ytan, inte allt i planet)
-// som slutna slingor i skissplanet, och som låst geometri i en skiss.
+// Extrude a face: the outline of the tapped flat face (only the connected face, not everything in
+// the plane) as closed loops in the sketch plane, and as locked geometry in a sketch.
 
 import type { Frame, V3 } from './frame';
 import { toPlane } from './frame';
@@ -8,22 +8,23 @@ import { newId, type SketchData } from './sketch/model';
 
 export type FaceLoop = { kind: 'circle'; c: Vec; r: number } | { kind: 'poly'; pts: Vec[] };
 
-/** Ta bort brus från float32 (STL:en). */
+/** Remove float32 noise (the STL). */
 const tidy = (v: number) => {
   const r = Math.round(v * 1e4) / 1e4;
   return Object.is(r, -0) ? 0 : r;
 };
 
 /**
- * Konturen av den plana ytan i planet som innehåller punkten `at` (i världen): ytterkant och hål,
- * raka bitar ihopslagna och runda hål/tappar som cirklar. Tom om ingen yta i planet träffas.
+ * The outline of the flat face in the plane containing the point `at` (in the world): outer edge
+ * and holes, straight pieces merged and round holes/bosses as circles. Empty if no face in the
+ * plane is hit.
  */
 export function faceLoops(positions: Float32Array, frame: Frame, at: V3): FaceLoop[] {
   const tol = 1e-3 + Math.hypot(...frame.o) * 1e-5;
   const nTri = positions.length / 9;
   const uvOf = (t: number, k: number) => toPlane(frame, [positions[t * 9 + k * 3], positions[t * 9 + k * 3 + 1], positions[t * 9 + k * 3 + 2]]);
   const key = (p: Vec) => `${Math.round(p.x * 1e4)},${Math.round(p.y * 1e4)}`;
-  // Trianglarna i planet, i skissens (u, v).
+  // The triangles in the plane, in the sketch's (u, v).
   const tris = new Map<number, Vec[]>();
   for (let t = 0; t < nTri; t++) {
     const q = [0, 1, 2].map(k => uvOf(t, k));
@@ -33,7 +34,7 @@ export function faceLoops(positions: Float32Array, frame: Frame, at: V3): FaceLo
     tris.set(t, q.map(p => ({ x: p.x, y: p.y })));
   }
   if (!tris.size) return [];
-  // Startfacetten: den som innehåller den tryckta punkten (annars närmaste).
+  // The start facet: the one containing the tapped point (otherwise the nearest).
   const hit = toPlane(frame, at);
   let seed = -1, best = Infinity;
   for (const [t, q] of tris) {
@@ -49,7 +50,7 @@ export function faceLoops(positions: Float32Array, frame: Frame, at: V3): FaceLo
     const dd = Math.hypot(cx - hit.x, cy - hit.y);
     if (dd < best) [best, seed] = [dd, t];
   }
-  // Sammanhängande yta: grannar över gemensamma kanter.
+  // Connected face: neighbours across shared edges.
   const edgeId = (a: Vec, b: Vec) => (key(a) < key(b) ? `${key(a)}|${key(b)}` : `${key(b)}|${key(a)}`);
   const byEdge = new Map<string, number[]>();
   for (const [t, q] of tris)
@@ -70,7 +71,7 @@ export function faceLoops(positions: Float32Array, frame: Frame, at: V3): FaceLo
           queue.push(u);
         }
   }
-  // Kantlinjer (bara en triangel i ytan), riktade som trianglarna → slingor.
+  // Boundary edges (only one triangle in the face), oriented like the triangles → loops.
   const next = new Map<string, Vec[]>();
   for (const t of face) {
     const q = tris.get(t)!;
@@ -103,7 +104,7 @@ export function faceLoops(positions: Float32Array, frame: Frame, at: V3): FaceLo
   return loops;
 }
 
-/** Slå ihop raka bitar; en slinga med många punkter på samma avstånd från mitten blir en cirkel. */
+/** Merge straight pieces; a loop with many points at the same distance from the center becomes a circle. */
 function simplify(pts: Vec[]): FaceLoop {
   const n = pts.length;
   if (n >= 12) {
@@ -121,7 +122,7 @@ function simplify(pts: Vec[]): FaceLoop {
   return { kind: 'poly', pts: keep.map(p => ({ x: tidy(p.x), y: tidy(p.y) })) };
 }
 
-/** Lägg in slingorna i skissen som låst geometri (fixerade punkter, cirklar med mått). */
+/** Add the loops to the sketch as locked geometry (fixed points, circles with dimensions). */
 export function addFaceLoops(sk: SketchData, loops: FaceLoop[]) {
   const fixed = (p: Vec) => {
     const id = newId(sk, 'p');
@@ -144,8 +145,9 @@ export function addFaceLoops(sk: SketchData, loops: FaceLoop[]) {
 }
 
 /**
- * Den runda (mjuka) ytan kring den tryckta punkten: facetter som hänger ihop över kanter med
- * mindre än 30° vinkel. Trianglarna i världen (9 tal per triangel), eller null om ytan är plan.
+ * The round (smooth) surface around the tapped point: facets connected across edges with an angle
+ * of less than 30°. The triangles in the world (9 numbers per triangle), or null if the face is
+ * flat.
  */
 export function smoothFace(positions: Float32Array, at: V3, normal: V3): number[] | null {
   const nTri = positions.length / 9;
@@ -160,7 +162,7 @@ export function smoothFace(positions: Float32Array, at: V3, normal: V3): number[
   const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const L = Math.hypot(...normal) || 1;
   const n0: V3 = [normal[0] / L, normal[1] / L, normal[2] / L];
-  // Startfacetten: samma normal, närmast punkten.
+  // The start facet: same normal, closest to the point.
   let seed = -1, best = Infinity;
   const normals: V3[] = [];
   for (let t = 0; t < nTri; t++) {

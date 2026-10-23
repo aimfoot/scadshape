@@ -1,4 +1,4 @@
-// Hål: borras i valda punkter i en skiss – enkelt, försänkt, koniskt eller gängat.
+// Hole: drilled at chosen points in a sketch – simple, counterbored, countersunk or threaded.
 
 import { t } from '../i18n';
 import { FieldReader, fnFor, inwardOf, num, type FeatureBase, type FeatureKind, type SketchFeature } from './common';
@@ -9,24 +9,24 @@ export type HoleKind = 'simple' | 'counterbore' | 'countersink' | 'threaded';
 export interface HoleFeature extends FeatureBase {
   type: 'hole';
   sketch: string;
-  points: string[] | null; // skisspunkternas id; null = alla fristående punkter
+  points: string[] | null; // the sketch points' ids; null = all standalone points
   kind: HoleKind;
-  size: string; // förval ('M3' …) eller 'custom'
-  diameter: string; // uttryck (mm); för gängat: nominell diameter
-  depth: string; // uttryck (mm), ignoreras vid through
+  size: string; // preset ('M3' …) or 'custom'
+  diameter: string; // expression (mm); for threaded: nominal diameter
+  depth: string; // expression (mm), ignored when through
   through: boolean;
-  cbDiameter: string; // cylindrisk försänkning
+  cbDiameter: string; // counterbore
   cbDepth: string;
-  csDiameter: string; // konisk försänkning
-  csAngle: string; // grader (90 för metriska försänkta skruvar)
-  pitch?: string; // gängat: stigning
-  threadLength?: string; // gängat: gängans längd
-  clearance?: string; // gängat: spel (diametralt) för 3D-utskrift
-  direction: 'normal' | 'reverse'; // borra längs planets normal eller mot den
-  start: string; // var borrningen börjar, mm längs normalen från skissplanet
+  csDiameter: string; // countersink
+  csAngle: string; // degrees (90 for metric countersunk screws)
+  pitch?: string; // threaded: pitch
+  threadLength?: string; // threaded: the thread's length
+  clearance?: string; // threaded: clearance (diametral) for 3D printing
+  direction: 'normal' | 'reverse'; // drill along the plane's normal or against it
+  start: string; // where the drilling starts, mm along the normal from the sketch plane
 }
 
-/** Frigångshål (ISO 273, medel), försänkning för insexskruv (DIN 912) och för försänkt skruv (90°). */
+/** Clearance holes (ISO 273, medium), counterbore for socket head screws (DIN 912) and for countersunk screws (90°). */
 export const HOLE_SIZES: Record<string, { d: number; cb: [number, number]; cs: number }> = {
   M2: { d: 2.4, cb: [4.4, 2.3], cs: 4.4 },
   'M2,5': { d: 2.9, cb: [5.5, 2.8], cs: 5.5 },
@@ -38,7 +38,7 @@ export const HOLE_SIZES: Record<string, { d: number; cb: [number, number]; cs: n
 };
 const sv = (n: number) => String(n).replace('.', ',');
 
-/** Fyll i måtten från en skruvstorlek (för gängat: gängans diameter och stigning). */
+/** Fill in the sizes from a screw size (for threaded: the thread's diameter and pitch). */
 export function applyHoleSize(h: HoleFeature, size: string) {
   h.size = size;
   if (h.kind === 'threaded') {
@@ -57,14 +57,14 @@ export function applyHoleSize(h: HoleFeature, size: string) {
   h.csAngle = '90';
 }
 
-/** Punkter som kan få hål: fristående punkter först, sedan cirkel- och bågcentrum. */
+/** Points that can get holes: standalone points first, then circle and arc centers. */
 export function holeCandidates(sk: SketchFeature): string[] {
   const out = Object.entries(sk.points).filter(([, p]) => p.standalone).map(([id]) => id);
   for (const e of Object.values(sk.entities)) if (e.type !== 'line' && !out.includes(e.c)) out.push(e.c);
   return out;
 }
 
-/** Valda hålpunkter (null = alla fristående punkter). */
+/** Chosen hole points (null = all standalone points). */
 export function holePoints(h: HoleFeature, sk: SketchFeature): string[] {
   if (h.points) return h.points.filter(id => sk.points[id]);
   return Object.entries(sk.points).filter(([, p]) => p.standalone).map(([id]) => id);
@@ -128,10 +128,10 @@ export const hole: FeatureKind<HoleFeature> = {
     const h: HoleFeature = {
       type: 'hole', id, name, sketch: sk.id, points: null, kind: 'simple', size: 'M3', diameter: '', depth: '10', through: true,
       cbDiameter: '', cbDepth: '', csDiameter: '', csAngle: '90', pitch: '0,5', threadLength: '8', clearance: '0,2',
-      direction: sk.outward ? inwardOf(sk) : 'normal', start: '0', // på en yta: borra in i kroppen
+      direction: sk.outward ? inwardOf(sk) : 'normal', start: '0', // on a face: drill into the body
     };
     applyHoleSize(h, 'M3');
-    // Utan fristående punkter: börja med alla kandidater (t.ex. cirkelcentrum).
+    // Without standalone points: start with all candidates (e.g. circle centers).
     if (!Object.values(sk.points).some(p => p.standalone) && holeCandidates(sk).length) h.points = holeCandidates(sk);
     return h;
   },
@@ -146,7 +146,8 @@ export const hole: FeatureKind<HoleFeature> = {
   changed(f, key) {
     if (DIMENSION_KEYS.has(key)) f.size = 'custom';
     if ((key === 'kind' || key === 'size') && f.size !== 'custom') {
-      // Byte mellan gängat och frigång: välj samma storlek i den andra tabellen om den finns.
+      // Switch between threaded and clearance: choose the same size in the other table if it
+      // exists.
       if (!(f.kind === 'threaded' ? METRIC : HOLE_SIZES)[f.size]) f.size = 'M3';
       applyHoleSize(f, f.size);
     }
@@ -159,8 +160,8 @@ export const hole: FeatureKind<HoleFeature> = {
     const D = r.positive(t('field.diameter'), f.diameter);
     const depth = f.through ? { v: 1000, code: '1000' } : r.positive(t('field.depth'), f.depth);
     const start = r.read(t('field.start'), f.start);
-    const e = '0.01'; // överlapp vid ingången så att inga ytor sammanfaller
-    // Grundformen borrar mot −z från z = 0.
+    const e = '0.01'; // overlap at the entrance so no faces coincide
+    // The base shape drills towards −z from z = 0.
     const body: string[] = [];
     if (f.kind === 'threaded') {
       const P = r.positive(t('field.pitch'), f.pitch ?? '');
@@ -187,7 +188,8 @@ export const hole: FeatureKind<HoleFeature> = {
     }
     if (r.error) return { error: r.error };
     const pts = ids.map(id => `[${num(sk.points[id].x)}, ${num(sk.points[id].y)}]`).join(', ');
-    // "normal" borrar längs planets normal (+z) → vänd grundformen (rotation, så att gängor förblir högergängade).
+    // "normal" drills along the plane's normal (+z) → flip the base shape (rotation, so threads
+    // stay right-handed).
     const flip = f.direction === 'normal' ? ' rotate([180, 0, 0])' : '';
     const code =
       `module ${ctx.module}() {\n  ${ctx.place(sk)}for (p = [${pts}])\n` +

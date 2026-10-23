@@ -1,5 +1,5 @@
-// 3D-vy: three.js med Z uppåt (som OpenSCAD), pekgester via OrbitControls,
-// ritar bara om när något ändras (sparar batteri på telefonen).
+// 3D view: three.js with Z up (like OpenSCAD), touch gestures via OrbitControls, only redraws when
+// something changes (saves battery on the phone).
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -10,25 +10,25 @@ import { planeFrame, toPlane, toWorld, type Frame, type V3 } from './frame';
 import { cornerVertices, type Pick } from './measure';
 import { currentTheme, type Theme } from './theme';
 
-/** Rutnät och skisslinjer per tema (kroppen och kanterna syns bra mot båda bakgrunderna). */
+/** Grid and sketch lines per theme (the body and the edges show well against both backgrounds). */
 const PALETTE: Record<Theme, { minor: number; minorA: number; major: number; majorA: number; sketch: number }> = {
   light: { minor: 0x7f8c99, minorA: 0.25, major: 0x5d6b78, majorA: 0.45, sketch: 0x1a6fc4 },
   dark: { minor: 0x8696a5, minorA: 0.16, major: 0x9aa9b7, majorA: 0.3, sketch: 0x5ea4ec },
 };
 
 const V = (a: V3) => new THREE.Vector3(a[0], a[1], a[2]);
-/** Skissens (x, y) och avstånd w längs normalen → världen. */
+/** The sketch's (x, y) and distance w along the normal → the world. */
 const to3d = (f: Frame, p: Vec, w = 0) => V(toWorld(f, p, w));
-/** Grundplan (för tester som skickar 'XY' osv.) eller frame. */
+/** Base plane (for tests that pass 'XY' etc.) or frame. */
 const asFrame = (f: Plane | Frame, offset = 0) => (typeof f === 'string' ? planeFrame(f, offset) : f);
 
 export interface Overlay {
-  /** Skissplanets placering. */
+  /** The sketch plane's placement. */
   frame: Frame;
   regions: { outer: Vec[]; holes: Vec[][]; selected: boolean }[];
   axes: { a: Vec; b: Vec; selected: boolean }[];
   points?: { p: Vec; selected: boolean }[];
-  /** Punkternas avstånd från planet längs normalen (t.ex. hålets startpunkt). */
+  /** The points' distance from the plane along the normal (e.g. the hole's start point). */
   pointsOffset?: number;
 }
 
@@ -36,7 +36,7 @@ export type ViewName = 'iso' | 'top' | 'front' | 'right';
 
 const VIEW_DIRS: Record<ViewName, THREE.Vector3> = {
   iso: new THREE.Vector3(1, -1, 0.8).normalize(),
-  top: new THREE.Vector3(0, -1e-4, 1).normalize(), // en aning från -Y så att X pekar åt höger
+  top: new THREE.Vector3(0, -1e-4, 1).normalize(), // slightly from -Y so X points to the right
   front: new THREE.Vector3(0, -1, 0),
   right: new THREE.Vector3(1, 0, 0),
 };
@@ -52,24 +52,24 @@ export class Viewer {
   private marks = new THREE.Group();
   private overlayAxes: { a: THREE.Vector3; b: THREE.Vector3 }[] = [];
   private overlayPoints: THREE.Vector3[] = [];
-  /** Tryck (utan att vyn roterats) – skärmkoordinater i canvasen. */
+  /** Tap (without the view having rotated) – screen coordinates in the canvas. */
   onTap?: (p: { x: number; y: number }) => void;
-  /** Tillfällig tryckhanterare (t.ex. välj yta för en ny skiss) som går före onTap. */
+  /** Temporary tap handler (e.g. pick a face for a new sketch) that takes precedence over onTap. */
   tapOverride: ((p: { x: number; y: number }) => void) | null = null;
-  /** Den visade modellens trianglar (9 tal per triangel), eller null. */
+  /** The shown model's triangles (9 numbers per triangle), or null. */
   meshPositions: Float32Array | null = null;
-  /** Modellens CAD-kanter (6 tal per segment), för mätverktyget. */
+  /** The model's CAD edges (6 numbers per segment), for the measure tool. */
   edgePositions: Float32Array | null = null;
   private cornerPositions: Float32Array | null = null;
-  /** Ett nytt nät visas (mätverktyget släpper sina val). */
+  /** A new mesh is shown (the measure tool drops its picks). */
   onMeshChanged?: () => void;
   private grid = new THREE.Group();
   private running = false;
   private dirty = true;
-  /** Modellens (och skisslinjernas) omslutande sfär. */
+  /** The bounding sphere of the model (and the sketch lines). */
   readonly bounds = new THREE.Sphere(new THREE.Vector3(), 50);
-  private insetRight = 0; // px som täcks av en panel till höger
-  private insetBottom = 0; // px som täcks av en panel nertill
+  private insetRight = 0; // px covered by a panel on the right
+  private insetBottom = 0; // px covered by a panel at the bottom
   private gridHalf = 100;
 
   constructor(private host: HTMLElement) {
@@ -81,7 +81,7 @@ export class Viewer {
     this.camera.up.set(0, 0, 1);
     this.scene.add(this.camera);
 
-    // Ljus: mjukt himmel/mark-ljus + ett riktat ljus som följer kameran.
+    // Light: soft sky/ground light + a directional light that follows the camera.
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8a96a3, 1.6));
     const key = new THREE.DirectionalLight(0xffffff, 1.4);
     key.position.set(-0.5, 1, 2);
@@ -97,7 +97,7 @@ export class Viewer {
     this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
     this.controls.addEventListener('change', () => this.requestRender());
 
-    // Tryck = kort tryck utan rörelse med ett finger.
+    // Tap = short touch without movement with one finger.
     let down: { x: number; y: number; t: number; id: number } | null = null;
     let fingers = 0;
     const el = this.renderer.domElement;
@@ -154,7 +154,7 @@ export class Viewer {
     else this.running = false;
   };
 
-  /** Byt tema: rutnätet och skisslinjerna får nya färger. */
+  /** Change theme: the grid and the sketch lines get new colors. */
   setTheme(th: Theme = currentTheme()) {
     this.buildGrid(this.gridHalf);
     for (const o of this.sketches.children) ((o as THREE.LineSegments).material as THREE.LineBasicMaterial).color.setHex(PALETTE[th].sketch);
@@ -192,7 +192,7 @@ export class Viewer {
     g.clear();
   }
 
-  /** Beräkna omfång (för vyer och rutnät) av modell + skisslinjer. */
+  /** Compute the extent (for views and the grid) of the model + sketch lines. */
   private updateBounds() {
     const box = new THREE.Box3()
       .setFromObject(this.part)
@@ -205,7 +205,7 @@ export class Viewer {
     this.requestRender();
   }
 
-  /** Regioner/axlar att välja bland (featurepanelen); null tar bort dem. Ritas alltid överst. */
+  /** Regions/axes to choose from (the feature panel); null removes them. Always drawn on top. */
   setOverlay(o: Overlay | null) {
     Viewer.disposeGroup(this.overlay);
     this.overlayAxes = [];
@@ -267,7 +267,7 @@ export class Viewer {
     this.updateBounds();
   }
 
-  /** Punkt på skissplanet (i skissens u, v) under en skärmpunkt, eller null. */
+  /** Point on the sketch plane (in the sketch's u, v) under a screen point, or null. */
   pickOnPlane(p: { x: number; y: number }, frame: Frame): Vec | null {
     const el = this.renderer.domElement;
     const ndc = new THREE.Vector2((p.x / el.clientWidth) * 2 - 1, -(p.y / el.clientHeight) * 2 + 1);
@@ -278,7 +278,7 @@ export class Viewer {
     return hit ? toPlane(frame, [hit.x, hit.y, hit.z]) : null;
   }
 
-  /** Modellytan under en skärmpunkt: träffpunkt och ytans normal (i världen), eller null. */
+  /** The model surface under a screen point: hit point and the surface's normal (in the world), or null. */
   pickFace(p: { x: number; y: number }): { point: [number, number, number]; normal: [number, number, number] } | null {
     const body = this.part.children[0] as THREE.Mesh | undefined;
     if (!body) return null;
@@ -292,8 +292,9 @@ export class Viewer {
   }
 
   /**
-   * Mätverktyget: vad trycket träffar – ett synligt hörn (inom 18 px; inte punkterna längs en cirkel), annars en synlig kant
-   * (inom 14 px), annars ytan. Hörn och kanter bakom modellen räknas inte.
+   * The measure tool: what the tap hits – a visible corner (within 18 px; not the points along a
+   * circle), otherwise a visible edge (within 14 px), otherwise the face. Corners and edges behind
+   * the model do not count.
    */
   pickMeasure(p: { x: number; y: number }): Pick | null {
     const body = this.part.children[0] as THREE.Mesh | undefined;
@@ -345,7 +346,7 @@ export class Viewer {
     return f ? { kind: 'face', point: f.point, normal: f.normal } : null;
   }
 
-  /** Mätverktygets markeringar: punkter, fetade kanter (polylinjer) och hjälplinjer. Ritas överst. */
+  /** The measure tool's marks: points, bold edges (polylines) and guide lines. Drawn on top. */
   setMarks(m: { points: V3[]; polylines: V3[][]; lines: [V3, V3][] } | null) {
     Viewer.disposeGroup(this.marks);
     if (m) {
@@ -377,21 +378,21 @@ export class Viewer {
     this.requestRender();
   }
 
-  /** Skärmposition för en världspunkt – för tester. */
+  /** Screen position for a world point – for tests. */
   screenOfWorld(x: number, y: number, z: number): { x: number; y: number } {
     const el = this.renderer.domElement;
     const q = new THREE.Vector3(x, y, z).project(this.camera);
     return { x: ((q.x + 1) / 2) * el.clientWidth, y: ((1 - q.y) / 2) * el.clientHeight };
   }
 
-  /** En panel täcker `px` till höger: förskjut bilden så att modellen hamnar mitt i det som syns. */
+  /** A panel covers `px` on the right: shift the image so the model lands in the middle of what is visible. */
   setRightInset(px: number) {
     this.insetRight = Math.max(0, px);
     this.applyInset();
     this.requestRender();
   }
 
-  /** En panel täcker `px` nertill (stående läge): flytta upp modellen till mitten av det som syns. */
+  /** A panel covers `px` at the bottom (portrait): move the model up to the middle of what is visible. */
   setBottomInset(px: number) {
     this.insetBottom = Math.max(0, px);
     this.applyInset();
@@ -402,20 +403,21 @@ export class Viewer {
     const w = this.host.clientWidth, h = this.host.clientHeight;
     if (!w || !h) return;
     const p = Math.min(this.insetRight, w * 0.6), b = Math.min(this.insetBottom, h * 0.6);
-    // En större tänkt bild där det synliga är nedre högra delen: mitten hamnar mitt i det fria.
+    // A larger imagined image where the visible part is the lower right: the center lands in the
+    // middle of the free area.
     if (p > 0 || b > 0) this.camera.setViewOffset(w + p, h + b, p, b, w, h);
     else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
   }
 
-  /** Skärmposition (i canvasen) för en punkt i ett skissplan – för tester. */
+  /** Screen position (in the canvas) for a point in a sketch plane – for tests. */
   screenOf(plane: Plane | Frame, uv: Vec, offset = 0): { x: number; y: number } {
     const el = this.renderer.domElement;
     const q = to3d(asFrame(plane, offset), uv).project(this.camera);
     return { x: ((q.x + 1) / 2) * el.clientWidth, y: ((1 - q.y) / 2) * el.clientHeight };
   }
 
-  /** Index för närmaste överlagrade punkt inom `tol` px, eller −1. */
+  /** Index of the nearest overlaid point within `tol` px, or −1. */
   nearestPoint(p: { x: number; y: number }, tol = 28): number {
     const el = this.renderer.domElement;
     let best = -1, bestD = tol;
@@ -430,7 +432,7 @@ export class Viewer {
     return best;
   }
 
-  /** Index för närmaste överlagrade axel inom `tol` px, eller −1. */
+  /** Index of the nearest overlaid axis within `tol` px, or −1. */
   nearestAxis(p: { x: number; y: number }, tol = 26): number {
     const el = this.renderer.domElement;
     const toScreen = (v: THREE.Vector3) => {
@@ -451,7 +453,7 @@ export class Viewer {
     return best;
   }
 
-  /** Skisskurvor i 3D (polylinjer med [x, y, z]-punkter). */
+  /** Sketch curves in 3D (polylines with [x, y, z] points). */
   setSketchLines(polylines: [number, number, number][][]) {
     Viewer.disposeGroup(this.sketches);
     const pts: number[] = [];
@@ -488,8 +490,8 @@ export class Viewer {
         polygonOffsetUnits: 1,
       }),
     );
-    // Kanter som i ett CAD-program. Har modellen väldigt många (t.ex. gängor) tonas de ner,
-    // annars blir sådana ytor svarta av linjer.
+    // Edges like in a CAD program. If the model has very many (e.g. threads) they are faded,
+    // otherwise such faces turn black with lines.
     const edgeGeo = new THREE.EdgesGeometry(geo, 25);
     this.edgePositions = edgeGeo.getAttribute('position').array as Float32Array;
     this.cornerPositions = cornerVertices(this.edgePositions);
@@ -503,7 +505,7 @@ export class Viewer {
     this.updateBounds();
   }
 
-  /** Placera kameran längs en standardriktning så att hela modellen syns. */
+  /** Place the camera along a standard direction so the whole model is visible. */
   setView(name: ViewName) {
     const dir = VIEW_DIRS[name];
     const r = Math.max(this.bounds.radius, 5);
@@ -526,7 +528,7 @@ export class Viewer {
     this.requestRender();
   }
 
-  /** Snurra modellen ett varv och räkna bildrutor (för benchmark). */
+  /** Spin the model one turn and count frames (for the benchmark). */
   measureFps(ms = 3000): Promise<{ fps: number; worstMs: number }> {
     return new Promise(resolve => {
       const c = this.bounds.center;

@@ -1,10 +1,11 @@
-// .scad → dokument med skisser och features. OpenSCAD kör filen och exporterar CSG-trädet (moduler,
-// loopar och variabler utförda); här blir kroppar som är prismor (kub, cylinder, linear_extrude) en skiss
-// på XY/XZ/YZ-planet + Extrudera, och resten blir kodblock (features/code.ts) så att modellen är komplett.
+// .scad → document with sketches and features. OpenSCAD runs the file and exports the CSG tree
+// (modules, loops and variables evaluated); here bodies that are prisms (cube, cylinder,
+// linear_extrude) become a sketch on the XY/XZ/YZ plane + Extrude, and the rest become code blocks
+// (features/code.ts) so the model is complete.
 //
-// Trädets booleska struktur plattas ut till trädets ordning (lägg till/ta bort/snitt). Det är exakt
-// bara om en bortdragning inte når kroppar som lades till före den – det kontrolleras med omslutande
-// lådor, och annars blir den delen ett kodblock.
+// The tree's boolean structure is flattened into the tree order (add/remove/intersect). That is
+// exact only if a subtraction does not reach bodies that were added before it – this is checked
+// with bounding boxes, and otherwise that part becomes a code block.
 
 import { emptyDoc, newFeature, newSketch, type Doc } from '../doc';
 import type { Op } from '../features/common';
@@ -12,9 +13,9 @@ import { newId, type Plane, type SketchData } from '../sketch/model';
 import { csgToScad, parseCsg, type CsgNode, type CsgValue } from './csg';
 
 export interface ConvertEngine {
-  /** Kör koden och returnera CSG-exporten. */
+  /** Run the code and return the CSG export. */
   csg(src: string): Promise<string>;
-  /** Rendera 2D-kod och returnera SVG-exporten. */
+  /** Render 2D code and return the SVG export. */
   svg(src: string): Promise<string>;
 }
 
@@ -30,7 +31,7 @@ type Vec = { x: number; y: number };
 type V3 = [number, number, number];
 type Mat = number[][]; // 4×4
 
-// ---- Matriser och lådor ----------------------------------------------------------------------
+// ---- Matrices and boxes ----------------------------------------------------------------------
 
 const I4: Mat = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
 const mul = (a: Mat, b: Mat): Mat => a.map(r => [0, 1, 2, 3].map(j => r[0] * b[0][j] + r[1] * b[1][j] + r[2] * b[2][j] + r[3] * b[3][j]));
@@ -51,7 +52,7 @@ const boxOf = (pts: V3[]): Box => ({
 const unionBox = (bs: Box[]): Box | null =>
   bs.length ? { min: [0, 1, 2].map(i => Math.min(...bs.map(b => b.min[i]))) as V3, max: [0, 1, 2].map(i => Math.max(...bs.map(b => b.max[i]))) as V3 } : null;
 const overlaps = (a: Box, b: Box, eps = 1e-6) => [0, 1, 2].every(i => a.min[i] < b.max[i] - eps && b.min[i] < a.max[i] - eps);
-/** Lådan för en lokal låda [lo, hi] efter transformationen m. */
+/** The box for a local box [lo, hi] after the transformation m. */
 const transformBox = (m: Mat, lo: V3, hi: V3): Box => {
   const pts: V3[] = [];
   for (const x of [lo[0], hi[0]]) for (const y of [lo[1], hi[1]]) for (const z of [lo[2], hi[2]]) pts.push(apply(m, [x, y, z]));
@@ -63,7 +64,7 @@ const vec3 = (v: CsgValue | undefined): V3 => (Array.isArray(v) ? [num(v[0]), nu
 const vec2 = (v: CsgValue | undefined): [number, number] => (Array.isArray(v) ? [num(v[0]), num(v[1])] : [num(v), num(v)]);
 const GROUPS = new Set(['group', 'union', 'color', 'render', 'children']);
 
-/** Cylinderns/cirkelns radier (r, r1/r2 eller d). */
+/** The cylinder's/circle's radii (r, r1/r2 or d). */
 function radii(n: CsgNode): [number, number] {
   const a = n.args;
   if (a.r1 !== undefined || a.r2 !== undefined) return [num(a.r1, 1), num(a.r2, 1)];
@@ -71,7 +72,7 @@ function radii(n: CsgNode): [number, number] {
   return [num(a.r, 1), num(a.r, 1)];
 }
 
-/** Omslutande låda för en 3D-nod (null = okänd). */
+/** Bounding box for a 3D node (null = unknown). */
 function bbox3(n: CsgNode, m: Mat): Box | null {
   const a = n.args;
   switch (n.name) {
@@ -130,7 +131,7 @@ function bbox3(n: CsgNode, m: Mat): Box | null {
       return null;
   }
 }
-/** Lådan för alla barn, eller null om någon är okänd. */
+/** The box for all children, or null if any is unknown. */
 function allKnown(children: CsgNode[], m: Mat): Box | null {
   const bs = children.map(c => bbox3(c, m));
   return bs.some(b => !b) ? null : unionBox(bs as Box[]);
@@ -138,7 +139,7 @@ function allKnown(children: CsgNode[], m: Mat): Box | null {
 
 // ---- 2D -----------------------------------------------------------------------------------
 
-/** 2D-affin: x' = a·x + b·y + tx, y' = c·x + d·y + ty. */
+/** 2D affine transform: x' = a·x + b·y + tx, y' = c·x + d·y + ty. */
 type Aff = { a: number; b: number; c: number; d: number; tx: number; ty: number };
 const I3: Aff = { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 };
 const affOf = (m: Mat): Aff => ({ a: m[0][0], b: m[0][1], c: m[1][0], d: m[1][1], tx: m[0][3], ty: m[1][3] });
@@ -147,19 +148,19 @@ const affMul = (p: Aff, q: Aff): Aff => ({
   tx: p.a * q.tx + p.b * q.ty + p.tx, ty: p.c * q.tx + p.d * q.ty + p.ty,
 });
 const affApply = (t: Aff, p: Vec): Vec => ({ x: t.a * p.x + t.b * p.y + t.tx, y: t.c * p.x + t.d * p.y + t.ty });
-/** Likformig skalning utan skjuvning (cirklar förblir cirklar)? Ger skalan. */
+/** Uniform scaling without shear (circles stay circles)? Returns the scale. */
 const uniformScale = (t: Aff) => {
   const s1 = Math.hypot(t.a, t.c), s2 = Math.hypot(t.b, t.d);
   return Math.abs(s1 - s2) < 1e-9 * Math.max(1, s1) && Math.abs(t.a * t.b + t.c * t.d) < 1e-9 * Math.max(1, s1 * s2) ? s1 : null;
 };
-/** Axlarna förblir axlar (rektanglar förblir rektanglar)? */
+/** Do the axes stay axes (rectangles stay rectangles)? */
 const axisAligned = (t: Aff) => (Math.abs(t.b) < 1e-12 && Math.abs(t.c) < 1e-12) || (Math.abs(t.a) < 1e-12 && Math.abs(t.d) < 1e-12);
 
 type Shape =
   | { kind: 'rect'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'circle'; c: Vec; r: number }
-  | { kind: 'loop'; pts: Vec[] } // polygon (bågar hittas när skissen byggs)
-  | { kind: 'rhull'; centers: Vec[]; r: number }; // konvext hölje av lika stora cirklar (rundad låda)
+  | { kind: 'loop'; pts: Vec[] } // polygon (arcs are found when the sketch is built)
+  | { kind: 'rhull'; centers: Vec[]; r: number }; // convex hull of equal circles (rounded box)
 
 interface Box2 {
   x0: number;
@@ -185,7 +186,7 @@ function shapeBox(s: Shape): Box2 {
 const disjoint2 = (a: Box2, b: Box2, eps = 1e-6) => a.x1 <= b.x0 + eps || b.x1 <= a.x0 + eps || a.y1 <= b.y0 + eps || b.y1 <= a.y0 + eps;
 const inside2 = (inner: Box2, outer: Box2, eps = 1e-6) => inner.x0 > outer.x0 + eps && inner.y0 > outer.y0 + eps && inner.x1 < outer.x1 - eps && inner.y1 < outer.y1 - eps;
 
-/** Lådan för 2D-noder (för 3D-lådor); null = okänd. */
+/** The box for 2D nodes (for 3D boxes); null = unknown. */
 function bbox2(n: CsgNode, t: Aff): Box2 | null {
   const sh = shapes2d(n, t);
   if (sh) return unionBox2Shapes(sh);
@@ -214,11 +215,11 @@ function unionBox2Shapes(shapes: Shape[], extra: Box2[] = []): Box2 | null {
   return bs.length ? { x0: Math.min(...bs.map(b => b.x0)), y0: Math.min(...bs.map(b => b.y0)), x1: Math.max(...bs.map(b => b.x1)), y1: Math.max(...bs.map(b => b.y1)) } : null;
 }
 
-/** Regelbunden polygon som OpenSCAD ritar en cirkel med få segment ($fn < 16 är ofta avsiktligt, t.ex. sexkant). */
+/** Regular polygon that OpenSCAD draws a circle with few segments as ($fn < 16 is often intentional, e.g. a hexagon). */
 const ngon = (c: Vec, r: number, n: number): Vec[] => Array.from({ length: n }, (_, i) => ({ x: c.x + r * Math.cos((2 * Math.PI * i) / n), y: c.y + r * Math.sin((2 * Math.PI * i) / n) }));
 const fnOf = (n: CsgNode) => num(n.args.$fn);
 
-/** Lägg en form genom en affin (null om den inte längre kan beskrivas exakt). */
+/** Put a shape through an affine transform (null if it can no longer be described exactly). */
 function mapShape(s: Shape, t: Aff): Shape | null {
   switch (s.kind) {
     case 'rect': {
@@ -240,7 +241,7 @@ function mapShape(s: Shape, t: Aff): Shape | null {
   }
 }
 
-/** 2D-delträd → exakta former, eller null om det måste ritas av OpenSCAD (offset, text, överlapp …). */
+/** 2D subtree → exact shapes, or null if OpenSCAD has to draw it (offset, text, overlap …). */
 function shapes2d(n: CsgNode, t: Aff): Shape[] | null {
   const a = n.args;
   const mapAll = (ss: Shape[]) => {
@@ -274,7 +275,8 @@ function shapes2d(n: CsgNode, t: Aff): Shape[] | null {
       const holes = shapes2dAll(rest, t, true);
       if (!holes) return null;
       const ob = shapeBox(outer[0]);
-      // Hålen måste ligga inuti och inte nudda varandra – då blir de hål i skissens region.
+      // The holes must lie inside and not touch each other – then they become holes in the sketch's
+      // region.
       if (!holes.every(h => inside2(shapeBox(h), ob))) return null;
       return [...outer, ...holes];
     }
@@ -293,7 +295,7 @@ function shapes2d(n: CsgNode, t: Aff): Shape[] | null {
       return null;
   }
 }
-/** Alla barns former; med `disjoint` krävs att de inte överlappar (annars ritas de av OpenSCAD). */
+/** All children's shapes; with `disjoint` they must not overlap (otherwise OpenSCAD draws them). */
 function shapes2dAll(children: CsgNode[], t: Aff, disjoint: boolean): Shape[] | null {
   const out: Shape[] = [];
   for (const c of children) {
@@ -320,10 +322,10 @@ function convexHull(ps: Vec[]): Vec[] {
     while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 1e-12) upper.pop();
     upper.push(q);
   }
-  return [...lower.slice(0, -1), ...upper.slice(0, -1)]; // moturs
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)]; // counterclockwise
 }
 
-/** Slingor ur OpenSCADs SVG-export (y är negerat där). */
+/** Loops from OpenSCAD's SVG export (y is negated there). */
 export function svgLoops(svg: string): Vec[][] {
   const loops: Vec[][] = [];
   for (const m of svg.matchAll(/\bd="([^"]*)"/g))
@@ -336,47 +338,47 @@ export function svgLoops(svg: string): Vec[][] {
 
 // ---- Plan ----------------------------------------------------------------------------------
 
-/** Världspunkt → (u, v, w) i ett skissplan (samma som planeFrame i frame.ts, baklänges). */
+/** World point → (u, v, w) in a sketch plane (the same as planeFrame in frame.ts, in reverse). */
 const toPlane: Record<Plane, (p: V3) => V3> = {
   XY: p => [p[0], p[1], p[2]],
   XZ: p => [p[0], p[2], -p[1]],
   YZ: p => [p[1], p[2], p[0]],
 };
-const PLANE_BY_AXIS: Plane[] = ['YZ', 'XZ', 'XY']; // normalens axel x, y, z
+const PLANE_BY_AXIS: Plane[] = ['YZ', 'XZ', 'XY']; // the normal's axis x, y, z
 
 interface Frame {
   plane: Plane;
-  /** Lokal 2D (x, y) → planets (u, v). */
+  /** Local 2D (x, y) → the plane's (u, v). */
   aff: Aff;
-  /** Planets w för lokalt z = 0, och hur mycket w ändras per lokal z-enhet (tecken = riktning). */
+  /** The plane's w for local z = 0, and how much w changes per local z unit (sign = direction). */
   w0: number;
   dw: number;
 }
-/** Är den lokala z-axeln parallell med en världsaxel? Då ligger lokala xy i ett av skissplanen. */
+/** Is the local z axis parallel to a world axis? Then local xy lies in one of the sketch planes. */
 function frameOf(m: Mat): Frame | null {
   const ez = dir(m, [0, 0, 1]);
   const k = [0, 1, 2].reduce((best, i) => (Math.abs(ez[i]) > Math.abs(ez[best]) ? i : best), 0);
   const L = Math.hypot(...ez);
   if (L < 1e-12 || [0, 1, 2].some(i => i !== k && Math.abs(ez[i]) > 1e-9 * L)) return null;
   const ex = dir(m, [1, 0, 0]), ey = dir(m, [0, 1, 0]);
-  if (Math.abs(ex[k]) > 1e-9 * Math.hypot(...ex) || Math.abs(ey[k]) > 1e-9 * Math.hypot(...ey)) return null; // skjuvning
+  if (Math.abs(ex[k]) > 1e-9 * Math.hypot(...ex) || Math.abs(ey[k]) > 1e-9 * Math.hypot(...ey)) return null; // shear
   const plane = PLANE_BY_AXIS[k];
   const P = toPlane[plane];
   const o = P(apply(m, [0, 0, 0])), px = P(ex), py = P(ey), pz = P(ez);
   return { plane, aff: { a: px[0], b: py[0], c: px[1], d: py[1], tx: o[0], ty: o[1] }, w0: o[2], dw: pz[2] };
 }
 
-// ---- Verktyg --------------------------------------------------------------------------------
+// ---- Tools ----------------------------------------------------------------------------------
 
 type Tool =
   | { kind: 'prism'; plane: Plane; offset: number; depth: number; direction: 'normal' | 'reverse' | 'symmetric'; shapes: Shape[]; op: Op }
-  /** Rotationskropp (kon, klot): profil i planet + axel (konstruktionslinje, eller skissens Y-/X-axel). */
+  /** Body of revolution (cone, sphere): profile in the plane + axis (construction line, or the sketch's Y/X axis). */
   | { kind: 'revolve'; plane: Plane; offset: number; profile: Vec[]; arc?: { c: Vec; from: number; to: number }; axis: [Vec, Vec]; op: Op }
   | { kind: 'code'; code: string; op: Op };
 
 class Converter {
   tools: Tool[] = [];
-  /** Lådor för det som lagts till hittills (för att se om en bortdragning når dem). */
+  /** Boxes for what has been added so far (to see whether a subtraction reaches them). */
   added: Box[] = [];
   constructor(private engine: ConvertEngine) {}
 
@@ -393,9 +395,9 @@ class Converter {
       return;
     }
     if (GROUPS.has(n.name)) {
-      if (op === 'intersect' && n.children.length > 1) return this.code(n, m, op); // snitt med en union är inte snitt i följd
-      // En union är densamma i vilken ordning som helst: ta skillnader och snitt först, så att deras
-      // bortdragningar inte når kroppar som annars hade lagts till före dem.
+      if (op === 'intersect' && n.children.length > 1) return this.code(n, m, op); // an intersection with a union is not intersections in sequence
+      // A union is the same in any order: take differences and intersections first, so their
+      // subtractions do not reach bodies that would otherwise have been added before them.
       const first = (c: CsgNode) => (c.name === 'difference' || c.name === 'intersection' ? 0 : 1);
       const kids = op === 'add' ? [...n.children].sort((a, b) => first(a) - first(b)) : n.children;
       for (const c of kids) await this.walk(c, m, op);
@@ -409,7 +411,7 @@ class Converter {
       for (const c of rest) {
         const b = bbox3(c, m) ?? INF_BOX;
         if (prior.some(p => overlaps(p, b))) {
-          // Skulle skära i något som lades till tidigare → hela skillnaden som kod.
+          // Would cut into something added earlier → the whole difference as code.
           this.tools.length = mark;
           this.added.length = before;
           return this.code(n, m, op);
@@ -434,7 +436,7 @@ class Converter {
     this.code(n, m, op);
   }
 
-  /** Kon (cylinder med olika radier) eller klot med axeln längs en världsaxel → profil + Revolve. */
+  /** Cone (cylinder with different radii) or sphere with its axis along a world axis → profile + Revolve. */
   private revolveOf(n: CsgNode, m: Mat): Omit<Extract<Tool, { kind: 'revolve' }>, 'op'> | null {
     if (n.name !== 'cylinder' && n.name !== 'sphere') return null;
     const ez = dir(m, [0, 0, 1]), ex = dir(m, [1, 0, 0]), ey = dir(m, [0, 1, 0]);
@@ -442,12 +444,12 @@ class Converter {
     const L = Math.hypot(...ez), sx = Math.hypot(...ex), sy = Math.hypot(...ey);
     if ([0, 1, 2].some(i => i !== k && Math.abs(ez[i]) > 1e-9 * L) || Math.abs(sx - sy) > 1e-9 * sx) return null;
     if (Math.abs(ex[k]) > 1e-9 * sx || Math.abs(ey[k]) > 1e-9 * sy) return null;
-    if (fnOf(n) >= 3 && fnOf(n) < 16) return null; // pyramid – inte en rotationskropp
-    // Planet som innehåller axeln: Z → XZ (axeln = v), Y → XY (v), X → XY (u).
+    if (fnOf(n) >= 3 && fnOf(n) < 16) return null; // pyramid – not a body of revolution
+    // The plane that contains the axis: Z → XZ (axis = v), Y → XY (v), X → XY (u).
     const plane: Plane = k === 2 ? 'XZ' : 'XY';
     const axisIsV = k !== 0;
     const P = toPlane[plane];
-    // (radiellt, axiellt) → (u, v); spegelvänt när axeln är u.
+    // (radial, axial) → (u, v); mirrored when the axis is u.
     const uv = (rad: number, ax: number): Vec => (axisIsV ? { x: rad, y: ax } : { x: ax, y: rad });
     const at = (z: number) => P(apply(m, [0, 0, z]));
     const radial = (p: V3) => (axisIsV ? p[0] : p[1]), axial = (p: V3) => (axisIsV ? p[1] : p[0]);
@@ -462,14 +464,14 @@ class Converter {
     const r = (n.args.d !== undefined ? num(n.args.d) / 2 : num(n.args.r, 1)) * sx;
     const C = at(0);
     const rad0 = radial(C), ac = axial(C);
-    // Halvcirkel på den radiella sidan, från axelns ena ände till den andra.
+    // Half circle on the radial side, from one end of the axis to the other.
     const lo = uv(rad0, ac - r), hi = uv(rad0, ac + r);
     const mid = uv(rad0 + r, ac), cc = uv(rad0, ac);
     const ccw = (lo.x - cc.x) * (mid.y - cc.y) - (lo.y - cc.y) * (mid.x - cc.x) > 0;
     return { kind: 'revolve', plane, offset: C[2], profile: ccw ? [lo, hi] : [hi, lo], arc: { c: cc, from: 0, to: 1 }, axis: [lo, hi] };
   }
 
-  /** Kub, cylinder, linear_extrude eller hull av sådana → skiss + extrudering. */
+  /** Cube, cylinder, linear_extrude or a hull of those → sketch + extrude. */
   private async prism(n: CsgNode, m: Mat, op: Op): Promise<boolean> {
     const p = await this.prismOf(n, m);
     if (!p) return false;
@@ -489,7 +491,7 @@ class Converter {
       [z0, z1] = c ? [-s[2] / 2, s[2] / 2] : [0, s[2]];
     } else if (n.name === 'cylinder') {
       const [r1, r2] = radii(n);
-      if (Math.abs(r1 - r2) > 1e-12 || r1 <= 0) return null; // kon: kod
+      if (Math.abs(r1 - r2) > 1e-12 || r1 <= 0) return null; // cone: code
       const h = num(a.h, 1), c = a.center === true, fn = fnOf(n);
       local = [fn >= 3 && fn < 16 ? { kind: 'loop', pts: ngon({ x: 0, y: 0 }, r1, fn) } : { kind: 'circle', c: { x: 0, y: 0 }, r: r1 }];
       [z0, z1] = c ? [-h / 2, h / 2] : [0, h];
@@ -501,7 +503,7 @@ class Converter {
       local = shapes2dAll(n.children, I3, true) ?? (await this.rendered(n.children));
       [z0, z1] = c ? [-h / 2, h / 2] : [0, h];
     } else if (n.name === 'hull') {
-      // Hölje av prismor med samma plan och höjd (t.ex. fyra cylindrar → rundad låda).
+      // Hull of prisms with the same plane and height (e.g. four cylinders → rounded box).
       const parts = await Promise.all(n.children.map(c => this.flatPrisms(c, m)));
       if (!parts.length || parts.some(p => !p)) return null;
       const all = parts.flat() as NonNullable<Awaited<ReturnType<typeof this.prismOf>>>[];
@@ -521,7 +523,7 @@ class Converter {
     if (!f) return null;
     const shapes = local.map(s => mapShape(s, f.aff));
     if (shapes.some(s => !s)) return null;
-    // w längs normalen för z0 och z1.
+    // w along the normal for z0 and z1.
     const wa = f.w0 + f.dw * z0, wb = f.w0 + f.dw * z1;
     const depth = Math.abs(wb - wa);
     if (depth < 1e-9) return null;
@@ -530,7 +532,7 @@ class Converter {
     return { kind: 'prism', plane: f.plane, offset: centered ? f.w0 : wa, depth, direction, shapes: shapes as Shape[] };
   }
 
-  /** En nod som (efter transformationer och grupper) bara är prismor. */
+  /** A node that (after transformations and groups) is only prisms. */
   private async flatPrisms(n: CsgNode, m: Mat): Promise<NonNullable<Awaited<ReturnType<Converter['prismOf']>>>[] | null> {
     if (n.name === 'multmatrix') return this.flatAll(n.children, mul(m, asMat(n.pos[0] ?? n.args.m)));
     if (GROUPS.has(n.name)) return this.flatAll(n.children, m);
@@ -547,10 +549,10 @@ class Converter {
     return out;
   }
 
-  /** 2D som OpenSCAD får rita (offset, text, överlapp …) → slingor. */
+  /** 2D that OpenSCAD has to draw (offset, text, overlap …) → loops. */
   private async rendered(children: CsgNode[]): Promise<Shape[] | null> {
-    // Fin upplösning där $fn inte är satt (text, offset …) – bågarna hittas sedan i punkterna.
-    // CSG-exporten skriver $fa/$fs på varje nod, så de ändras i noderna.
+    // Fine resolution where $fn is not set (text, offset …) – the arcs are then found in the
+    // points. The CSG export writes $fa/$fs on every node, so they are changed in the nodes.
     const fine = (n: CsgNode): CsgNode => ({
       ...n,
       args: num(n.args.$fn) ? n.args : { ...n.args, ...('$fa' in n.args ? { $fa: 2 } : {}), ...('$fs' in n.args ? { $fs: 0.1 } : {}) },
@@ -566,11 +568,11 @@ class Converter {
   }
 }
 
-// ---- Skisser --------------------------------------------------------------------------------
+// ---- Sketches -------------------------------------------------------------------------------
 
 const fmt = (n: number) => String(Math.round(n * 1e6) / 1e6).replace('.', ',');
 
-/** Bågar i en polygon: följder av ≥ 4 punkter på samma cirkel (rundade hörn, offset). */
+/** Arcs in a polygon: runs of ≥ 4 points on the same circle (rounded corners, offset). */
 function fitSegments(pts: Vec[]): ({ kind: 'line'; a: number; b: number } | { kind: 'arc'; a: number; b: number; c: Vec; ccw: boolean })[] {
   const n = pts.length;
   const size = Math.max(...pts.map(p => Math.hypot(p.x - pts[0].x, p.y - pts[0].y)), 1e-9);
@@ -585,7 +587,8 @@ function fitSegments(pts: Vec[]): ({ kind: 'line'; a: number; b: number } | { ki
     const a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n];
     return Math.atan2((b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x), (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y));
   };
-  // Börja i en övergång (segmentlängden eller svängen ändras mest), så att ingen båge delas av början.
+  // Start at a transition (where the segment length or the turn changes most), so no arc is split
+  // by the start.
   const len = (i: number) => Math.hypot(pts[(i + 1) % n].x - pts[i].x, pts[(i + 1) % n].y - pts[i].y);
   let start = 0, bestJump = -1;
   for (let i = 0; i < n; i++) {
@@ -600,7 +603,7 @@ function fitSegments(pts: Vec[]): ({ kind: 'line'; a: number; b: number } | { ki
     let best = 0;
     if (i + 3 <= n) {
       const c0 = circle(P(i), P(i + 1), P(i + 2));
-      // Ett steg i en båge: ungefär lika långt som det första, och en liten sväng åt samma håll.
+      // One step in an arc: about as long as the first, and a small turn in the same direction.
       const seg = Math.hypot(P(i + 1).x - P(i).x, P(i + 1).y - P(i).y);
       const turnAt = (k: number) => turn((start + k) % n);
       const t0 = turnAt(i + 1);
@@ -618,12 +621,13 @@ function fitSegments(pts: Vec[]): ({ kind: 'line'; a: number; b: number } | { ki
           j++;
           if (j === n) break;
         }
-        if (j - i >= 3) best = j - i; // minst tre segment
+        if (j - i >= 3) best = j - i; // at least three segments
         if (best) {
           const a = P(i), b = P(i + 1), e = P(i + best);
           const ccw = (a.x - c0.c.x) * (b.y - c0.c.y) - (a.y - c0.c.y) * (b.x - c0.c.x) > 0;
-          // Centrum på mittnormalen mellan ändpunkterna: båda ligger då exakt på radien
-          // (punkterna från OpenSCAD är avrundade, och skissens regioner kräver att bågen når ändpunkten).
+          // Center on the perpendicular bisector of the end points: both then lie exactly on the
+          // radius (the points from OpenSCAD are rounded, and the sketch's regions require the arc
+          // to reach its end point).
           let c = c0.c;
           const L = Math.hypot(e.x - a.x, e.y - a.y);
           if (L > 1e-9) {
@@ -669,7 +673,7 @@ class SketchBuilder {
     const sk = this.sk;
     switch (s.kind) {
       case 'rect': {
-        // Med mått: bredd och höjd går att ändra direkt.
+        // With dimensions: width and height can be changed directly.
         const p = [this.pt({ x: s.x0, y: s.y0 }), this.pt({ x: s.x1, y: s.y0 }), this.pt({ x: s.x1, y: s.y1 }), this.pt({ x: s.x0, y: s.y1 })];
         this.line(p[0], p[1], 'horizontal');
         this.line(p[1], p[2], 'vertical');
@@ -688,7 +692,7 @@ class SketchBuilder {
       case 'rhull': {
         const cs = s.centers.length > 2 ? convexHull(s.centers) : dedupe(s.centers);
         if (cs.length === 1) return this.add({ kind: 'circle', c: cs[0], r: s.r });
-        // Linjer förskjutna utåt längs varje kant, bågar runt hörnen (moturs).
+        // Lines offset outwards along each edge, arcs around the corners (counterclockwise).
         const k = cs.length;
         const normal = (i: number) => {
           const a = cs[i], b = cs[(i + 1) % k];
@@ -703,14 +707,15 @@ class SketchBuilder {
           lines.push(this.line(starts[i], ends[i], Math.abs(nn.x) < 1e-12 ? 'horizontal' : Math.abs(nn.y) < 1e-12 ? 'vertical' : undefined));
         }
         for (let i = 0; i < k; i++) arcs.push(this.arc(cs[(i + 1) % k], ends[i], starts[(i + 1) % k], true));
-        // Parametrisk: linjerna tangerar bågarna, alla hörn har samma radie (med mått).
+        // Parametric: the lines are tangent to the arcs, all corners have the same radius (with
+        // dimensions).
         for (let i = 0; i < k; i++) {
           this.con({ type: 'tangent', e1: lines[i], e2: arcs[i], quiet: true });
           this.con({ type: 'tangent', e1: lines[(i + 1) % k], e2: arcs[i], quiet: true });
           if (i) this.con({ type: 'equal', e1: arcs[0], e2: arcs[i], quiet: true });
         }
         this.con({ type: 'radius', e: arcs[0], value: s.r });
-        // Rundad rektangel: ytterbredd och ytterhöjd som mått.
+        // Rounded rectangle: outer width and outer height as dimensions.
         if (k === 4) {
           const dirs = cs.map((_, i) => normal(i));
           const find = (x: number, y: number) => dirs.findIndex(d => Math.abs(d.x - x) < 1e-9 && Math.abs(d.y - y) < 1e-9);
@@ -726,7 +731,7 @@ class SketchBuilder {
       case 'loop': {
         const pts = dedupe(s.pts);
         if (pts.length < 3) return;
-        // En hel cirkel ritad som polygon (många hörn på samma cirkel) → cirkel.
+        // A full circle drawn as a polygon (many corners on the same circle) → circle.
         const segs = fitSegments(pts);
         if (segs.length === 1 && segs[0].kind === 'arc') {
           const c = segs[0].c;
@@ -739,7 +744,7 @@ class SketchBuilder {
             this.line(ids[g.a], ids[g.b], Math.abs(a.y - b.y) < 1e-9 ? 'horizontal' : Math.abs(a.x - b.x) < 1e-9 ? 'vertical' : undefined);
           } else this.arc(g.c, ids[g.a], ids[g.b], g.ccw);
         }
-        // Punkter mitt i bågar används inte.
+        // Points in the middle of arcs are not used.
         const used = new Set(Object.values(sk.entities).flatMap(e => (e.type === 'circle' ? [e.c] : e.type === 'line' ? [e.p1, e.p2] : [e.c, e.p1, e.p2])));
         for (const id of ids) if (!used.has(id)) delete sk.points[id];
         return;
@@ -752,7 +757,7 @@ const dedupe = (pts: Vec[]) => pts.filter((p, i) => {
   return Math.hypot(p.x - q.x, p.y - q.y) > 1e-9;
 });
 
-/** Slå ihop prismor i följd med samma plan, höjd och operation till en skiss (om formerna inte nuddar varandra). */
+/** Merge consecutive prisms with the same plane, height and operation into one sketch (if the shapes do not touch each other). */
 function mergeTools(tools: Tool[]): Tool[] {
   const out: Tool[] = [];
   for (const t of tools) {
@@ -768,7 +773,7 @@ function mergeTools(tools: Tool[]): Tool[] {
   return out;
 }
 
-/** Konvertera OpenSCAD-kod till ett dokument med skisser och features. */
+/** Convert OpenSCAD code to a document with sketches and features. */
 export async function scadToDoc(src: string, engine: ConvertEngine): Promise<ConvertResult> {
   const roots = parseCsg(await engine.csg(src));
   const conv = new Converter(engine);
@@ -807,7 +812,7 @@ export async function scadToDoc(src: string, engine: ConvertEngine): Promise<Con
   return { doc, sketches, extrudes, revolves, codeBlocks };
 }
 
-/** Skiss med profil och axel (konstruktionslinje) + Revolve 360°. */
+/** Sketch with profile and axis (construction line) + Revolve 360°. */
 function revolveFeatures(doc: Doc, t: Extract<Tool, { kind: 'revolve' }>) {
   const sk = newSketch(doc, t.plane);
   if (Math.abs(t.offset) > 1e-9) sk.offset = fmt(t.offset);
@@ -818,11 +823,11 @@ function revolveFeatures(doc: Doc, t: Extract<Tool, { kind: 'revolve' }>) {
   };
   const ids = t.profile.map(pt);
   if (t.arc) {
-    // Klot: halvcirkel (moturs från ids[0] till ids[1]) + linjen längs axeln.
+    // Sphere: half circle (counterclockwise from ids[0] to ids[1]) + the line along the axis.
     sk.entities[newId(sk, 'e')] = { type: 'arc', c: pt(t.arc.c), p1: ids[0], p2: ids[1] };
     sk.entities[newId(sk, 'e')] = { type: 'line', p1: ids[1], p2: ids[0] };
   } else ids.forEach((id, i) => (sk.entities[newId(sk, 'e')] = { type: 'line', p1: id, p2: ids[(i + 1) % ids.length] }));
-  // Axeln: skissens Y-/X-axel om den går genom origo, annars en konstruktionslinje.
+  // The axis: the sketch's Y/X axis if it goes through the origin, otherwise a construction line.
   const [a, b] = t.axis;
   const r = newFeature(doc, 'revolve', sk);
   if (Math.abs(a.x) < 1e-9 && Math.abs(b.x) < 1e-9) r.axis = { kind: 'y' };

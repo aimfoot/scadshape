@@ -1,6 +1,6 @@
-// Mätverktyget i 3D: vad ett tryck på modellen träffade (hörn, kant, yta) → en referens
-// (punkt, rak kant, cirkel/båge, yta) → mått mellan en eller två referenser.
-// Ren geometri på nätets kanter (viewerns EdgesGeometry), utan three.js.
+// The measure tool in 3D: what a tap on the model hit (corner, edge, face) → a reference (point,
+// straight edge, circle/arc, face) → measurements between one or two references. Pure geometry on
+// the mesh's edges (the viewer's EdgesGeometry), without three.js.
 
 import { fmtNum } from './sketch/geom';
 import { t } from './i18n';
@@ -8,12 +8,12 @@ import type { V3 } from './frame';
 
 export type { V3 };
 
-/** Vad ett tryck träffade (från Viewer.pickMeasure). */
+/** What a tap hit (from Viewer.pickMeasure). */
 export interface Pick {
   kind: 'vertex' | 'edge' | 'face';
   point: V3;
-  normal?: V3; // yta
-  seg?: number; // kantsegment (edge)
+  normal?: V3; // face
+  seg?: number; // edge segment (edge)
 }
 
 export type Ref =
@@ -25,7 +25,7 @@ export type Ref =
 export interface Result {
   main: string;
   detail?: string;
-  /** Hjälplinje att rita (t.ex. det vinkelräta avståndet). */
+  /** Guide line to draw (e.g. the perpendicular distance). */
   guide?: [V3, V3];
 }
 
@@ -37,14 +37,14 @@ const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[
 const len = (a: V3) => Math.hypot(a[0], a[1], a[2]);
 const norm = (a: V3): V3 => mul(a, 1 / (len(a) || 1));
 const deg = (r: number) => (r * 180) / Math.PI;
-const PAR = Math.sin((0.5 * Math.PI) / 180); // parallellt inom 0,5°
+const PAR = Math.sin((0.5 * Math.PI) / 180); // parallel within 0.5°
 
 const seg = (e: Float32Array, i: number): [V3, V3] => [
   [e[i * 6], e[i * 6 + 1], e[i * 6 + 2]],
   [e[i * 6 + 3], e[i * 6 + 4], e[i * 6 + 5]],
 ];
 
-/** Index: avrundad punkt → segment som slutar där (och punkten). */
+/** Index: rounded point → segments ending there (and the point). */
 function vertexIndex(e: Float32Array) {
   const key = (p: V3) => `${Math.round(p[0] * 1e4)},${Math.round(p[1] * 1e4)},${Math.round(p[2] * 1e4)}`;
   const map = new Map<string, number[]>();
@@ -66,8 +66,9 @@ const MAX_TURN = Math.cos((40 * Math.PI) / 180);
 const STRAIGHT = Math.cos((0.5 * Math.PI) / 180);
 
 /**
- * Väx en kedja av kantsegment från segmentet `start` åt båda håll så länge `accept` godtar
- * nästa punkt (fortsättningen med minst sväng väljs). Sluten om den kommer runt till början.
+ * Grow a chain of edge segments from the segment `start` in both directions as long as `accept`
+ * accepts the next point (the continuation with the least turn is chosen). Closed if it comes round
+ * to the start.
  */
 function grow(e: Float32Array, start: number, accept: (chain: V3[], next: V3) => boolean): { poly: V3[]; closed: boolean } {
   const { key, map } = vertexIndex(e);
@@ -103,8 +104,8 @@ function grow(e: Float32Array, start: number, accept: (chain: V3[], next: V3) =>
 }
 
 /**
- * Hörn att fästa mot: kantpunkter där en eller fler än två kanter möts, eller där kanten
- * svänger mer än 40° – inte punkterna längs en tessellerad cirkel (3 tal per punkt).
+ * Corners to snap to: edge points where one or more than two edges meet, or where the edge turns
+ * more than 40° – not the points along a tessellated circle (3 numbers per point).
  */
 export function cornerVertices(e: Float32Array): Float32Array {
   const { key, map, pts } = vertexIndex(e);
@@ -120,7 +121,7 @@ export function cornerVertices(e: Float32Array): Float32Array {
   return new Float32Array(out);
 }
 
-/** Cirkel genom tre punkter i rummet (centrum, radie, normal), eller null om de ligger på linje. */
+/** Circle through three points in space (center, radius, normal), or null if they are collinear. */
 function circle3(a: V3, b: V3, c: V3): { c: V3; r: number; n: V3 } | null {
   const ab = sub(b, a), ac = sub(c, a);
   const n = cross(ab, ac);
@@ -139,13 +140,14 @@ const onCircle = (f: { c: V3; r: number; n: V3 }, p: V3) => {
   return Math.abs(len(sub(p, f.c)) - f.r) < tol && Math.abs(dot(sub(p, f.c), f.n)) < tol;
 };
 
-/** Cirkel/båge: varje steg svänger lite (inte rakt), lika långa steg, och punkten ligger på cirkeln genom kedjan. */
+/** Circle/arc: every step turns a little (not straight), equal steps, and the point lies on the circle through the chain. */
 function arcAccept(chain: V3[], next: V3) {
   const n = chain.length;
   const prev = sub(chain[n - 1], chain[n - 2]), step = sub(next, chain[n - 1]);
   const c = dot(norm(prev), norm(step));
   if (c < MAX_TURN || c > STRAIGHT) return false;
-  // Tessellerade bågar har jämna segment; en lång rak kant som går in i en båge är inte en del av den.
+  // Tessellated arcs have even segments; a long straight edge running into an arc is not part of
+  // it.
   const ratio = len(step) / len(prev);
   if (ratio > 3 || ratio < 1 / 3) return false;
   if (n < 3) return true;
@@ -153,10 +155,10 @@ function arcAccept(chain: V3[], next: V3) {
   return !!f && onCircle(f, next);
 }
 
-/** Rak kant (delad i flera segment): fortsätter i samma riktning. */
+/** Straight edge (split into several segments): continues in the same direction. */
 const straightAccept = (chain: V3[], next: V3) => dot(norm(sub(chain[chain.length - 1], chain[0])), norm(sub(next, chain[chain.length - 1]))) > STRAIGHT;
 
-/** Referensen för ett tryck: hörn, cirkel/båge, rak kant (hela längden) eller yta. */
+/** The reference for a tap: corner, circle/arc, straight edge (the whole length) or face. */
 export function refOf(pick: Pick, edges: Float32Array | null): Ref {
   if (pick.kind === 'vertex') return { kind: 'vertex', p: pick.point };
   if (pick.kind === 'face' || pick.seg === undefined || !edges) return { kind: 'face', p: pick.point, n: norm(pick.normal ?? [0, 0, 1]) };
@@ -181,7 +183,7 @@ function axisName(n: V3) {
   return n.map(v => fmtNum(v, 3)).join(', ');
 }
 
-/** Text för en ensam referens. */
+/** Text for a single reference. */
 export function describe(r: Ref): Result {
   switch (r.kind) {
     case 'vertex':
@@ -200,7 +202,7 @@ export function describe(r: Ref): Result {
 
 const pointLike = (r: Ref) => r.kind === 'vertex' || r.kind === 'circle';
 
-/** Avstånd/vinkel mellan två referenser. */
+/** Distance/angle between two references. */
 export function measureBetween(a: Ref, b: Ref): Result {
   if (b.kind === 'face' && a.kind !== 'face') [a, b] = [b, a];
   if (b.kind === 'line' && pointLike(a)) [a, b] = [b, a];
@@ -221,7 +223,7 @@ export function measureBetween(a: Ref, b: Ref): Result {
       return angle(Math.acos(Math.max(-1, Math.min(1, c))), 'measure.angleFaces');
     }
     if (b.kind === 'line' && Math.abs(dot(b.dir, n)) > PAR) return angle(Math.asin(Math.min(1, Math.abs(dot(b.dir, n)))), 'measure.angle');
-    // Punkt (eller kant parallell med ytan) → vinkelrätt avstånd till ytans plan.
+    // Point (or edge parallel to the face) → perpendicular distance to the face's plane.
     const d = dot(sub(b.p, a.p), n);
     return { main: t('measure.distance', { v: mm(Math.abs(d)) }), detail: t('measure.perpendicular'), guide: [b.p, sub(b.p, mul(n, d))] };
   }
@@ -236,7 +238,7 @@ export function measureBetween(a: Ref, b: Ref): Result {
       }
       return angle(Math.asin(Math.min(1, s)), 'measure.angle');
     }
-    // Punkt → vinkelrätt avstånd till kantens linje.
+    // Point → perpendicular distance to the edge's line.
     const off = sub(b.p, a.a);
     const foot = add(a.a, mul(a.dir, dot(off, a.dir)));
     return { main: t('measure.distance', { v: mm(len(sub(b.p, foot))) }), detail: t('measure.toEdge'), guide: [b.p, foot] };

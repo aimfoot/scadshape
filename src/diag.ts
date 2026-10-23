@@ -1,8 +1,8 @@
-// Diagnos: är OpenSCAD långsamt för att workern hamnar på en liten CPU-kärna?
-// Jämför samma arbete på huvudtråden och i en worker. Resultatet skickas till data/client.jsonl.
+// Diagnostics: is OpenSCAD slow because the worker ends up on a small CPU core? Compares the same
+// work on the main thread and in a worker. The result is sent to data/client.jsonl.
 
 import { remoteLog, installErrorReporting } from './remote';
-import plattan from './examples/plattan.scad';
+import plate from './examples/plate.scad';
 
 installErrorReporting();
 
@@ -12,7 +12,7 @@ const line = (s: string) => {
   out.textContent += s + '\n';
 };
 
-// Ren JS-belastning (samma kod körs i workern via Blob-URL).
+// Pure JS load (the same code runs in the worker via a Blob URL).
 const CPU_SRC = `function cpu() {
   const t0 = performance.now();
   let x = 0;
@@ -33,7 +33,7 @@ function inWorker<T>(body: string): Promise<T> {
 
 const base = new URL('./openscad/', location.href).href;
 
-// OpenSCAD-rendering av plattan; samma kod används på huvudtråden och i workern.
+// OpenSCAD rendering of the plate; the same code is used on the main thread and in the worker.
 const SCAD_SRC = `async function scad(base, src, runs) {
   const { default: OpenSCAD } = await import(base + 'openscad.js');
   const module = await WebAssembly.compileStreaming(fetch(base + 'openscad.wasm'));
@@ -58,7 +58,7 @@ async function run() {
   out.textContent = '';
   const res: Record<string, unknown> = { cores: navigator.hardwareConcurrency };
   try {
-    line('JS-loop, huvudtråd …');
+    line('JS loop, main thread …');
     await new Promise(r => setTimeout(r, 50));
     res.jsMain = [cpu().ms, cpu().ms, cpu().ms].map(Math.round);
     line(`  ${(res.jsMain as number[]).join(', ')} ms`);
@@ -67,27 +67,27 @@ async function run() {
     res.jsWorker = await inWorker<number[]>(`${CPU_SRC}; postMessage([cpu().ms, cpu().ms, cpu().ms].map(Math.round));`);
     line(`  ${(res.jsWorker as number[]).join(', ')} ms`);
 
-    line('JS-loop, 4 workers samtidigt …');
+    line('JS loop, 4 workers at once …');
     res.jsWorker4 = await Promise.all(
       [0, 1, 2, 3].map(() => inWorker<number>(`${CPU_SRC}; postMessage(Math.round(cpu().ms));`)),
     );
     line(`  ${(res.jsWorker4 as number[]).join(', ')} ms`);
 
-    line('OpenSCAD plattan, worker …');
+    line('OpenSCAD plate, worker …');
     res.scadWorker = await inWorker<number[]>(
-      `${SCAD_SRC}; scad(${JSON.stringify(base)}, ${JSON.stringify(plattan)}, 3).then(t => postMessage(t));`,
+      `${SCAD_SRC}; scad(${JSON.stringify(base)}, ${JSON.stringify(plate)}, 3).then(t => postMessage(t));`,
     );
     line(`  ${(res.scadWorker as number[]).join(', ')} ms`);
 
-    line('OpenSCAD plattan, huvudtråd (sidan fryser en stund) …');
+    line('OpenSCAD plate, main thread (the page freezes for a while) …');
     await new Promise(r => setTimeout(r, 50));
-    res.scadMain = await scadMain(base, plattan, 3);
+    res.scadMain = await scadMain(base, plate, 3);
     line(`  ${(res.scadMain as number[]).join(', ')} ms`);
 
-    line('\nKlart – skickat till servern.');
+    line('\nDone – sent to the server.');
   } catch (e) {
     res.error = String(e);
-    line(`Fel: ${e}`);
+    line(`Error: ${e}`);
   }
   remoteLog('diag', res);
   btn.disabled = false;

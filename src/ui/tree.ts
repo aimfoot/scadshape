@@ -1,4 +1,4 @@
-// Feature-trädet (☰): lista, fel, undertryckta, rollback-markör och åtgärdsmenyn (⋯).
+// The feature tree (☰): list, errors, suppressed, rollback marker and the action menu (⋯).
 
 import { activeCount, dependents, removeFeature, type Feature, type SketchFeature } from '../doc';
 import { kindOf } from '../features';
@@ -11,10 +11,10 @@ import { app, emit } from './state';
 const SKETCH_ICON =
   '<svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><circle class="dot" cx="4" cy="18" r="1.6"/><circle class="dot" cx="10" cy="6" r="1.6"/><circle class="dot" cx="20" cy="14" r="1.6"/></svg>';
 
-/** Vad som händer när man trycker på en feature (sätts av main: skissläge eller panel). */
+/** What happens when a feature is tapped (set by main: sketch mode or the panel). */
 export const treeActions = { edit: (_f: Feature) => {} };
 
-/** Skissens plan: "Topp +t", "Fram −20" eller "Sned yta". */
+/** The sketch's plane: "Top +t", "Front −20" or "Slanted face". */
 export function planeLabel(f: SketchFeature): string {
   if (f.face) return t('plane.slantedFace');
   return t(PLANE_NAMES[f.plane]) + (f.offset && f.offset !== '0' ? (f.offset.startsWith('-') ? ` −${f.offset.slice(1)}` : ` +${f.offset}`) : '');
@@ -56,7 +56,7 @@ export function renderTree() {
   $('#treeEmpty').hidden = doc.features.length > 0;
 }
 
-// ---- Åtgärdsmenyn ----------------------------------------------------------------------------
+// ---- The action menu -------------------------------------------------------------------------
 
 const menu = () => $<HTMLDialogElement>('#featMenu');
 let menuFeature: Feature | null = null;

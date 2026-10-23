@@ -1,6 +1,6 @@
-// Installerbar app och offline: service workern (sw.js) registreras bara över https
-// (eller lokalt med ?sw för tester) – utvecklingsservern över Tailscale är vanlig http.
-// Inte i Android-appen: där ligger filerna redan i APK:n.
+// Installable app and offline: the service worker (sw.js) is only registered over https (or locally
+// with ?sw for tests) – the dev server over Tailscale is plain http. Not in the Android app: the
+// files are already in the APK there.
 
 import { t } from '../i18n';
 import { showToast } from './toast';
@@ -11,10 +11,10 @@ export function initPwa() {
   const local = location.hostname === '127.0.0.1' && new URLSearchParams(location.search).has('sw');
   if (location.protocol !== 'https:' && !local) return;
   const hadController = !!navigator.serviceWorker.controller;
-  // Den nya service workern tar över sidan direkt (clients.claim) → controllerchange.
-  // Första gången: nu fungerar appen utan nät. Annars: en ny version är hämtad.
+  // The new service worker takes over the page right away (clients.claim) → controllerchange. The
+  // first time: the app now works without network. Otherwise: a new version has been downloaded.
   navigator.serviceWorker.addEventListener('controllerchange', () => showToast(t(hadController ? 'toast.updated' : 'toast.offlineReady')), { once: true });
   navigator.serviceWorker.register('sw.js').catch(() => {
-    /* utan service worker fungerar appen ändå, bara inte offline */
+    /* without a service worker the app still works, just not offline */
   });
 }

@@ -1,4 +1,5 @@
-// Variabler: dialogen (namn = uttryck), variabelknappar under uttrycksfält och omräkning av skissmått.
+// Variables: the dialog (name = expression), variable buttons below expression fields and
+// recomputing sketch dimensions.
 
 import { parseExpr } from '../expr';
 import { t } from '../i18n';
@@ -10,7 +11,7 @@ import { $, el } from './dom';
 import { app, emit, vars } from './state';
 import { showToast } from './toast';
 
-// ---- Variabelknappar (telefonens sifferknappsats saknar bokstäver) -------------------------------
+// ---- Variable buttons (the phone's number pad has no letters) ------------------------------------
 
 const chipRows = new Set<{ box: HTMLElement; target: () => HTMLInputElement | null }>();
 
@@ -18,7 +19,7 @@ function fillChips(box: HTMLElement, target: () => HTMLInputElement | null) {
   box.replaceChildren(
     ...app.doc.params.map(p => {
       const b = el('button', { type: 'button', textContent: p.name });
-      b.addEventListener('pointerdown', e => e.preventDefault()); // behåll fokus i fältet
+      b.addEventListener('pointerdown', e => e.preventDefault()); // keep the focus in the field
       b.addEventListener('click', () => {
         const input = target();
         if (!input) return;
@@ -33,10 +34,10 @@ function fillChips(box: HTMLElement, target: () => HTMLInputElement | null) {
   );
 }
 
-/** En rad variabelknappar som skriver in i fältet som `target` ger. */
+/** A row of variable buttons that type into the field given by `target`. */
 export function chipRow(target: () => HTMLInputElement | null): HTMLElement {
   const box = el('div', { className: 'chips' });
-  // Gamla rader (från stängda paneler) städas bort när de inte längre sitter i dokumentet.
+  // Old rows (from closed panels) are cleaned up when they are no longer in the document.
   for (const r of chipRows) if (!r.box.isConnected) chipRows.delete(r);
   chipRows.add({ box, target });
   fillChips(box, target);
@@ -47,11 +48,11 @@ export function refreshChips() {
   for (const r of chipRows) fillChips(r.box, r.target);
 }
 
-// ---- Dialogen -------------------------------------------------------------------------------------
+// ---- The dialog -----------------------------------------------------------------------------------
 
 const dlg = () => $<HTMLDialogElement>('#paramsDlg');
 
-/** Variablerna har ändrats: räkna om skissmått som använder dem och bygg om. */
+/** The variables have changed: recompute the sketch dimensions that use them and rebuild. */
 function applyParams() {
   const v = vars();
   const errs: string[] = [];

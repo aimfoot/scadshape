@@ -1,6 +1,7 @@
-// Skissplanets placering i världen: origo o, axlar u och v (skissens x och y) och normalen n = u × v.
-// Grundplanen (XY, XZ, YZ med förskjutning) och sneda ytor (skissa på en yta) ger samma sorts frame,
-// så OpenSCAD-koden, 3D-vyn och valen i 3D behöver bara känna till den.
+// The sketch plane's placement in the world: origin o, axes u and v (the sketch's x and y) and the
+// normal n = u × v. The base planes (XY, XZ, YZ with offset) and slanted faces (sketch on a face)
+// give the same kind of frame, so the OpenSCAD code, the 3D view and the picking in 3D only need to
+// know about it.
 
 import { parseExpr, type Vars } from './expr';
 import type { Doc } from './doc';
@@ -24,7 +25,7 @@ export const scale = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k];
 export const add = (...vs: V3[]): V3 => vs.reduce((s, a) => [s[0] + a[0], s[1] + a[1], s[2] + a[2]], [0, 0, 0] as V3);
 export const unit = (a: V3): V3 => scale(a, 1 / (Math.hypot(...a) || 1));
 
-/** Grundplanen (samma placering som PLANE_ROTATE + förskjutning i model3d). */
+/** The base planes (the same placement as PLANE_ROTATE + offset in model3d). */
 export function planeFrame(plane: Plane, offset = 0): Frame {
   switch (plane) {
     case 'XY':
@@ -36,12 +37,12 @@ export function planeFrame(plane: Plane, offset = 0): Frame {
   }
 }
 
-/** Skissens förskjutning som tal, 0 om den saknas eller är ogiltig. */
+/** The sketch's offset as a number, 0 if it is missing or invalid. */
 export const offsetValue = (sk: SketchFeature, vars?: Vars) => (sk.offset ? (parseExpr(sk.offset, vars).value ?? 0) : 0);
 
 /**
- * Skissens frame: en sned yta (räknad ur extruderingen den kommer från om dokumentet ges,
- * annars sk.face) eller ett grundplan, förskjutet längs normalen.
+ * The sketch's frame: a slanted face (computed from the extrude it comes from if the document is
+ * given, otherwise sk.face) or a base plane, offset along the normal.
  */
 export function sketchFrame(sk: SketchFeature, vars?: Vars, doc?: Doc, depth = 0): Frame {
   const off = offsetValue(sk, vars);
@@ -51,16 +52,16 @@ export function sketchFrame(sk: SketchFeature, vars?: Vars, doc?: Doc, depth = 0
   return { ...base, o: add(base.o, scale(base.n, off)) };
 }
 
-/** Skissens (x, y) och avstånd w längs normalen → världen. */
+/** The sketch's (x, y) and distance w along the normal → the world. */
 export const toWorld = (f: Frame, p: Vec, w = 0): V3 => add(f.o, scale(f.u, p.x), scale(f.v, p.y), scale(f.n, w));
 
-/** Världspunkt → skissens (x, y) och avstånd från planet. */
+/** World point → the sketch's (x, y) and distance from the plane. */
 export function toPlane(f: Frame, q: V3): Vec & { w: number } {
   const d = sub(q, f.o);
   return { x: dot(d, f.u), y: dot(d, f.v), w: dot(d, f.n) };
 }
 
-/** OpenSCAD: placera skissens xy-plan på framen. */
+/** OpenSCAD: place the sketch's xy plane on the frame. */
 export function frameScad(f: Frame): string {
   const r = (x: number) => {
     const s = String(Math.round(x * 1e9) / 1e9);
@@ -70,16 +71,16 @@ export function frameScad(f: Frame): string {
   return `multmatrix([${row(0)}, ${row(1)}, ${row(2)}, [0, 0, 0, 1]]) `;
 }
 
-// ---- Ytor från extruderingar (skissa på en sned yta som följer måtten) --------------------------
+// ---- Faces from extrudes (sketch on a slanted face that follows the dimensions) -----------------
 
-/** Kanonisk frame för en yta med normalen n: u vågrätt längs ytan, v uppför (n = u × v). */
+/** Canonical frame for a face with normal n: u horizontal along the face, v uphill (n = u × v). */
 export function faceAxes(n: V3): { u: V3; v: V3 } {
   let u = cross([0, 0, 1], n);
   u = Math.hypot(...u) < 1e-6 ? [1, 0, 0] : unit(u);
   return { u, v: cross(n, u) };
 }
 
-/** Extruderingens utsträckning längs skissnormalen [wa, wb], eller null om djupet är ogiltigt. */
+/** The extrude's extent along the sketch normal [wa, wb], or null if the depth is invalid. */
 export function extrudeSpan(f: ExtrudeFeature, vars?: Vars): [number, number] | null {
   const h = parseExpr(f.depth, vars).value;
   if (h === null || !(h > 0)) return null;
@@ -87,15 +88,15 @@ export function extrudeSpan(f: ExtrudeFeature, vars?: Vars): [number, number] | 
 }
 
 export interface ExtrudeFace {
-  /** Normal (utan tecken, dvs. före FaceRef.sign). */
+  /** Normal (unsigned, i.e. before FaceRef.sign). */
   n: V3;
-  /** Hörn för en sidoyta (P0 = A vid wa, P1 = B vid wa, P2 = B vid wb, P3 = A vid wb). */
+  /** Corners of a side face (P0 = A at wa, P1 = B at wa, P2 = B at wb, P3 = A at wb). */
   corners?: [V3, V3, V3, V3];
-  /** En punkt i ändytan (skissens origo flyttat till wa/wb). */
+  /** A point in the end face (the sketch's origin moved to wa/wb). */
   point: V3;
 }
 
-/** Geometrin för en yta på en extrudering, i världen. */
+/** The geometry of a face on an extrude, in the world. */
 export function extrudeFace(fs: Frame, sk: SketchFeature, span: [number, number], key: { entity?: string; cap?: 'lo' | 'hi' }): ExtrudeFace | null {
   const [wa, wb] = span;
   if (key.cap) return { n: fs.n, point: add(fs.o, scale(fs.n, key.cap === 'lo' ? wa : wb)) };
@@ -111,7 +112,7 @@ export function extrudeFace(fs: Frame, sk: SketchFeature, span: [number, number]
   return { n, corners: [at(A, wa), at(B, wa), at(B, wb), at(A, wb)], point: at(A, wa) };
 }
 
-/** Frame för en extruderingsyta: kanonisk orientering; origo i nedre vänstra hörnet (sidoyta) eller i skissens origo (ändyta). */
+/** Frame for an extrude face: canonical orientation; origin in the lower left corner (side face) or at the sketch's origin (end face). */
 export function extrudeFaceFrame(g: ExtrudeFace, sign: 1 | -1): Frame {
   const n = scale(g.n, sign);
   const { u, v } = faceAxes(n);
@@ -131,7 +132,7 @@ export function extrudeFaceFrame(g: ExtrudeFace, sign: 1 | -1): Frame {
 
 const MAX_DEPTH = 16;
 
-/** Lös en skiss faceRef ur dokumentet (extruderingen måste ligga före skissen och vara aktiv). */
+/** Resolve a sketch's faceRef from the document (the extrude must come before the sketch and be active). */
 function resolveFaceRef(doc: Doc, sk: SketchFeature, vars: Vars | undefined, depth: number): Frame | null {
   const ref = sk.faceRef;
   if (!ref || depth > MAX_DEPTH) return null;

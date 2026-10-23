@@ -1,8 +1,8 @@
-// Skicka förlopp och fel till servern (data/client.jsonl) – telefonen har ingen konsol vi ser.
-// Bara på utvecklingsservern (Tailscale) och lokalt; den publika versionen skickar ingenting, och i
-// appbygget (__DEV_TOOLS__ = false) finns koden inte ens med.
+// Send progress and errors to the server (data/client.jsonl) – the phone has no console we can see.
+// Only on the dev server (Tailscale) and locally; the public version sends nothing, and in the app
+// build (__DEV_TOOLS__ = false) the code is not even included.
 
-/** Körs appen från utvecklingsservern? (localhost eller en Tailscale-adress, 100.64.0.0/10) */
+/** Is the app running from the dev server? (localhost or a Tailscale address, 100.64.0.0/10) */
 export const isDevHost =
   __DEV_TOOLS__ && /^(localhost|127\.0\.0\.1|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+)$/.test(globalThis.location?.hostname ?? '');
 
@@ -10,11 +10,11 @@ export function remoteLog(kind: string, data: Record<string, unknown> = {}) {
   if (!__DEV_TOOLS__ || !isDevHost) return;
   const body = JSON.stringify({ kind, at: new Date().toISOString(), ...data });
   try {
-    // sendBeacon överlever att sidan läggs i bakgrunden eller stängs.
+    // sendBeacon survives the page going to the background or closing.
     if (navigator.sendBeacon?.('api/log', new Blob([body], { type: 'application/json' }))) return;
     fetch('api/log', { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
   } catch {
-    /* loggning får aldrig stoppa appen */
+    /* logging must never stop the app */
   }
 }
 

@@ -1,6 +1,7 @@
-// Gänga: utvändig gänga på cylindrar eller invändig gänga i hål, vid valda cirklar i en skiss.
-// Utvändig: cylindern skärs bort över gänglängden och ersätts av en gängad stav (avfasad).
-// Invändig: en gängtapp dras bort (hålet bör vara högst mutterns innerdiameter).
+// Thread: external threads on cylinders or internal threads in holes, at chosen circles in a
+// sketch. External: the cylinder is cut away over the thread length and replaced by a threaded rod
+// (chamfered). Internal: a threaded plug is subtracted (the hole should be at most the nut's minor
+// diameter).
 
 import { t } from '../i18n';
 import { FieldReader, fnFor, num, type FeatureBase, type FeatureKind, type SketchFeature } from './common';
@@ -9,19 +10,19 @@ import { METRIC, minorDiameter, nearestMetric, threadScad } from './threads';
 export interface ThreadFeature extends FeatureBase {
   type: 'thread';
   sketch: string;
-  circles: string[] | null; // cirklarnas id; null = alla cirklar
+  circles: string[] | null; // the circles' ids; null = all circles
   mode: 'external' | 'internal';
-  size: string; // 'M8' … eller 'custom'
-  diameter: string; // nominell diameter (mm)
+  size: string; // 'M8' … or 'custom'
+  diameter: string; // nominal diameter (mm)
   pitch: string;
   length: string;
-  start: string; // mm längs normalen från skissplanet
+  start: string; // mm along the normal from the sketch plane
   direction: 'normal' | 'reverse';
-  clearance: string; // diametralt spel för 3D-utskrift
+  clearance: string; // diametral clearance for 3D printing
   chamfer: boolean;
 }
 
-/** Cirklar som kan gängas. */
+/** Circles that can be threaded. */
 export const threadCandidates = (sk: SketchFeature) => Object.entries(sk.entities).filter(([, e]) => e.type === 'circle').map(([id]) => id);
 
 export function threadCircles(f: ThreadFeature, sk: SketchFeature): string[] {
@@ -38,7 +39,7 @@ function applySize(f: ThreadFeature, size: string) {
   f.pitch = sv(m.p);
 }
 
-/** Föreslå storlek utifrån den första cirkeln: ytterdiameter (utvändig) eller innerdiameter (invändig). */
+/** Suggest a size from the first circle: major diameter (external) or minor diameter (internal). */
 export function suggestThreadSize(f: ThreadFeature, sk: SketchFeature) {
   const id = threadCircles(f, sk)[0];
   const c = id ? sk.entities[id] : undefined;
@@ -100,7 +101,7 @@ export const thread: FeatureKind<ThreadFeature> = {
   changed(f, key, sk) {
     if (key === 'diameter' || key === 'pitch') f.size = 'custom';
     if (key === 'size' && f.size !== 'custom') applySize(f, f.size);
-    // Nytt läge eller nya cirklar: föreslå storlek igen (om man inte valt egna mått).
+    // New mode or new circles: suggest a size again (unless custom sizes were chosen).
     if ((key === 'mode' || key === 'circles') && f.size !== 'custom' && sk) suggestThreadSize(f, sk);
   },
 
@@ -115,7 +116,7 @@ export const thread: FeatureKind<ThreadFeature> = {
     const c = r.read(t('field.clearance'), f.clearance, v => v >= 0, t('err.notNegative'));
     if (r.error) return { error: r.error };
     if (!(minorDiameter(D.v, P.v) > 0)) return { error: t('err.pitchTooLarge') };
-    const flip = f.direction === 'reverse' ? 'rotate([180, 0, 0]) ' : ''; // rotation, inte spegling: gängan ska förbli högergängad
+    const flip = f.direction === 'reverse' ? 'rotate([180, 0, 0]) ' : ''; // rotation, not mirroring: the thread must stay right-handed
     const at = (id: string) => {
       const e = sk.entities[id] as { c: string; r: number };
       const p = sk.points[e.c];
@@ -127,7 +128,8 @@ export const thread: FeatureKind<ThreadFeature> = {
     for (const id of ids) {
       const { x, y, r: rc } = at(id);
       if (f.mode === 'external') {
-        // Skär bort cylindern (minst cirkelns radie) och lägg en gängad stav i stället.
+        // Cut away the cylinder (at least the circle's radius) and put a threaded rod there
+        // instead.
         const rr = Math.max(rc, D.v / 2) + 0.02;
         clear.push(place(x, y, `translate([0, 0, -0.01]) cylinder(r = ${num(rr)}, h = ${num(L.v + 0.02)}, $fn = ${fnFor(2 * rr)});`));
         parts.push(place(x, y, threadScad({ R: D.v / 2 - c.v / 2, P: P.v, L: L.v, chamfer: f.chamfer }, '    ')));

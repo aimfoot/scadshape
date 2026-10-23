@@ -1,24 +1,24 @@
-// Slutna regioner i en skiss, som i ett CAD-program: kurvorna delas där de
-// korsar varandra, lösa ändar rensas bort och varje begränsad yta (face) i den
-// plana grafen blir en region. Fristående komponenter som ligger inuti en yta
-// blir hål (och öar i hålen material igen). Konstruktionsgeometri räknas inte.
+// Closed regions in a sketch, like in a CAD program: the curves are split where they cross each
+// other, loose ends are cleaned away and every bounded face in the planar graph becomes a region.
+// Separate components lying inside a face become holes (and islands in the holes material again).
+// Construction geometry does not count.
 
 import { arcPoints, ccwSweep, dist, normAngle, pointInPolygon, polar, signedArea, TAU, type Vec } from './geom';
 import { arcGeom, type SketchData } from './model';
 
 export interface Loop {
-  pts: Vec[]; // sluten polygon (sista punkten upprepas inte), moturs
+  pts: Vec[]; // closed polygon (the last point is not repeated), counterclockwise
   area: number; // absolut area, mm²
-  entityIds: string[]; // kurvor som bildar kanten
-  circle?: { c: Vec; r: number }; // fristående hel cirkel
-  component: number; // sammanhängande grupp av kurvor
-  depth: number; // antal regioner (i andra komponenter) som omsluter denna
-  parent: number; // index för närmast omslutande region, −1 om ingen
+  entityIds: string[]; // curves that form the edge
+  circle?: { c: Vec; r: number }; // a separate full circle
+  component: number; // connected group of curves
+  depth: number; // number of regions (in other components) that enclose this one
+  parent: number; // index of the nearest enclosing region, −1 if none
 }
 
 const EPS = 1e-7;
 
-/** En kurva i parameterform: linje t∈[0,1] mellan a och b, eller båge θ = a0 + t·sweep. */
+/** A curve in parametric form: line t∈[0,1] between a and b, or arc θ = a0 + t·sweep. */
 type Curve =
   | { id: string; kind: 'line'; a: Vec; b: Vec }
   | { id: string; kind: 'arc'; c: Vec; r: number; a0: number; sweep: number; closed: boolean };
@@ -29,7 +29,7 @@ function curveAt(cv: Curve, t: number): Vec {
     : polar(cv.c, cv.r, cv.a0 + cv.sweep * t);
 }
 
-/** Parameter för en punkt på en båge, eller null om den ligger utanför bågen. */
+/** Parameter for a point on an arc, or null if it lies outside the arc. */
 function arcParam(cv: Extract<Curve, { kind: 'arc' }>, p: Vec): number | null {
   let s = normAngle(Math.atan2(p.y - cv.c.y, p.x - cv.c.x) - cv.a0);
   if (s > TAU - 1e-9) s = 0;
@@ -60,12 +60,12 @@ function circleCircle(c1: Vec, r1: number, c2: Vec, r2: number): Vec[] {
   return h < EPS ? [{ x: mx, y: my }] : [{ x: mx + ox, y: my - oy }, { x: mx - ox, y: my + oy }];
 }
 
-/** Skärningar mellan två kurvor som parameterpar. */
+/** Intersections between two curves as parameter pairs. */
 function intersect(p: Curve, q: Curve): { tp: number; tq: number; at: Vec }[] {
   if (p.kind === 'line' && q.kind === 'line') {
     const r = { x: p.b.x - p.a.x, y: p.b.y - p.a.y }, s = { x: q.b.x - q.a.x, y: q.b.y - q.a.y };
     const den = r.x * s.y - r.y * s.x;
-    if (Math.abs(den) < 1e-12 * Math.hypot(r.x, r.y) * Math.hypot(s.x, s.y)) return []; // parallella
+    if (Math.abs(den) < 1e-12 * Math.hypot(r.x, r.y) * Math.hypot(s.x, s.y)) return []; // parallel
     const w = { x: q.a.x - p.a.x, y: q.a.y - p.a.y };
     const t = (w.x * s.y - w.y * s.x) / den, u = (w.x * r.y - w.y * r.x) / den;
     if (t < -1e-9 || t > 1 + 1e-9 || u < -1e-9 || u > 1 + 1e-9) return [];
@@ -88,7 +88,7 @@ function intersect(p: Curve, q: Curve): { tp: number; tq: number; at: Vec }[] {
 interface SubEdge {
   u: number; // startvertex
   v: number; // slutvertex
-  pts: Vec[]; // polylinje från u till v
+  pts: Vec[]; // polyline from u to v
   entity: string;
 }
 interface Half {
@@ -100,7 +100,7 @@ interface Half {
 }
 
 export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> } {
-  // 1. Kurvor
+  // 1. Curves
   const curves: Curve[] = [];
   for (const [id, e] of Object.entries(sk.entities)) {
     if (e.construction) continue;
@@ -115,7 +115,7 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
     }
   }
 
-  // 2. Delningspunkter per kurva (ändpunkter + skärningar)
+  // 2. Split points per curve (end points + intersections)
   const verts: Vec[] = [];
   const vertexAt = (p: Vec) => {
     for (let i = 0; i < verts.length; i++) if (dist(verts[i], p) < 1e-6) return i;
@@ -133,7 +133,7 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
         splits[j].push({ t: x.tq, v });
       }
 
-  // 3. Dela kurvorna i delkanter
+  // 3. Split the curves into sub-edges
   const edges: SubEdge[] = [];
   const standaloneCircles: number[] = [];
   const piece = (cv: Curve, t0: number, t1: number, u: number, v: number) => {
@@ -143,7 +143,7 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
     pts[0] = verts[u];
     pts[pts.length - 1] = verts[v];
     if (u === v) {
-      // Självslinga (t.ex. cirkel som rör något i en punkt): dela på mitten.
+      // Self-loop (e.g. a circle touching something at one point): split in the middle.
       const m = vertexAt(curveAt(cv, (t0 + t1) / 2));
       piece(cv, t0, (t0 + t1) / 2, u, m);
       piece(cv, (t0 + t1) / 2, t1, m, v);
@@ -153,7 +153,7 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
   };
   curves.forEach((cv, i) => {
     const sp = splits[i].sort((a, b) => a.t - b.t);
-    // Ta bort dubbletter (samma vertex direkt efter varandra).
+    // Remove duplicates (the same vertex twice in a row).
     const uniq = sp.filter((s, k) => k === 0 || s.v !== sp[k - 1].v);
     if (cv.kind === 'arc' && cv.closed) {
       if (!uniq.length) return standaloneCircles.push(i);
@@ -165,7 +165,7 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
     } else for (let k = 0; k + 1 < uniq.length; k++) piece(cv, uniq[k].t, uniq[k + 1].t, uniq[k].v, uniq[k + 1].v);
   });
 
-  // 4. Rensa lösa ändar (vertex med en enda kant), upprepat.
+  // 4. Clean away loose ends (vertices with a single edge), repeatedly.
   let live = edges.filter(e => e.u !== e.v);
   for (;;) {
     const deg = new Map<number, number>();
@@ -175,12 +175,13 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
     live = next;
   }
 
-  // 5. Komponenter (union-find över vertex)
+  // 5. Components (union-find over vertices)
   const parent = verts.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
   for (const e of live) parent[find(e.u)] = find(e.v);
 
-  // 6. Ytor: gå runt halvkanterna; vid varje vertex ta kanten närmast medurs från tvillingen.
+  // 6. Faces: walk around the half-edges; at each vertex take the edge closest clockwise from the
+  // twin.
   const out = new Map<number, Half[]>();
   const halves: Half[] = [];
   for (const e of live)
@@ -223,7 +224,7 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
     loops.push({ pts, area: Math.PI * cv.r * cv.r, entityIds: [cv.id], circle: { c: cv.c, r: cv.r }, component: -1 - i });
   }
 
-  // 7. Nästling mellan komponenter: B ligger i A om (ett urval av) B:s punkter ligger i A.
+  // 7. Nesting between components: B lies in A if (a sample of) B's points lie in A.
   const nested: Loop[] = loops.map(l => ({ ...l, depth: 0, parent: -1 }));
   const contains = (a: Loop, b: Loop) => {
     if (a.component === b.component || a.area <= b.area) return false;
@@ -246,7 +247,7 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
   return { loops: nested, inLoop };
 }
 
-/** Antal kurvändar (linjer/bågar, ej konstruktion) per punkt: 1 = öppen ände. */
+/** Number of curve ends (lines/arcs, not construction) per point: 1 = open end. */
 export function endpointDegrees(sk: SketchData): Map<string, number> {
   const deg = new Map<string, number>();
   for (const e of Object.values(sk.entities)) {
@@ -258,21 +259,21 @@ export function endpointDegrees(sk: SketchData): Map<string, number> {
 
 export { ccwSweep };
 
-// ---- Regioner för features -----------------------------------------------------------
+// ---- Regions for features ------------------------------------------------------------
 //
-// Varje slinga ger en region: slingan minus slingorna direkt inuti den (hålen).
-// En region identifieras i features av en punkt inuti den ("frö"), så att valet
-// överlever att skissen ändras så länge punkten fortfarande hamnar i regionen.
+// Each loop gives a region: the loop minus the loops directly inside it (the holes). A region is
+// identified in features by a point inside it (a "seed"), so the choice survives changes to the
+// sketch as long as the point still lands in the region.
 
 export interface Region {
-  loop: number; // index i loops
+  loop: number; // index in loops
   holes: number[];
-  seed: Vec; // punkt garanterat inuti regionen
+  seed: Vec; // point guaranteed to be inside the region
   area: number;
   depth: number;
 }
 
-/** En punkt inuti polygonen `outer` men utanför `holes` (bredaste spannet på några svepande linjer). */
+/** A point inside the polygon `outer` but outside `holes` (the widest span on a few sweeping lines). */
 export function interiorPoint(outer: Vec[], holes: Vec[][]): Vec {
   const all = [outer, ...holes];
   const ys = outer.map(p => p.y);
@@ -280,7 +281,7 @@ export function interiorPoint(outer: Vec[], holes: Vec[][]): Vec {
   let best: Vec = outer[0];
   let bestW = -1;
   for (let k = 1; k <= 15; k++) {
-    // Undvik exakt hörnhöjder genom en irrationell förskjutning.
+    // Avoid exact corner heights with an irrational offset.
     const y = y0 + ((y1 - y0) * (k - 0.5 + 0.0137 * Math.SQRT2)) / 15.3;
     const xs: number[] = [];
     for (const poly of all)
@@ -313,7 +314,7 @@ export function regionsOf(loops: Loop[]): Region[] {
   });
 }
 
-/** Regionen som innehåller punkten p (den minsta om flera), eller −1. */
+/** The region containing the point p (the smallest if several), or −1. */
 export function regionAt(regions: Region[], loops: Loop[], p: Vec): number {
   let best = -1;
   for (let i = 0; i < regions.length; i++) {
@@ -324,7 +325,7 @@ export function regionAt(regions: Region[], loops: Loop[], p: Vec): number {
   return best;
 }
 
-/** Regioner som väljs av fröna; null = standard (allt som är material med jämnt djup). */
+/** Regions chosen by the seeds; null = default (everything that is material at even depth). */
 export function selectRegions(regions: Region[], loops: Loop[], seeds: Vec[] | null): number[] {
   if (!seeds) return regions.map((r, i) => (r.depth % 2 === 0 ? i : -1)).filter(i => i >= 0);
   const out = new Set<number>();

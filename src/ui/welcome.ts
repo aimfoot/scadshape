@@ -1,6 +1,6 @@
-// Startkortet: syns i 3D-ytan när modellen är tom (eller via ☰ → Kom igång) – fyra steg och
-// exempelmodeller (src/examples/models.ts). Det blockerar inte verktygen och försvinner när
-// modellen får innehåll, en panel öppnas eller man går in i en skiss.
+// The start card: shown in the 3D area when the model is empty (or via ☰ → Getting started) – four
+// steps and example models (src/examples/models.ts). It does not block the tools and disappears
+// when the model gets content, a panel opens or you enter a sketch.
 
 import { EXAMPLES, buildExample, type ExampleId } from '../examples/models';
 import { onLangChange, t, type Key } from '../i18n';
@@ -11,8 +11,8 @@ import { view } from './render';
 import { app, on } from './state';
 import { showToast } from './toast';
 
-let dismissed = false; // stängt med × (gäller sessionen)
-let forced = false; // öppnat från ☰, även när modellen inte är tom
+let dismissed = false; // closed with × (applies to the session)
+let forced = false; // opened from ☰, even when the model is not empty
 
 function update() {
   const empty = app.source === 'model' && app.doc.features.length === 0;
@@ -39,10 +39,10 @@ function renderExamples() {
   );
 }
 
-/** ☰ → Kom igång. */
+/** ☰ → Getting started. */
 export function showStart() {
   forced = true;
-  if (!$('#tree').hidden) $('#btnTree').click(); // lådan ligger annars över kortet
+  if (!$('#tree').hidden) $('#btnTree').click(); // the drawer would otherwise cover the card
   update();
 }
 

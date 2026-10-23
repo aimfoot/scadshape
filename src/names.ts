@@ -1,4 +1,4 @@
-/** Feature-namn → giltigt OpenSCAD-identifierare ("Skiss 1" → skiss_1). */
+/** Feature name → valid OpenSCAD identifier ("Sketch 1" → sketch_1). */
 export function codeName(name: string) {
   const s = name
     .toLowerCase()

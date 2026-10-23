@@ -1,6 +1,6 @@
-// Läser OpenSCADs CSG-export (.csg): ett träd av anrop med bara literaler som argument,
-// t.ex. multmatrix([[1, 0, 0, 3], …]) { cylinder(h = 8.4, r1 = 3, r2 = 3, center = false); }.
-// Moduler, loopar och variabler är redan utförda av OpenSCAD.
+// Reads OpenSCAD's CSG export (.csg): a tree of calls with only literals as arguments, e.g.
+// multmatrix([[1, 0, 0, 3], …]) { cylinder(h = 8.4, r1 = 3, r2 = 3, center = false); }. Modules,
+// loops and variables have already been evaluated by OpenSCAD.
 
 export type CsgValue = number | string | boolean | null | CsgValue[];
 
@@ -35,14 +35,14 @@ class Reader {
   }
 
   expect(c: string) {
-    if (this.peek() !== c) throw new Error(`CSG: väntade '${c}' vid ${this.i}, fick '${this.s.slice(this.i, this.i + 20)}'`);
+    if (this.peek() !== c) throw new Error(`CSG: expected '${c}' at ${this.i}, got '${this.s.slice(this.i, this.i + 20)}'`);
     this.i++;
   }
 
   ident(): string {
     this.ws();
     const m = /^[$A-Za-z_][\w$]*/.exec(this.s.slice(this.i, this.i + 64));
-    if (!m) throw new Error(`CSG: väntade namn vid ${this.i}: '${this.s.slice(this.i, this.i + 20)}'`);
+    if (!m) throw new Error(`CSG: expected a name at ${this.i}: '${this.s.slice(this.i, this.i + 20)}'`);
     this.i += m[0].length;
     return m[0];
   }
@@ -61,7 +61,7 @@ class Reader {
         const d = this.peek();
         this.i++;
         if (d === ']') return out;
-        if (d !== ',') throw new Error(`CSG: väntade ',' eller ']' vid ${this.i - 1}`);
+        if (d !== ',') throw new Error(`CSG: expected ',' or ']' at ${this.i - 1}`);
       }
     }
     if (c === '"') {
@@ -78,7 +78,7 @@ class Reader {
       return s;
     }
     const m = /^(-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?|-?inf|nan|true|false|undef)/i.exec(this.s.slice(this.i, this.i + 40));
-    if (!m) throw new Error(`CSG: okänt värde vid ${this.i}: '${this.s.slice(this.i, this.i + 20)}'`);
+    if (!m) throw new Error(`CSG: unknown value at ${this.i}: '${this.s.slice(this.i, this.i + 20)}'`);
     this.i += m[0].length;
     const w = m[0].toLowerCase();
     if (w === 'true') return true;
@@ -108,7 +108,7 @@ class Reader {
         const d = this.peek();
         this.i++;
         if (d === ')') break;
-        if (d !== ',') throw new Error(`CSG: väntade ',' eller ')' vid ${this.i - 1}`);
+        if (d !== ',') throw new Error(`CSG: expected ',' or ')' at ${this.i - 1}`);
       }
     } else this.i++;
     const children: CsgNode[] = [];
@@ -118,12 +118,12 @@ class Reader {
       this.i++;
       while (this.peek() !== '}') children.push(this.node());
       this.i++;
-    } else children.push(this.node()); // enstaka barn utan klamrar
+    } else children.push(this.node()); // single child without braces
     return { name, pos, args, children };
   }
 }
 
-/** Läs en .csg-fil (alla toppnivåns noder). */
+/** Read a .csg file (all top-level nodes). */
 export function parseCsg(text: string): CsgNode[] {
   const r = new Reader(text);
   const out: CsgNode[] = [];
@@ -131,7 +131,7 @@ export function parseCsg(text: string): CsgNode[] {
   return out;
 }
 
-/** Skriv tillbaka en nod som OpenSCAD-kod (för delar som inte blir skisser). */
+/** Write a node back as OpenSCAD code (for parts that do not become sketches). */
 export function csgToScad(n: CsgNode, indent = ''): string {
   const val = (v: CsgValue): string =>
     Array.isArray(v) ? `[${v.map(val).join(', ')}]` : typeof v === 'string' ? JSON.stringify(v) : v === null ? 'undef' : v === Infinity ? '1e200' : v === -Infinity ? '-1e200' : String(v);
