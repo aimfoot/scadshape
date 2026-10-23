@@ -60,7 +60,8 @@ function writeServiceWorker(dir) {
     for (const name of readdirSync(join(dir, sub)).sort()) {
       const rel = sub ? `${sub}/${name}` : name;
       if (statSync(join(dir, rel)).isDirectory()) walk(rel);
-      else if (!/\.gz$|^diag\.|^sw\.js$|VERSION$/.test(name) && rel !== 'diag.html') files.push(rel);
+      // _headers läses av Cloudflare Pages men serveras inte – i listan skulle installationen misslyckas.
+      else if (!/\.gz$|^diag\.|^sw\.js$|VERSION$|^_headers$/.test(name) && rel !== 'diag.html') files.push(rel);
     }
   };
   walk('');

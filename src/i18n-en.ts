@@ -43,6 +43,8 @@ export const en: Record<keyof typeof sv, string> = {
   'about.license': 'scadshape is free software: you may share and modify it under the GNU General Public License version 3 or later. It comes with no warranty.',
   'about.showLicense': 'Show the license (GPL-3.0)',
   'about.source': 'Source code',
+  'about.privacy': 'Privacy: scadshape collects nothing – no accounts, no tracking. Your models are only saved here, and the Android app has no internet permission.',
+  'about.privacyLink': 'Privacy policy',
   'about.builtWith': 'Built with',
   'about.engineSource': 'The 3D engine is OpenSCAD built for WebAssembly. Its source code is at github.com/openscad/openscad and the build at github.com/openscad/openscad-wasm. Tap a license to read it.',
   'about.group.engine': '3D engine (OpenSCAD)',

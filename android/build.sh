@@ -27,8 +27,8 @@ fi
 
 rm -rf build && mkdir -p build/classes build/gen build/assets dist
 (cd .. && SCADSHAPE_VERSION=$VERSION_NAME node build.mjs --out android/build/assets/www)
-# Sådant som bara behövs på webben: förkomprimerat, service worker, diagnossidan.
-find build/assets/www \( -name '*.gz' -o -name 'sw.js' -o -name 'diag.*' \) -delete
+# Sådant som bara behövs på webben: förkomprimerat, service worker, diagnossidan, Pages-rubriker.
+find build/assets/www \( -name '*.gz' -o -name 'sw.js' -o -name 'diag.*' -o -name '_headers' \) -delete
 
 "$BT/aapt2" compile --dir res -o build/res.zip
 link() {

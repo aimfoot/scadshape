@@ -234,6 +234,7 @@ dialog form { margin-top: 10px; text-align: right; }
 .about h3 { margin: 12px 0 2px; font-size: 14px; }
 .about ul.parts { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.7; }
 .about a { color: var(--accent); }
+.about .aboutlinks { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
 #aboutTextBody { margin: 6px 0 0; padding: 8px; overflow: auto; min-height: 0; flex: 1; white-space: pre-wrap; font: 12px/1.45 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 8px; }
 #aboutText:not([hidden]) { height: calc(100dvh - 72px); }
 .aboutback { margin-top: 10px; text-align: right; }

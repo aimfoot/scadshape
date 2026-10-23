@@ -8,6 +8,9 @@ export type Part = { name: string; version?: string; license: string; url: strin
 
 /** Var scadshapes källkod finns (tom = inte publicerad än, länken visas inte). */
 export const SOURCE_URL = 'https://github.com/aimfoot/scadshape';
+/** Webbplatsen (webbappen) och integritetspolicyn (public/privacy.html där). */
+export const WEBSITE_URL = 'https://scadshape.com';
+export const PRIVACY_URL = `${WEBSITE_URL}/privacy.html`;
 
 const L = (f: string) => `licenses/${f}.txt`;
 const GPL3 = L('GPL-3.0-or-later'), LGPL3 = L('LGPL-3.0-or-later'), LGPL21 = L('LGPL-2.1-or-later');

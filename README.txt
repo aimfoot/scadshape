@@ -215,7 +215,17 @@ Adresser
     eller en Tailscale-adress 100.64.0.0/10).
 
 Publik adress
-  En omvänd proxy eller tunnel (t.ex. Cloudflare Tunnel) till 127.0.0.1:8791 (scadshape-public).
+  scadshape.com (domänen beställd 2026-10-23): tänkt på Cloudflare Pages – webbappen är statisk,
+  publiceras vid varje push till main och är oberoende av hemservern. Inställningar i Cloudflare
+  (Workers & Pages → Create → Pages → Connect to Git → aimfoot/scadshape): produktionsgren main,
+  byggkommando "npm ci && node build.mjs", utdatakatalog "dist", Node enligt .node-version (22);
+  sedan Custom domains → scadshape.com (domänen i samma Cloudflare-konto). Rubrikerna (CSP m.m.)
+  kommer från public/_headers – samma som serve.py i publikt läge, håll dem lika. _headers serveras
+  inte av Pages och är därför undantagen ur service workerns lista (build.mjs) och ur appen.
+  public/privacy.html = integritetspolicyn (engelska + svenska), länkad från Om (licenses.ts:
+  WEBSITE_URL, PRIVACY_URL) och README.md.
+  Alternativ: en omvänd proxy eller tunnel (t.ex. Cloudflare Tunnel) till 127.0.0.1:8791
+  (scadshape-public, steg i HOSTING.local.txt).
   Över https registreras sw.js: appen sparas för offline (cache per innehållshash, ny version
   hämtas i bakgrunden och används vid nästa start) och kan installeras ("Lägg till på
   startskärmen"). manifest.webmanifest + icons/ (ritas av tools/browser/make-icons.mjs).

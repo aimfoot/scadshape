@@ -1,0 +1,9 @@
+# Cloudflare Pages (scadshape.com): samma rubriker som serve.py i publikt läge (håll dem lika).
+# 'unsafe-eval' behövs av villkorslösaren planegcs (embind skapar funktioner med new Function).
+# no-cache: webbläsaren frågar efter nyare filer varje gång; offline sköts av service workern.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cache-Control: no-cache

@@ -41,6 +41,8 @@ export const sv = {
   'about.license': 'scadshape är fri programvara: du får sprida och ändra den enligt GNU General Public License version 3 eller senare. Den levereras utan någon garanti.',
   'about.showLicense': 'Visa licensen (GPL-3.0)',
   'about.source': 'Källkod',
+  'about.privacy': 'Integritet: scadshape samlar inte in något – inga konton, ingen spårning. Modellerna sparas bara här, och Android-appen har ingen nätbehörighet.',
+  'about.privacyLink': 'Integritetspolicy',
   'about.builtWith': 'Byggt med',
   'about.engineSource': '3D-motorn är OpenSCAD byggd för WebAssembly. Källkoden finns på github.com/openscad/openscad och bygget på github.com/openscad/openscad-wasm. Tryck på en licens för att läsa den.',
   'about.group.engine': '3D-motor (OpenSCAD)',

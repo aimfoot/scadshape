@@ -2,7 +2,7 @@
 // hämtas ur appens egna filer när man trycker på dem, så det fungerar offline.
 
 import { t } from '../i18n';
-import { PARTS, SCADSHAPE_LICENSE, SOURCE_URL, type Part } from '../licenses';
+import { PARTS, PRIVACY_URL, SCADSHAPE_LICENSE, SOURCE_URL, WEBSITE_URL, type Part } from '../licenses';
 import { $, el } from './dom';
 
 const dlg = () => $<HTMLDialogElement>('#aboutDlg');
@@ -46,6 +46,8 @@ function render() {
   const src = $<HTMLAnchorElement>('#aboutSource');
   src.hidden = !SOURCE_URL;
   if (SOURCE_URL) src.href = SOURCE_URL;
+  $<HTMLAnchorElement>('#aboutWebsite').href = WEBSITE_URL;
+  $<HTMLAnchorElement>('#aboutPrivacy').href = PRIVACY_URL;
   $('#aboutParts').replaceChildren(
     ...PARTS.flatMap(g => [el('h3', {}, t(g.group)), el('ul', { className: 'parts' }, ...g.parts.map(partRow))]),
   );
