@@ -7,6 +7,9 @@ import { join, relative } from 'node:path';
 import { setLang } from '../src/i18n';
 import { diagnose, problemsForAi } from '../src/diagnose';
 import { fontsFor } from '../src/fonts';
+import { lint } from '../src/lint';
+import { buildModel } from '../src/model3d';
+import { EXAMPLES, buildExample } from '../src/examples/models';
 setLang('en');
 
 let n = 0;
@@ -42,6 +45,26 @@ await test('an error inside a library is placed on the line that called it', () 
 await test('"the result is empty" alone gets its own hint; with other problems it is left out', () => {
   assert.match(diagnose(['Current top level object is empty.'], 'if (false) cube(1);')[0].hint!, /draws no body/);
   assert.equal(diagnose(['WARNING: Ignoring unknown module \'cuboid\' in file /in.scad, line 1', 'Current top level object is empty.'], 'cuboid(1);').length, 1);
+});
+
+await test('the checks raise no false alarms on correct code', () => {
+  const correct = [
+    'a = 30; cube([10 * cos(a), 10 * sin(a * 180 / PI / 50), tan(45) * 3]);', // degrees, or converted
+    'r = 2 * PI * 10; rotate([0, 0, 45]) cube([r, 1, 1]);', // PI outside the trig
+    'x = 7 % 3; y = 2 * 3; flag = false; if (!flag) cube(x + y);', // %, * and ! in expressions
+    'function total(v, i = 0) = i < len(v) ? v[i] + total(v, i + 1) : 0; cube(total([1, 2]));',
+    'for (i = [0:2]) let(x = i * 10) translate([x, 0, 0]) cube(5);',
+    'pts = [for (i = [0:5]) let(a = i * 60) [cos(a), sin(a)] * 10]; polygon(pts);',
+    'linear_extrude(2) text("Hi", font = "Liberation Sans:style=Bold"); translate([0, 20]) linear_extrude(2) text("x", font = "Orbitron");',
+    '$fn = 96; color("red") cube(1); color("blue") translate([5, 0, 0]) cube(1);', // two colored parts is not an assembly yet
+    '// rotate(PI) in a comment, and "sin(PI)" in a string\necho("sin(PI)"); cube(1);',
+  ];
+  for (const src of correct) assert.deepEqual(lint(src).map(p => p.hint), [], src);
+  // The app's own code: the examples and the models built from them.
+  const files = [...readdirSync(`${process.env.ROOT}/src/examples`).filter(f => f.endsWith('.scad')).map(f => `${process.env.ROOT}/src/examples/${f}`),
+    ...readdirSync(`${process.env.ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')).map(f => `${process.env.ROOT}/tests/fixtures/${f}`)];
+  for (const f of files) assert.deepEqual(lint(readFileSync(f, 'utf8')).map(p => `${p.line}: ${p.hint}`), [], f);
+  for (const ex of EXAMPLES) assert.deepEqual(lint(buildModel(buildExample(ex.id)).code).map(p => p.hint), [], ex.id);
 });
 
 // ---- The corpus, through the real OpenSCAD ---------------------------------------------------

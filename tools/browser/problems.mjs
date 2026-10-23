@@ -77,6 +77,20 @@ st = await waitRendered();
 assert.doesNotMatch(st.text, /problem/); assert.doesNotMatch(st.cls, /warn|error/);
 assert.ok(await page.isHidden('#problems'));
 
+// A silent mistake: OpenSCAD renders rotate(PI/4) without a word (it turns 0.785°), the app's check
+// finds it and says so in the status bar and the text for the AI.
+await page.fill('#code', 'cube([30, 4, 4]);\nrotate([0, 0, PI / 4]) cube([30, 4, 4]);\n');
+st = await waitRendered();
+assert.match(st.text, /triangles · 1 problem$/, st.text);
+list = await rows();
+assert.match(list[0].text, /^Line 2rotate\(\) takes degrees, but this uses PI \(radians\)/);
+assert.match(list[0].text, /rotate\(\[0, 0, PI \/ 4\]\)$/);
+assert.equal(await page.isVisible('#log'), true, '"Full log" is still on');
+await page.click('#btnCopyProblems');
+await page.waitForTimeout(300);
+assert.match(await page.evaluate(() => navigator.clipboard.readText()), /\nLine 2: CHECK: rotate\(\) takes degrees, but this uses PI \(radians\): rotate\(90\), not rotate\(PI\/2\)\.\n {4}rotate\(\[0, 0, PI \/ 4\]\) cube\(\[30, 4, 4\]\);\n/);
+await page.screenshot({ path: `${out}/p-check.png` });
+
 // A syntax error (+=): fails, the list says why
 await page.fill('#code', 'x = 1;\nx += 1;\ncube(x);\n');
 st = await waitRendered();

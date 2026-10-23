@@ -4,13 +4,16 @@
 // typical mistakes of AI-written code recognised (radians(), +=, Python loops, a forgotten BOSL2
 // include …). problemsForAi() writes them as text to paste back into the AI chat.
 
+import { FONTS } from './fonts';
 import { t } from './i18n';
 import { BOSL2_NAMES } from './libnames.gen';
 import { LIBRARIES } from './libs';
+import { lint } from './lint';
 
 export interface Problem {
-  severity: 'error' | 'warn';
-  /** OpenSCAD's own message, without the file and line. */
+  /** note: maybe intended (not counted in the status bar). */
+  severity: 'error' | 'warn' | 'note';
+  /** OpenSCAD's own message, without the file and line; for a check (lint.ts) the code it is about. */
   message: string;
   /** Line in the user's code (1-based), or null. */
   line: number | null;
@@ -19,6 +22,8 @@ export interface Problem {
   hint: string | null;
   /** A consequence of another problem (an undefined value used further on). */
   followUp: boolean;
+  /** Found by the app's own check of the code (lint.ts), not by OpenSCAD. */
+  check?: true;
 }
 
 const USER_FILE = '/in.scad';
@@ -116,7 +121,7 @@ function hintFor(msg: string, line: number | null, src: string, lines: string[])
     return t('dx.noLibrary', { name: m[1], libs: LIBRARIES.map(l => l.name).join(', ') });
   }
   if (/Can't open import file/.test(msg)) return t('dx.importFile');
-  if ((m = /Can't get font (.+)/.exec(msg))) return t('dx.font', { font: m[1].trim() });
+  if ((m = /Can't get font (.+)/.exec(msg))) return t('dx.font', { font: m[1].trim(), fonts: [...new Set(FONTS.map(f => f.family.split(':')[0]))].join(', ') });
   if ((m = /"(\w+)" was assigned on line (\d+) but was overwritten/.exec(msg))) return t('dx.overwritten', { name: m[1] });
   if (/^Assertion/.test(msg)) return t('dx.assertion');
   if (/top level object is empty/.test(msg)) return t('dx.empty');
@@ -168,11 +173,13 @@ export function diagnose(log: string[], src: string): Problem[] {
   const list = real.length ? real : out;
   // Follow-ups only count as such when there is a cause to point at.
   const hasCause = list.some(p => !p.followUp);
-  return list.map(p => ({
+  const found = list.map(p => ({
     ...p,
     followUp: p.followUp && hasCause,
     hint: hintFor(p.message, p.line, src, lines),
   }));
+  // With the app's own checks (what OpenSCAD renders without a word), in the order of the code.
+  return [...found, ...lint(src)].sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));
 }
 
 /** The problems as text for an AI chat: OpenSCAD's messages with their lines of code. */
@@ -183,7 +190,9 @@ export function problemsForAi(problems: Problem[], src: string, version: string)
   const out = [t('dx.ai.intro', { version, libs: LIBRARIES.map(l => l.name).join(', ') }), ''];
   for (const p of main) {
     const times = p.count > 1 ? ` (${t('dx.ai.times', { n: p.count })})` : '';
-    out.push(`${p.line ? `${t('dx.ai.line', { n: p.line })}: ` : ''}${p.severity === 'error' ? 'ERROR' : 'WARNING'}: ${p.message}${times}`);
+    // A check is not an OpenSCAD message: say what it found instead.
+    const what = p.check ? `${t('dx.ai.check')}: ${p.hint}` : `${p.severity === 'error' ? 'ERROR' : 'WARNING'}: ${p.message}${times}`;
+    out.push(`${p.line ? `${t('dx.ai.line', { n: p.line })}: ` : ''}${what}`);
     const code = p.line ? lines[p.line - 1]?.trim() : '';
     if (code) out.push(`    ${code}`);
   }

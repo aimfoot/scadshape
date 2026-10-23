@@ -32,7 +32,7 @@ function row(p: Problem) {
   return el('li', { className: p.severity }, b);
 }
 
-/** Show the problems in a render's log. Returns how many there are (follow-ups not counted). */
+/** Show the problems in a render's log. Returns how many there are (follow-ups and notes not counted). */
 export function showProblems(log: string[], src: string): number {
   const problems = diagnose(log, src);
   shown = { problems, src };
@@ -48,7 +48,7 @@ export function showProblems(log: string[], src: string): number {
     items.push(el('li', { className: 'follow' }, b));
   }
   $('#problemList').replaceChildren(...items);
-  return main.length;
+  return main.filter(p => p.severity !== 'note').length;
 }
 
 export const clearProblems = () => showProblems([], '');
