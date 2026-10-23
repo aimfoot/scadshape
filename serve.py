@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""scadshape webbserver.
+"""scadshape web server.
 
-Två lägen:
-  utveckling (standard)  SCADSHAPE_HOST:8790 (standard 127.0.0.1; för telefonen t.ex. Tailscale-IP:n),
-                         tar emot mätningar och loggar (nedan).
-  publikt (SCADSHAPE_PUBLIC=1, tjänsten scadshape-public)  127.0.0.1:8791 bakom Cloudflare-tunneln:
-                         bara statiska filer, strikt CSP, inga POST-mottagare och ingen åtkomstlogg.
+Two modes:
+  development (default)  SCADSHAPE_HOST:8790 (default 127.0.0.1; for the phone e.g. the Tailscale IP),
+                         receives benchmarks and logs (below).
+  public (SCADSHAPE_PUBLIC=1, the scadshape-public service)  127.0.0.1:8791 behind the Cloudflare tunnel:
+                         static files only, strict CSP, no POST endpoints and no access log.
 
-Serverar dist/ och tar emot mätresultat från
-appens "Mät"-knapp (POST /api/bench → data/bench.jsonl) samt fel och
-förlopp från telefonen (POST /api/log → data/client.jsonl).
+Serves dist/ and receives benchmark results from the web
+version's "Benchmark" button (POST /api/bench → data/bench.jsonl) plus errors
+and progress from the phone (POST /api/log → data/client.jsonl).
 
-Förkomprimerade filer (x.gz bredvid x) skickas med Content-Encoding: gzip
-när webbläsaren klarar det. Cache-Control: no-cache gör att en ombyggnad
-syns direkt, men oförändrade filer ger 304 (Last-Modified).
+Precompressed files (x.gz next to x) are sent with Content-Encoding: gzip
+when the browser supports it. Cache-Control: no-cache makes a rebuild
+show up at once, while unchanged files give 304 (Last-Modified).
 """
 import email.utils
 import json
@@ -23,10 +23,10 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = os.environ.get("SCADSHAPE_HOST", "127.0.0.1")
-# Publikt läge (bakom Cloudflare-tunneln): inga POST-mottagare, strikt CSP, ingen åtkomstlogg.
+# Public mode (behind the Cloudflare tunnel): no POST endpoints, strict CSP, no access log.
 PUBLIC = os.environ.get("SCADSHAPE_PUBLIC") == "1"
-# 'unsafe-eval': villkorslösaren planegcs (Emscripten/embind) skapar funktioner med new Function;
-# utan den misslyckas t.ex. kontrollen av överflödiga mått tyst. Sidan har inget innehåll från andra.
+# 'unsafe-eval': the constraint solver planegcs (Emscripten/embind) creates functions with new Function;
+# without it e.g. the redundant-dimension check fails silently. The page has no third-party content.
 CSP = (
     "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; worker-src 'self'; "
     "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; "

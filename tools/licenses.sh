@@ -1,10 +1,10 @@
 #!/bin/sh
-# Samlar licenstexterna för allt som följer med appen i vendor/licenses/ (build.mjs kopierar dem till
-# dist/licenses/, "Om scadshape" visar dem). Kör om när OpenSCAD-WASM:en eller ett beroende byts.
-# OpenSCAD-WASM:ens beroenden och versioner: github.com/openscad/openscad-wasm, Makefile (*_REF).
+# Collects the licence texts for everything bundled with the app in vendor/licenses/ (build.mjs copies them to
+# dist/licenses/, "About scadshape" shows them). Run again when the OpenSCAD WASM or a dependency changes.
+# The OpenSCAD WASM's dependencies and versions: github.com/openscad/openscad-wasm, Makefile (*_REF).
 set -eu
 cd "$(dirname "$0")/../vendor/licenses"
-SPDX=/usr/share/licenses/spdx   # Arch-paketet licenses
+SPDX=/usr/share/licenses/spdx   # the Arch package licenses
 
 for id in GPL-2.0-or-later GPL-3.0-or-later LGPL-2.1-or-later LGPL-3.0-or-later MPL-2.0 Apache-2.0 BSL-1.0; do
     cp "$SPDX/$id.txt" "$id.txt"
@@ -12,10 +12,10 @@ done
 
 GH=https://raw.githubusercontent.com
 FD=https://gitlab.freedesktop.org
-get() { # namn url
+get() { # name url
     curl -sSfL -o "$1.tmp" "$2"
-    # En felsida (HTML) är ingen licens.
-    if head -c 200 "$1.tmp" | grep -qi '<!doctype\|<html'; then echo "HTML från $2" >&2; rm "$1.tmp"; exit 1; fi
+    # An error page (HTML) is not a licence.
+    if head -c 200 "$1.tmp" | grep -qi '<!doctype\|<html'; then echo "HTML from $2" >&2; rm "$1.tmp"; exit 1; fi
     mv "$1.tmp" "$1.txt"
     printf '%-20s %s\n' "$1" "$2" >> SOURCES.txt.new
 }
@@ -37,6 +37,6 @@ get libxml2           https://gitlab.gnome.org/GNOME/libxml2/-/raw/v2.15.3/Copyr
 get double-conversion $GH/google/double-conversion/v3.4.0/LICENSE
 get lib3mf            $GH/3MFConsortium/lib3mf/v2.3.2/LICENSE
 get nlohmann-json     $GH/nlohmann/json/develop/LICENSE.MIT
-{ echo "Hämtat $(date +%F). SPDX-texterna (GPL, LGPL, MPL, Apache, BSL) från $SPDX."; cat SOURCES.txt.new; } > SOURCES.txt
+{ echo "Fetched $(date +%F). The SPDX texts (GPL, LGPL, MPL, Apache, BSL) from $SPDX."; cat SOURCES.txt.new; } > SOURCES.txt
 rm SOURCES.txt.new
 ls

@@ -1,410 +1,413 @@
-scadshape – parametriskt CAD-program för Android, byggt på OpenSCAD
+scadshape – a parametric CAD app for Android, built on OpenSCAD
 =====================================================================
 
-Mål: rita skisser (linje, rektangel, cirkel, 3-punktsbåge …) med fingret,
-extrudera/revolve i ett feature-träd, allt offline i telefonen. Modellen är
-feature-trädet (JSON); OpenSCAD-kod genereras ur det och renderas av
-OpenSCAD-WASM med Manifold-backend. Webbsida först, APK-omslag senare
-(som ~/opt/messenger-web).
+Goal: draw sketches (line, rectangle, circle, 3-point arc …) with a finger,
+extrude/revolve in a feature tree, all offline on the phone. The model is the
+feature tree (JSON); OpenSCAD code is generated from it and rendered by
+OpenSCAD-WASM with the Manifold backend. Web page first, APK wrapper later.
 
-Status: fas 0–3 klara 2026-10-16 (spike, skissverktyg, villkor/mått, features).
-2026-10-17: omstrukturering (moduler, feature-register), svenska/engelska, gängor,
-förskjutna skissplan; sedan behållare (fack, insticks-/skruvlock), export 3MF/STL/.scad
-(fas 4), upprepa (linjärt/rutnät/runt axel/spegla) och kanter (hörnradie, avrunda/fasa)
-(fas 5), PWA (offline, installerbar) + publik server klar för Cloudflare-tunneln,
-modeller (flera projekt, fil in/ut), text (8 typsnitt), ångra i delläget, skissverktygen
-polygon och avlångt hål, avrunda/fasa skisshörn (sketch/fillet.ts), mätverktyg i 3D (measure.ts), import av STL/SVG (Importera), mörkt tema (☰ → Tema), snäpplås (snäpphake/urtag, snäpplock). Kvar: publik adress,
-Android-appen inför Play (android/README.txt), fler features (se Idéer).
+Status: phases 0–3 done 2026-10-16 (spike, sketch tools, constraints/dimensions, features).
+2026-10-17: restructuring (modules, feature registry), Swedish/English, threads,
+offset sketch planes; then containers (compartments, push-fit/screw lids), export 3MF/STL/.scad
+(phase 4), repeat (linear/grid/around axis/mirror) and edges (corner radius, round/chamfer)
+(phase 5), PWA (offline, installable) + a public server ready for the Cloudflare tunnel,
+models (several projects, file in/out), text (8 fonts), undo in part mode, the sketch tools
+polygon and slot, round/chamfer sketch corners (sketch/fillet.ts), a 3D measure tool (measure.ts),
+STL/SVG import (Import), dark theme (☰ → Theme), snap fits (snap hook/catch, snap lid).
+2026-10-23: English is the base language of the code, comments and docs; Swedish is a UI translation.
+Left: the public address, the Android app before Play (android/README.txt), more features (see Ideas).
 
-Arkitektur (2026-10-17)
-  src/features/        en fil per feature-typ: data, standardvärden, panelens fält,
-                       beskrivning i trädet och OpenSCAD-kod (build). index.ts = register.
-                       Ny typ: skriv features/<typ>.ts, lägg in i KINDS och SolidFeature,
-                       lägg till en knapp i verktygsfältet (startFeature) och texter i i18n.
-  src/model3d.ts       sätter ihop modellen ur features (union/difference/intersection).
-  src/ui/              render, tree, panel (fält byggs från features/*.fields), pickers
-                       (val i 3D: regioner, axel, punkter, cirklar), params, sketchmode,
-                       bench, dom, state (delat tillstånd + händelser), toast.
-  src/i18n.ts + i18n-sv.ts/i18n-en.ts  t('nyckel'), data-i18n i HTML; engelska typkontrolleras
-                       mot svenska (saknad översättning = kompileringsfel). Språkval i ☰.
-                       Standardnamn ("Skiss 1"/"Sketch 1") följer språket.
+Architecture (2026-10-17)
+  src/features/        one file per feature type: data, defaults, the panel's fields,
+                       the description in the tree and the OpenSCAD code (build). index.ts = registry.
+                       New type: write features/<type>.ts, add it to KINDS and SolidFeature,
+                       add a toolbar button (startFeature) and texts in i18n.
+  src/model3d.ts       assembles the model from the features (union/difference/intersection).
+  src/ui/              render, tree, panel (fields built from features/*.fields), pickers
+                       (picking in 3D: regions, axis, points, circles), params, sketchmode,
+                       bench, dom, state (shared state + events), toast.
+  src/i18n.ts + i18n-en.ts/i18n-sv.ts  t('key'), data-i18n in the HTML; English is the base and
+                       Swedish is type-checked against it (a missing translation = a compile error).
+                       Language picker in ☰. Default names ("Sketch 1"/"Skiss 1") follow the language.
+                       Example ids and saved source ids are English (plate, cup, heavy, cube, custom);
+                       the Swedish ids saved before 2026-10-23 are mapped in ui/state.ts.
 
-Behållare (features/container.ts)
-  Sluten profil → låda: höjd, vägg, botten, hörnradie, fack i X/Y (avdelare, lägre än
-  lockkanten). Lock bredvid (för utskrift): insticks (platta + kant innanför väggen, spel per
-  sida) eller skruv (bara cirkel: utvändig gänga i halsen med 45° övergång inuti, lock med
-  invändig gänga och grepp). Utan skiss skapar knappen en mallskiss 80 × 60 med mått.
-  Testat: locket går att skruva på (överlapp 0 i rätt vinkel, > 50 mm³ i fel).
+Container (features/container.ts)
+  Closed profile → box: height, wall, bottom, corner radius, compartments in X/Y (dividers, lower than
+  the lid rim). Lid beside it (for printing): push-fit (plate + rim inside the wall, clearance per
+  side) or screw (circle only: external thread on the neck with a 45° transition inside, a lid with
+  an internal thread and grip). Without a sketch the button creates an 80 × 60 template sketch with dimensions.
+  Tested: the lid screws on (overlap 0 at the right angle, > 50 mm³ at a wrong one).
 
-Upprepa och kanter (features/pattern.ts, extrude.ts)
-  Varje feature har "Upprepa": linjärt (axel, antal, avstånd), rutnät, runt axel (antal,
-  vinkel; 360 = jämnt), spegla (plan genom origo). Läggs runt featurens verktyg i model3d.
-  Gängor speglas inte (blir vänstergänga) – fel med förklaring.
-  Extrudera: hörnradie (rundar in- och utåtgående hörn med offset), kant avrunda/fasa vid
-  ytteränden/skissen/båda (lager av offset-profiler).
+Repeat and edges (features/pattern.ts, extrude.ts)
+  Every feature has "Repeat": linear (axis, count, spacing), grid, around axis (count,
+  angle; 360 = evenly), mirror (plane through the origin). Wrapped around the feature's tool in model3d.
+  Threads are not mirrored (that would make a left-hand thread) – an error with an explanation.
+  Extrude: corner radius (rounds inward and outward corners with offset), edge round/chamfer at
+  the outer end/the sketch/both (layers of offset profiles).
 
-Modeller (projects.ts, ui/projects.ts, kv.ts)
-  Flera modeller i IndexedDB (databasen "scadshape", tabellen "kv", sedan 2026-10-22; tidigare
-  localStorage): scadshape.projects (index), scadshape.doc.<id>, scadshape.current. kv.ts läser allt
-  till minnet när modulen laddas (top-level await) och skriver varje ändring vidare, så projects.ts är
-  synkron som förut. Finns modellnycklar i localStorage flyttas de (ersätter IndexedDB, läses tillbaka
-  och jämförs, tas sedan bort ur localStorage). Utan IndexedDB: localStorage, annars minnet. Misslyckad
-  skrivning → röd notis (storageHooks). UI-inställningar, språk, tema och Egen kod ligger kvar i
+Models (projects.ts, ui/projects.ts, kv.ts)
+  Several models in IndexedDB (database "scadshape", store "kv", since 2026-10-22; before that
+  localStorage): scadshape.projects (index), scadshape.doc.<id>, scadshape.current. kv.ts reads everything
+  into memory when the module loads (top-level await) and writes every change through, so projects.ts is
+  synchronous as before. If there are model keys in localStorage they are moved (they replace IndexedDB, are
+  read back and compared, then removed from localStorage). Without IndexedDB: localStorage, otherwise memory.
+  A failed write → a red notice (storageHooks). UI settings, language, theme and Custom code stay in
   localStorage. Test: tools/browser/storage.mjs.
-  Starten: main.ts sätter temat, väntar på openStorage(), sedan initState() och resten. <body> har
-  klassen loading (dold) tills allt är kopplat; tester väntar på body:not(.loading) innan de läser
-  window.__scadshape (där storage är en testkrok för att läsa/skriva/tömma lagringen). Det gamla enda dokumentet (scadshape.doc) blir "Min modell" vid första
-  starten. ☰ → namnet → lista: öppna, byt namn, duplicera, ta bort, ny, öppna fil, spara som
-  fil (.scadshape.json). Öppna fil tar också .scad: öppnas som Egen kod och renderas (filväljaren
-  har inget accept-filter – Android gråar annars ut .scad). Ångra/gör om i delläget (ui/history.ts): ögonblicksbild per ändring,
-  nollställs vid byte av modell.
+  Startup: main.ts sets the theme, waits for openStorage(), then initState() and the rest. <body> has
+  the class loading (hidden) until everything is wired up; tests wait for body:not(.loading) before they read
+  window.__scadshape (where storage is a test hook to read/write/clear the storage). The old single
+  document (scadshape.doc) becomes "My model" at the first start. ☰ → the name → list: open, rename,
+  duplicate, delete, new, open file, save as file (.scadshape.json). Open file also takes .scad: it opens
+  as Custom code and renders (the file chooser has no accept filter – otherwise Android greys out .scad).
+  Undo/redo in part mode (ui/history.ts): a snapshot per change, reset when switching models.
 
 Text (features/text.ts, fonts.ts)
-  Upphöjd/ingraverad text vid valda punkter (annars skissens origo), start (mm från planet).
-  Typsnitt i public/fonts/ (OFL, LICENSE.txt): Liberation Sans (+ fet), Allerta Stencil, Bebas
-  Neue, Pacifico, Orbitron (Medium = "Orbitron", Bold, Black; 2026-10-23). Motorn får hela familjen
-  när koden nämner den (fontsFor: "Orbitron:style=Medium" eller bara "Orbitron" räcker); workern
-  hämtar och cachar dem och sätter FONTCONFIG_FILE i preRun. Variabla typsnitt (t.ex. Googles
-  Orbitron[wght]) kraschar WASM-bygget – använd statiska .ttf. Orbitron har reserverat namn (OFL
-  RFN): egna instanser ur den variabla filen (fontTools) får inte heta Orbitron, därför projektets
-  egna omodifierade statiska filer (v1.000, github.com/theleagueof/orbitron) – originalritningen,
-  något annorlunda än Googles 2.001 på servern. Test: model.test "Orbitron, Bold och Black väljs".
+  Raised/engraved text at the picked points (otherwise the sketch origin), start (mm from the plane).
+  Fonts in public/fonts/ (OFL, LICENSE.txt): Liberation Sans (+ bold), Allerta Stencil, Bebas
+  Neue, Pacifico, Orbitron (Medium = "Orbitron", Bold, Black; 2026-10-23). The engine gets the whole family
+  when the code mentions it (fontsFor: "Orbitron:style=Medium" or just "Orbitron" is enough); the worker
+  fetches and caches them and sets FONTCONFIG_FILE in preRun. Variable fonts (e.g. Google's
+  Orbitron[wght]) crash the WASM build – use static .ttf files. Orbitron has a reserved name (OFL
+  RFN): own instances made from the variable file (fontTools) must not be called Orbitron, hence the
+  project's own unmodified static files (v1.000, github.com/theleagueof/orbitron) – the original drawing,
+  slightly different from Google's 2.001. Test: model.test "Orbitron, Bold and Black are chosen …".
 
-Bibliotek (libs.ts, vendor/libraries/)
-  Samma bibliotek som på servern, kopierade 2026-10-17 (bara *.scad + LICENSE, se VERSION):
-    BOSL2 2.0.766 (BSD-2)              include <BOSL2/std.scad>              1,06 MB gz
+Libraries (libs.ts, vendor/libraries/)
+  Copied 2026-10-17 (only *.scad + LICENSE, see VERSION):
+    BOSL2 2.0.766 (BSD-2)              include <BOSL2/std.scad>              1.06 MB gz
     Round-Anything (MIT)               use <Round-Anything/polyround.scad>   12 kB gz
     dotSCAD 3.3 (LGPL-3)               use <dotSCAD/src/line2d.scad>         94 kB gz
-    gridfinity-rebuilt-openscad (MIT)  use <gridfinity-rebuilt-openscad/…>, eller hela
-                                       gridfinity-rebuilt-bins.scad inklistrad      47 kB gz
-  build.mjs paketerar varje bibliotek till dist/libs/<namn>.json. Motorn skickar bara med de
-  bibliotek koden använder (include/use <namn/…>, eller detect i libs.ts); workern hämtar JSON:en
-  en gång, skriver filerna till /libraries och sätter OPENSCADPATH (plus paths per bibliotek:
-  dotSCAD/src och gridfinitys rotkatalog, för deras relativa includes). Ingår i offline-cachen.
-  Tider (WASM): BOSL2 cuboid ~0,5 s, screw("M6") ~0,8 s, gridfinity-bin ~0,65 s.
-  Fler bibliotek: kopiera till vendor/libraries/<namn> och lägg till i LIBRARIES. Test: libs.mjs.
-  Vyn anpassas i Egen kod/exempel när modellen byter storlek/läge kraftigt (inte i egna modeller).
+    gridfinity-rebuilt-openscad (MIT)  use <gridfinity-rebuilt-openscad/…>, or the whole
+                                       gridfinity-rebuilt-bins.scad pasted in       47 kB gz
+  build.mjs packs every library into dist/libs/<name>.json. The engine only sends along the
+  libraries the code uses (include/use <name/…>, or detect in libs.ts); the worker fetches the JSON
+  once, writes the files to /libraries and sets OPENSCADPATH (plus paths per library:
+  dotSCAD/src and gridfinity's root directory, for their relative includes). Part of the offline cache.
+  Times (WASM): BOSL2 cuboid ~0.5 s, screw("M6") ~0.8 s, gridfinity bin ~0.65 s.
+  More libraries: copy to vendor/libraries/<name> and add to LIBRARIES. Test: libs.mjs.
+  The view refits in Custom code/examples when the model changes size/position a lot (not in own models).
 
-Gör om till skisser (convert/csg.ts, convert/scad2doc.ts, ui/convert.ts, features/code.ts)
-  Knappen i kodpanelen (Egen kod/exempel): OpenSCAD kör koden och exporterar CSG-trädet (.csg:
-  moduler, loopar, variabler redan utförda). Kroppar som är prismor längs en världsaxel (cube,
-  cylinder, linear_extrude, hull av sådana) → skiss på XY/XZ/YZ (+ förskjutning) + Extrudera;
-  koner och klot → profil + Revolve; resten (BOSL2-polyedrar, minkowski, hull i 3D, vridna kroppar,
-  text med saknat typsnitt) → kodblock (feature "OpenSCAD-kod", ingen skiss, include/use lyfts ut).
-  2D: square/circle/polygon direkt (rektanglar och cirklar med mått); offset/text/överlapp ritas
-  av OpenSCAD (SVG, fin upplösning) och bågar hittas i punkterna (centrum justerat så att
-  ändpunkterna ligger exakt på radien). hull av lika cirklar → rundad form med tangens, lika radier,
-  radiemått och (rektangel) ytterbredd/-höjd – bara läget fritt. $fn < 16 behålls som polygon
-  (avsiktlig sexkant), cirklar utan $fn blir riktiga cirklar.
-  Booleska trädet plattas ut i trädets ordning; en bortdragning som når en tidigare tillagd kropp
-  (lådor) gör hela den skillnaden till kod. I en union tas difference/intersection först.
-  Prismor i följd med samma plan/höjd/operation slås ihop till en skiss. Efteråt jämförs volymen
-  med originalet (renderat med $fa=1, $fs=0,2) och resultatet visas.
-  Tester (tests/convert.test.ts): testmodellerna i tests/fixtures/ (snap_box 8 skisser/1 kod,
-  bracket 8 skisser/0 kod, bosl2_knob delvis kod, cable_clip, wall_hook; alla ≤ 0,04 % volym) och, om
-  den finns, tests/private/ (egna filer som inte publiceras).
-  Begränsning: skisserna är fristående – ändras lådans bredd följer inte hålen med (ingen
-  koppling som i originalkodens variabler).
+Convert to sketches (convert/csg.ts, convert/scad2doc.ts, ui/convert.ts, features/code.ts)
+  The button in the code panel (Custom code/examples): OpenSCAD runs the code and exports the CSG tree (.csg:
+  modules, loops, variables already evaluated). Bodies that are prisms along a world axis (cube,
+  cylinder, linear_extrude, hull of such) → a sketch on XY/XZ/YZ (+ offset) + Extrude;
+  cones and spheres → profile + Revolve; the rest (BOSL2 polyhedra, minkowski, hull in 3D, rotated bodies,
+  text with a missing font) → code blocks (feature "OpenSCAD code", no sketch, include/use lifted out).
+  2D: square/circle/polygon directly (rectangles and circles with dimensions); offset/text/overlaps are drawn
+  by OpenSCAD (SVG, fine resolution) and arcs are found in the points (the center adjusted so that the
+  end points lie exactly on the radius). hull of equal circles → a rounded shape with tangents, equal radii,
+  a radius dimension and (rectangle) outer width/height – only the position free. $fn < 16 is kept as a polygon
+  (an intentional hexagon), circles without $fn become real circles.
+  The boolean tree is flattened in the tree's order; a subtraction that reaches a body added earlier
+  (boxes) turns that whole difference into code. In a union, difference/intersection are taken first.
+  Consecutive prisms with the same plane/height/operation are merged into one sketch. Afterwards the volume
+  is compared with the original (rendered with $fa=1, $fs=0.2) and the result is shown.
+  Tests (tests/convert.test.ts): the test models in tests/fixtures/ (snap_box 8 sketches/1 code,
+  bracket 8 sketches/0 code, bosl2_knob partly code, cable_clip, wall_hook; all ≤ 0.04 % volume) and, if
+  it exists, tests/private/ (own files that are not published).
+  Limitation: the sketches are independent – if the box's width changes the holes do not follow (no
+  link like the original code's variables).
 
 Export (ui/export.ts)
-  3MF (zip, enhet mm), STL (binär), OpenSCAD-kod. Filen tas fram när dialogen öppnas så att
-  knapptrycket kan ladda ner/dela direkt. Chrome på Android delar inte .3mf/.stl via Web Share
-  – därför nedladdning (i appen: Hämtade filer och dela-menyn). Filnamn = modellens namn.
-  Filerna behöver en slicer (Bambu Studio, OrcaSlicer, PrusaSlicer …). Bambu Handy slicar inte:
-  den startar bara färdiga utskriftsfiler (MakerWorld/Bambu Studio) – testat 2026-10-23 på en
-  Xiaomi 11T Pro, 3MF gick inte att öppna. Att slica i telefonen (t.ex. Kiri:Moto) och skicka till
-  en Bambu-skrivare skulle kräva nät och Bambus .gcode.3mf-format – inte gjort.
+  3MF (zip, unit mm), STL (binary), OpenSCAD code. The file is produced when the dialog opens so that
+  the button press can download/share at once. Chrome on Android does not share .3mf/.stl via Web Share
+  – hence a download (in the app: Downloads and the share sheet). File name = the model's name.
+  The files need a slicer (Bambu Studio, OrcaSlicer, PrusaSlicer …). Bambu Handy does not slice:
+  it only starts finished print files (MakerWorld/Bambu Studio) – tested 2026-10-23 on a
+  Xiaomi 11T Pro, the 3MF could not be opened. Slicing on the phone (e.g. Kiri:Moto) and sending to
+  a Bambu printer would need the network and Bambu's .gcode.3mf format – not done.
 
-Gängor (features/threads.ts, thread.ts, hole.ts)
-  ISO-metrisk profil (60°, topp P/8, botten P/4), tvärsnitt r(θ) extruderat med −360°/
-  stigning (högergänga). M2–M30 med standardstigning, spel för 3D-utskrift (0,2 mm).
-  Hål → Gängat: invändig gänga + kärnhål. Gänga-feature: välj cirklar i 3D; Utvändig skär
-  bort cylindern och ersätter med gängad stav (avfasad), Invändig drar bort en gängtapp.
-  Storlek föreslås från cirkeln (ytter- resp. innerdiameter). M8×15 mm ≈ 0,05 s, 85k tri.
-  Förskjutna skissplan: "Förskjutning" i planvalet (t.ex. plattans höjd/variabel).
-  Riktning nedåt vänds med rotate([180,0,0]), inte mirror – en spegling ger vänstergänga
-  (tests: "gängor är högergängade i alla riktningar" mäter helixen i meshen).
+Threads (features/threads.ts, thread.ts, hole.ts)
+  ISO metric profile (60°, crest P/8, root P/4), a cross-section r(θ) extruded with −360°/
+  pitch (right-hand thread). M2–M30 with the standard pitch, clearance for 3D printing (0.2 mm).
+  Hole → Threaded: internal thread + core hole. Thread feature: pick circles in 3D; External cuts
+  away the cylinder and replaces it with a threaded rod (chamfered), Internal subtracts a thread tap.
+  The size is suggested from the circle (outer or inner diameter). M8×15 mm ≈ 0.05 s, 85k tri.
+  Offset sketch planes: "Offset" in the plane picker (e.g. the plate's height/a variable).
+  Downward direction is flipped with rotate([180,0,0]), not mirror – a mirror gives a left-hand thread
+  (tests: "threads are right-handed in every direction" measures the helix in the mesh).
 
-Skissverktyg (sketch/editor.ts)
-  Polygon (G): centrum + hörn, 3/4/5/6/8 sidor; hörn på en konstruktionscirkel + lika sidor
-  → mått på cirkeln (t.ex. nyckelvidd) och vridning. Avlångt hål (O): två ändar + bredd;
-  bågar och linjer tangenta. Verktygens villkor är "quiet" (symbolerna syns när formen är
-  markerad). Tangens i gemensam ändpunkt löses som i FreeCAD (radien ⟂ linjen,
-  perpendicular_pppp) – avståndsformen gav fel antal frihetsgrader (slits 9 i stället för 5).
+Sketch tools (sketch/editor.ts)
+  Polygon (G): center + corner, 3/4/5/6/8 sides; corners on a construction circle + equal sides
+  → a dimension on the circle (e.g. across flats) and rotation. Slot (O): two ends + width;
+  arcs and lines tangent. The tools' constraints are "quiet" (the symbols show when the shape is
+  selected). Tangency at a shared end point is solved as in FreeCAD (the radius ⟂ the line,
+  perpendicular_pppp) – the distance form gave the wrong number of degrees of freedom (slot 9 instead of 5).
 
-Skissa på en yta (faceref.ts, 2026-10-17)
-  Skiss → "Välj yta på modellen" → tryck på en plan yta i 3D. Ytor parallella med
-  Topp/Fram/Höger: planet och förskjutningen räknas ut (XZ: förskjutning = −y).
-  Sneda ytor: skissen får face = { o, u, v } (frame.ts; normalen u × v ut ur kroppen), placeras
-  med multmatrix. Kommer ytan från en extrudering (findFaceRef: sidan som en linje i profilen
-  sveper upp, eller en ändyta lo/hi) sparas faceRef { feature, entity | cap, sign } och planet
-  räknas om ur den vid varje bygge (linjens lösta punkter, djup, riktning, föräldraskissens
-  frame – rekursivt), så skissen följer måtten. Annars (eller om källan tas bort/undertrycks)
-  gäller face = senast kända läge. Normal och läge ur alla trianglar
-  i planet (areaviktat); u vågrätt längs ytan, v uppför, origo i nedre vänstra hörnet sett utifrån.
-  Allt som placerar en skiss (OpenSCAD, 3D-vy, val i 3D, kontur) går via sketchFrame(). Förskjutningen
-  blir helst ett uttryck från extruderingen som skapade ytan (t.ex. "t", "2 + t", "-(t / 2)"),
-  så skissen följer med när måttet ändras; annars talet. Skissen får outward ('normal'/'reverse')
-  = åt vilket håll ytan pekar ut: nya extruderingar/text bygger utåt, "ta bort" vänder inåt,
-  hål borrar inåt. I skissläget visas modellens kanter i planet (grått, ur den senaste meshen;
-  gäller alla skisser vars plan sammanfaller med en yta) och man snäpper till hörn, cirkelmitt
-  och kanter (ny punkt, inget villkor). Vyn anpassas efter ytan bara för skisser från en yta.
-  Tester: model.test "skissa på en yta …", tools/browser/faces.mjs.
+Sketch on a face (faceref.ts, 2026-10-17)
+  Sketch → "Pick a face on the model" → tap a flat face in 3D. Faces parallel to
+  Top/Front/Right: the plane and the offset are worked out (XZ: offset = −y).
+  Slanted faces: the sketch gets face = { o, u, v } (frame.ts; the normal u × v out of the body), placed
+  with multmatrix. If the face comes from an extrude (findFaceRef: the side that a line in the profile
+  sweeps up, or an end face lo/hi), faceRef { feature, entity | cap, sign } is saved and the plane is
+  recomputed from it on every build (the line's solved points, depth, direction, the parent sketch's
+  frame – recursively), so the sketch follows the dimensions. Otherwise (or if the source is deleted/suppressed)
+  face = the last known position applies. Normal and position from all triangles
+  in the plane (area-weighted); u horizontal along the face, v uphill, the origin at the bottom left corner seen from outside.
+  Everything that places a sketch (OpenSCAD, the 3D view, picking in 3D, outline) goes through sketchFrame(). The offset
+  preferably becomes an expression from the extrude that created the face (e.g. "t", "2 + t", "-(t / 2)"),
+  so the sketch follows when the dimension changes; otherwise the number. The sketch gets outward ('normal'/'reverse')
+  = which way the face points out: new extrudes/text build outward, "remove" turns inward,
+  holes drill inward. In sketch mode the model's edges in the plane are shown (grey, from the latest mesh;
+  applies to every sketch whose plane coincides with a face) and you snap to corners, circle centers
+  and edges (a new point, no constraint). The view fits the face only for sketches from a face.
+  Tests: model.test "sketch on a face …", tools/browser/faces.mjs.
 
-Licens och "Om scadshape" (2026-10-22)
-  scadshape: GPL-3.0 eller senare (LICENSE). Krävs i praktiken: OpenSCAD-WASM:en innehåller CGAL
-  (GPL-3); OpenSCAD själv är GPL-2 med undantag för CGAL. ☰ → Om scadshape (src/ui/about.ts) visar
-  version (android/build.sh sätter SCADSHAPE_VERSION), licensen och allt som följer med, grupperat
-  (src/licenses.ts). Licenstexterna: vendor/licenses/ (tools/licenses.sh hämtar dem från de versioner
-  som openscad-wasm-bygget låser + SPDX-texter; SOURCES.txt) och beroendenas LICENSE, kopierade av
-  build.mjs till dist/licenses/. Byts OpenSCAD-WASM:en eller ett bibliotek: kör tools/licenses.sh
-  och uppdatera src/licenses.ts. Test: tools/browser/about.mjs (alla texter öppnas).
-  Bakåt/Esc i en licenstext går tillbaka till listan (Androids bakåt: knappar med data-back).
+Licence and "About scadshape" (2026-10-22)
+  scadshape: GPL-3.0 or later (LICENSE). Required in practice: the OpenSCAD WASM contains CGAL
+  (GPL-3); OpenSCAD itself is GPL-2 with an exception for CGAL. ☰ → About scadshape (src/ui/about.ts) shows
+  the version (android/build.sh sets SCADSHAPE_VERSION), the licence and everything bundled, grouped
+  (src/licenses.ts). The licence texts: vendor/licenses/ (tools/licenses.sh fetches them from the versions
+  that the openscad-wasm build pins + SPDX texts; SOURCES.txt) and the dependencies' LICENSE files, copied by
+  build.mjs to dist/licenses/. When the OpenSCAD WASM or a library changes: run tools/licenses.sh
+  and update src/licenses.ts. Test: tools/browser/about.mjs (every text opens).
+  Back/Esc in a licence text goes back to the list (Android's back: buttons with data-back).
 
-Bilder i README.md (2026-10-23, docs/media/)
-  tools/browser/readme-media.mjs gör om dem mot staging (se skriptets huvud): två GIF:ar
-  (sketch-to-part, variables) och fem skärmbilder, engelska, 390 × 844. GIF:arna är bildserier med
-  bestämd visningstid per bild (gifenc + pngjs, utvecklingsberoenden i tools/browser); DUMP=<katalog>
-  sparar också bilderna som PNG för granskning. Kör om när gränssnittet ändras märkbart.
-  Två följdändringar i appen: featurepanelen i stående läge (nertill) flyttar upp modellen ovanför sig
-  (viewer.setBottomInset, som setRightInset i liggande) – förut låg modellen dold under panelen; och
-  skissvyn ger minst 90 px marginal i sidled (editor.fit), så att måttetiketter med variabelnamn inte
-  klipps på smala telefoner.
+Images in README.md (2026-10-23, docs/media/)
+  tools/browser/readme-media.mjs remakes them against staging (see the script's header): two GIFs
+  (sketch-to-part, variables) and five screenshots, English, 390 × 844. The GIFs are frame series with
+  a fixed display time per frame (gifenc + pngjs, dev dependencies in tools/browser); DUMP=<dir>
+  also saves the frames as PNG for review. Run again when the interface changes noticeably.
+  Two follow-up changes in the app: the feature panel in portrait (at the bottom) moves the model up above it
+  (viewer.setBottomInset, like setRightInset in landscape) – before, the model was hidden under the panel; and
+  the sketch view leaves at least 90 px margin at the sides (editor.fit), so that dimension labels with variable
+  names are not clipped on narrow phones.
 
-Startkort och exempel (2026-10-22, ui/welcome.ts, examples/models.ts)
-  När modellen är tom visas ett kort i 3D-ytan: fyra steg (Skiss → rita/Mått → Klar + Extrudera …
-  → Exportera) och fyra exempel. Det blockerar inte verktygen och döljs när modellen får innehåll,
-  en featurepanel öppnas eller man går in i en skiss; × döljer det för sessionen, ☰ → Kom igång
-  visar det igen. Exemplen byggs när de öppnas (nya modeller i nuvarande format) med mått som hänger
-  på variabler (namnen följer språket): Låda med lock (behållare), Monteringsplatta (extrudering +
-  försänkta M4-hål på ovansidan, outward 'normal' så att de borrar nedåt), Skylt (text), Kopp
-  (revolve). En burk med skruvlock var med först men tog ~3 s och 357k trianglar (gängorna) – för
-  tungt som första intryck. Tester: tests/examples.test.ts (fullt bestämda skisser, renderar,
-  variabel ×1,5 → större modell, hålen går igenom), tools/browser/welcome.mjs.
-  Verktygsraden tonas i kanten där den fortsätter (ui/scrollhint.ts). Mät prestanda finns bara på
-  utvecklingsservern (isDevHost).
-  Svag telefon: tools/browser/lowend.mjs (360 × 640, CPU strypt 1/4/6×): start 0,18/0,46/0,69 s,
-  exemplen 0,1–0,4 s. Obs: CDP-strypningen gäller inte workern, så motortiderna är serverns.
+Start card and examples (2026-10-22, ui/welcome.ts, examples/models.ts)
+  When the model is empty a card shows in the 3D area: four steps (Sketch → draw/Dimension → Done + Extrude …
+  → Export) and four examples. It does not block the tools and hides when the model gets content,
+  a feature panel opens or you enter a sketch; × hides it for the session, ☰ → Get started
+  shows it again. The examples are built when they are opened (new models in the current format) with dimensions
+  that depend on variables (the names follow the language): Box with lid (container), Mounting plate (extrude +
+  countersunk M4 holes on the top, outward 'normal' so they drill downward), Sign (text), Cup
+  (revolve). A jar with a screw lid was in at first but took ~3 s and 357k triangles (the threads) – too
+  heavy as a first impression. Tests: tests/examples.test.ts (fully defined sketches, renders,
+  variable ×1.5 → a larger model, the holes go through), tools/browser/welcome.mjs.
+  The toolbar fades at the edge where it continues (ui/scrollhint.ts). Benchmark only exists on the
+  development server (isDevHost).
+  Weak phone: tools/browser/lowend.mjs (360 × 640, CPU throttled 1/4/6×): start 0.18/0.46/0.69 s,
+  the examples 0.1–0.4 s. Note: the CDP throttling does not apply to the worker, so the engine times are the machine's own.
 
-Android-app (android/, påbörjad 2026-10-22)
-  WebView-omslag, helt offline: android/build.sh → android/dist/scadshape.apk. Spara/dela filer,
-  öppna filer från andra appar och bakåtknappen går via bryggan i src/android.ts + src/ui/android.ts
-  (finns bara i appen). Detaljer och vad som är kvar inför Play: android/README.txt.
+Android app (android/, started 2026-10-22)
+  WebView wrapper, fully offline: android/build.sh → android/dist/scadshape.apk. Saving/sharing files,
+  opening files from other apps and the back button go through the bridge in src/android.ts + src/ui/android.ts
+  (only present in the app). Details and what is left before Play: android/README.txt.
 
-Idéer (ej gjort)
-  Gridfinity-lådor, gångjärn, ytskiss på revolve/kodblock som följer måtten.
+Ideas (not done)
+  Gridfinity bins, hinges, a face sketch on revolve/code blocks that follows the dimensions.
 
-Faser
-  0 spike         WASM-motor i Web Worker, 3D-vy med pekgester, mätknapp   ✔
-  1 skissverktyg  linje, rektangel, cirkel, polygon, slits, bågar, snäpp       ✔
-  2 constraints   planegcs (FreeCADs lösare, WASM), mått med sifferinmatning   ✔
-  3 features      extrudera (+/−), revolve, hål, gänga, behållare, text, träd   ✔
-  4 utskrift      export 3MF/STL/.scad (nedladdning/dela; vidare till en slicer)  ✔
-  5 extra         förskjutna plan, upprepa/spegla, hörnradie, avrunda/fasa kant  ✔
-Begränsning: OpenSCAD är CSG/mesh utan B-rep – ingen "klicka på 3D-kant och runda";
-kanterna rundas/fasas därför per extrudering (lager om ~0,2 mm, ett per utskriftslager).
+Phases
+  0 spike         WASM engine in a Web Worker, 3D view with touch gestures, benchmark   ✔
+  1 sketch tools  line, rectangle, circle, polygon, slot, arcs, snapping                ✔
+  2 constraints   planegcs (FreeCAD's solver, WASM), dimensions with number entry       ✔
+  3 features      extrude (+/−), revolve, hole, thread, container, text, tree           ✔
+  4 printing      export 3MF/STL/.scad (download/share; on to a slicer)                 ✔
+  5 extras        offset planes, repeat/mirror, corner radius, round/chamfer edges      ✔
+Limitation: OpenSCAD is CSG/mesh without B-rep – no "tap a 3D edge and round it";
+the edges are therefore rounded/chamfered per extrude (layers of ~0.2 mm, one per print layer).
 
-Adresser
-  Utveckling: http://<SCADSHAPE_HOST>:8790/ (scadshape-web, tar emot loggar). serve.py lyssnar på
-    127.0.0.1 om inget annat sägs; för att nå den från telefonen sätts SCADSHAPE_HOST till t.ex.
-    Tailscale-IP:n i en systemd-drop-in (~/.config/systemd/user/scadshape-web.service.d/host.conf:
-    [Service] + Environment=SCADSHAPE_HOST=<ip>), som inte ligger i förrådet.
-  Publik (för Cloudflare-tunneln): 127.0.0.1:8791 (scadshape-public, SCADSHAPE_PUBLIC=1:
-    strikt CSP, inga POST, ingen åtkomstlogg). Samma dist/ – ombyggnad når båda direkt.
-    Appen skickar loggar/mätningar bara från utvecklingsadressen (remote.ts isDevHost: localhost
-    eller en Tailscale-adress 100.64.0.0/10).
+Addresses
+  Development: http://<SCADSHAPE_HOST>:8790/ (scadshape-web, receives logs). serve.py listens on
+    127.0.0.1 unless told otherwise; to reach it from the phone, SCADSHAPE_HOST is set to e.g.
+    the Tailscale IP in a systemd drop-in (~/.config/systemd/user/scadshape-web.service.d/host.conf:
+    [Service] + Environment=SCADSHAPE_HOST=<ip>), which is not in the repository.
+  Public (for the Cloudflare tunnel): 127.0.0.1:8791 (scadshape-public, SCADSHAPE_PUBLIC=1:
+    strict CSP, no POST, no access log). The same dist/ – a rebuild reaches both at once.
+    The app sends logs/benchmarks only from the development address (remote.ts isDevHost: localhost
+    or a Tailscale address 100.64.0.0/10).
 
-Publik adress
-  En omvänd proxy eller tunnel (t.ex. Cloudflare Tunnel) till 127.0.0.1:8791 (scadshape-public).
-  Över https registreras sw.js: appen sparas för offline (cache per innehållshash, ny version
-  hämtas i bakgrunden och används vid nästa start) och kan installeras ("Lägg till på
-  startskärmen"). manifest.webmanifest + icons/ (ritas av tools/browser/make-icons.mjs).
-  CSP kräver 'unsafe-eval': planegcs (embind) skapar funktioner med new Function – utan den
-  misslyckades kontrollen av överflödiga mått tyst.
+Public address
+  A reverse proxy or tunnel (e.g. Cloudflare Tunnel) to 127.0.0.1:8791 (scadshape-public).
+  Over https sw.js is registered: the app is cached for offline use (a cache per content hash, a new version
+  is fetched in the background and used at the next start) and can be installed ("Add to
+  home screen"). manifest.webmanifest + icons/ (drawn by tools/browser/make-icons.mjs).
+  The CSP needs 'unsafe-eval': planegcs (embind) creates functions with new Function – without it
+  the redundant-dimension check failed silently.
 
-Skissverktyget (fas 1)
-  "+ Skiss" → välj plan (Topp XY, Fram XZ, Höger YZ) → rita → "Klar".
-  Punkten hamnar där fingret är; förstoringsglas medan fingret är nere; dra
-  från första till andra punkten i ett svep, eller tryck punkt för punkt.
-  Två fingrar panorerar/zoomar. Snäpp: befintliga punkter/origo (blir delade
-  punkter = sammanfallande), rutnät (steg efter zoom), vågrätt/lodrätt (linje).
-  Linjekedja avslutas på befintlig punkt, med "Avsluta" eller tryck på sista
-  punkten igen. Markera: tryck, dra punkter/linjer/cirkelkant, släpp en punkt på
-  en annan för att slå ihop. Konstruktion = streckad, räknas inte som profil.
-  Regioner som i ett CAD-program (regions.ts): kurvorna delas där de korsar
-  varandra, lösa ändar rensas, varje begränsad yta i den plana grafen blir en
-  region (fylls blått). Fristående komponenter inuti en yta blir hål, öar i hål
-  material igen. Öppna ändar visas med röd ring. Dokumentet sparas i localStorage.
-  tests/phone-sketches.json: handritade skisser med ojämna koordinater (testfall).
+The sketch tool (phase 1)
+  "+ Sketch" → pick a plane (Top XY, Front XZ, Right YZ) → draw → "Done".
+  The point goes where the finger is; a magnifier while the finger is down; drag
+  from the first to the second point in one swipe, or tap point by point.
+  Two fingers pan/zoom. Snapping: existing points/the origin (become shared
+  points = coincident), grid (step by zoom), horizontal/vertical (line).
+  A line chain ends on an existing point, with "Finish" or by tapping the last
+  point again. Select: tap, drag points/lines/a circle edge, drop a point on
+  another to merge them. Construction = dashed, does not count as a profile.
+  Regions as in a CAD program (regions.ts): the curves are split where they cross
+  each other, loose ends are trimmed, every bounded face in the planar graph becomes a
+  region (filled blue). Standalone components inside a face become holes, islands in holes
+  material again. Open ends are shown with a red ring. The document is saved in localStorage.
+  tests/phone-sketches.json: hand-drawn sketches with uneven coordinates (test cases).
 
-Villkor och mått (fas 2)
-  Lösare: planegcs (@salusoft89/planegcs, FreeCADs lösare som WASM, dist/planegcs.wasm).
-  Varje ändring löses; krockar den (eller är den överflödig, för nya villkor/mått)
-  rullas den tillbaka med en röd notis och de inblandade villkoren blinkar rött.
-  Dra geometri: temporära villkor drar mot fingret så långt villkoren tillåter.
-  Markera → sammanhangsraden visar passande villkor: Vågrät/Lodrät (linjer eller
-  två punkter), Parallell, Vinkelrät, Lika, Tangent, Koncentrisk, På linjen/kurvan,
-  Mittpunkt, Sammanfoga, Fixera/Lossa, Mått. Mått: linje → längd (längs/vågrätt/
-  lodrätt), cirkel → diameter, båge → radie (växla), två linjer → vinkel (parallella
-  → avstånd), punkt+linje, två punkter. Måttfältet tar uttryck (40/2+5).
-  Tryck på ett mått för att ändra/ta bort. Automatiska villkor vid ritning:
-  vågrätt/lodrätt, sammanfallande (delad punkt), på kurva (snäpp mot kurva ▢),
-  mittpunkt (snäpp ▲). Blått = kan röra sig, svart = fullt bestämt (frihetsanalys:
-  alla punkter dras slumpvis med temporära villkor – det som rör sig är fritt).
-  Statusraden visar frihetsgrader eller "Fullt definierad".
-  planegcs diagnostiserar i startläget, därför löses varje gång två gånger
-  (andra gången från den lösta geometrin) – annars missas överflödiga villkor.
+Constraints and dimensions (phase 2)
+  Solver: planegcs (@salusoft89/planegcs, FreeCAD's solver as WASM, dist/planegcs.wasm).
+  Every change is solved; if it conflicts (or is redundant, for new constraints/dimensions)
+  it is rolled back with a red notice and the constraints involved blink red.
+  Dragging geometry: temporary constraints pull toward the finger as far as the constraints allow.
+  Select → the context bar shows the fitting constraints: Horizontal/Vertical (lines or
+  two points), Parallel, Perpendicular, Equal, Tangent, Concentric, On line/curve,
+  Midpoint, Merge, Fix/Unfix, Dimension. Dimension: line → length (along/horizontal/
+  vertical), circle → diameter, arc → radius (toggle), two lines → angle (parallel
+  → distance), point+line, two points. The dimension field takes expressions (40/2+5).
+  Tap a dimension to change/delete it. Automatic constraints while drawing:
+  horizontal/vertical, coincident (shared point), on curve (snap to a curve ▢),
+  midpoint (snap ▲). Blue = can move, black = fully defined (freedom analysis:
+  every point is dragged at random with temporary constraints – what moves is free).
+  The status bar shows the degrees of freedom or "Fully defined".
+  planegcs diagnoses in the starting state, so every solve runs twice
+  (the second time from the solved geometry) – otherwise redundant constraints are missed.
 
-Features (fas 3)
-  Dokument v2 (doc.ts): features i ordning (skiss, extrudera, revolve), variabler,
-  rollback-markör. v1 (fas 1–2) migreras: varje skiss med regioner får en extrudering
-  med den gamla förhandsvisningshöjden. model3d.ts bygger OpenSCAD: en modul per
-  feature; lägg till = union, ta bort = difference, snitt = intersection, i trädets
-  ordning. Fel per feature (t.ex. "Profilen korsar axeln", "Okänd variabel") visas med
-  ⚠ i trädet och featuren hoppas över.
-  Extrudera: skiss, regioner, höjd (uttryck), uppåt/nedåt/symmetrisk, operation.
-  Revolve: axel = skissens X/Y-axel eller en linje i skissen (ofta konstruktionslinje),
-  vinkel, symmetriskt, operation. Profilen måste ligga på ena sidan om axeln.
-  Regionval: panelen visar skissens regioner som ytor i 3D; tryck för att välja/avvälja.
-  Valet sparas som en punkt inuti varje region ("frö"), så det överlever skissändringar.
-  Standard (inget valt) = det som är material med jämnt djup (ring runt hål osv.).
-  Axelval: "Välj axel"/"Linje" visar kandidater streckade; tryck på en.
-  Trädet (☰): tryck = redigera; ⋯ = redigera, undertryck, rulla tillbaka hit, ta bort
-  (en skiss tar med sig features som bygger på den). Nya features läggs vid markören.
-  Variabler (fx): namn = uttryck, får använda variabler ovanför. Används i höjd/vinkel
-  och i skissmått (måttet sparar uttrycket; ändras variabeln räknas skissen om och
-  löses). Svenska namn översätts i koden (höjd → hojd) eftersom OpenSCAD bara tål a–z.
-  Förhandsvisning medan panelen är öppen (senaste begäran vinner, 350 ms efter tangent).
-  Liggande: 3D-vyn förskjuts så att modellen hamnar bredvid panelen.
+Features (phase 3)
+  Document v2 (doc.ts): features in order (sketch, extrude, revolve), variables,
+  a rollback marker. v1 (phases 1–2) is migrated: every sketch with regions gets an extrude
+  with the old preview height. model3d.ts builds OpenSCAD: one module per
+  feature; add = union, remove = difference, intersect = intersection, in the tree's
+  order. Errors per feature (e.g. "The profile crosses the axis", "Unknown variable") are shown with
+  ⚠ in the tree and the feature is skipped.
+  Extrude: sketch, regions, height (expression), up/down/symmetric, operation.
+  Revolve: axis = the sketch's X/Y axis or a line in the sketch (often a construction line),
+  angle, symmetric, operation. The profile must lie on one side of the axis.
+  Region picking: the panel shows the sketch's regions as faces in 3D; tap to select/deselect.
+  The choice is saved as a point inside every region ("seed"), so it survives sketch changes.
+  Default (nothing picked) = what is material with an even depth (a ring around a hole etc.).
+  Axis picking: "Pick axis"/"Line" shows the candidates dashed; tap one.
+  The tree (☰): tap = edit; ⋯ = edit, suppress, roll back to here, delete
+  (a sketch takes the features built on it along). New features are inserted at the marker.
+  Variables (fx): name = expression, may use the variables above. Used in height/angle
+  and in sketch dimensions (the dimension saves the expression; when the variable changes the sketch is recomputed and
+  solved). Names with non-ASCII letters are transliterated in the code (höjd → hojd) because OpenSCAD only takes a–z.
+  Preview while the panel is open (the latest request wins, 350 ms after a key press).
+  Landscape: the 3D view is shifted so the model ends up beside the panel.
 
-Avrunda/fasa skisshörn (src/sketch/fillet.ts)
-  Markera hörnpunkter (två linjer möts, inte parallella) eller linjer → Avrunda / Fasa i
-  sammanhangsraden; måttdialogen öppnas (radie resp. ben). Flera hörn: ett mått, resten Lika.
-  Avrunda: linjerna trimmas till tangentpunkterna, båge + tangentvillkor + radiemått.
-  Fasa: rak linje, konstruktionsben från hörnet (Lika) + mått på det första benet.
-  Virtuellt hörn: har hörnpunkten mått/villkor (eller är origo) – och alltid vid fasning –
-  behålls den på linjernas förlängning (punkt på linje + streckade ben), så måtten gäller.
-  Linje med Lika/Mittpunkt blir konstruktion i full längd + trimmad kopia (polygonens sidor).
-  Frihetsgraderna ändras inte. Tester: solver.test "avrunda/fasa …", tools/browser/fillet.mjs.
-  Bara linje–linje-hörn (inte linje–båge).
+Fillet/chamfer sketch corners (src/sketch/fillet.ts)
+  Select corner points (two lines meet, not parallel) or lines → Fillet / Chamfer in
+  the context bar; the dimension dialog opens (radius or leg). Several corners: one dimension, the rest Equal.
+  Fillet: the lines are trimmed to the tangent points, an arc + tangent constraints + a radius dimension.
+  Chamfer: a straight line, construction legs from the corner (Equal) + a dimension on the first leg.
+  Virtual corner: if the corner point has dimensions/constraints (or is the origin) – and always when chamfering –
+  it is kept on the lines' extension (point on line + dashed legs), so the dimensions still hold.
+  A line with Equal/Midpoint becomes construction at full length + a trimmed copy (the polygon's sides).
+  The degrees of freedom do not change. Tests: solver.test "fillet: …"/"chamfer: …", tools/browser/fillet.mjs.
+  Only line–line corners (not line–arc).
 
-Mätverktyget (src/measure.ts, src/ui/measure.ts)
-  "Mät" i delens verktygsrad. Tryck fäster mot synligt hörn (18 px; inte punkterna längs en
-  tessellerad cirkel), annars synlig kant (14 px), annars ytan. Kant → hela den raka kanten
-  (längd) eller cirkel/båge (Ø/R, centrum; kedjan av nätets kanter följs så länge punkterna
-  ligger på samma cirkel med jämna segment). Ett val: mått/koordinater. Två val: avstånd +
-  ΔX/ΔY/ΔZ (cirkel räknas från centrum); parallella ytor/kanter → vinkelrätt avstånd, annars
-  vinkel; punkt → yta/kant vinkelrätt. Tredje trycket börjar om; ny rendering rensar valen.
-  Tester: tests/measure.test.ts, tools/browser/measure.mjs.
+The measure tool (src/measure.ts, src/ui/measure.ts)
+  "Measure" in the part toolbar. A tap snaps to a visible corner (18 px; not the points along a
+  tessellated circle), otherwise a visible edge (14 px), otherwise the face. Edge → the whole straight edge
+  (length) or circle/arc (Ø/R, center; the chain of mesh edges is followed as long as the points
+  lie on the same circle with even segments). One pick: size/coordinates. Two picks: distance +
+  ΔX/ΔY/ΔZ (a circle counts from its center); parallel faces/edges → perpendicular distance, otherwise
+  an angle; point → face/edge perpendicular. The third tap starts over; a new render clears the picks.
+  Tests: tests/measure.test.ts, tools/browser/measure.mjs.
 
-Import (src/ui/importer.ts, Importera i delens verktygsrad)
-  STL (binär/ASCII, högst 64 MB) → feature "Importerad kropp" (features/mesh.ts): mitt på plattan
-  (botten på Z = 0), skala %, rotera, flytta, lägg till/ta bort/snitt. Filen ligger i IndexedDB
-  efter innehållshash (src/blobs.ts; dokumentet sparar bara hashen). Motorn (scad.ts) ser
-  import("/imports/<hash>.stl") i koden och skriver filen till workerns filsystem. "Spara som fil"
-  bäddar in filerna (base64, "files") och "Öppna fil" sparar dem; .scad-exporten pekar på
-  originalfilens namn. Saknas filen i webbläsaren blir det ett fel i trädet. Filer tas inte bort
-  när modellen raderas (IndexedDB "scadshape-files").
-  SVG (src/svg.ts, egen XML-läsare): path (alla kommandon), rect (rx/ry), circle, ellipse, line,
-  polyline, polygon, g/transform, viewBox/enheter → mm, y uppåt. Text, bilder och use hoppas över
-  (räknas upp i dialogen). Cirkelbågar blir skissbågar om transformen är likformig, Bézier plattas
-  ut (0,02 mm). Dialog: bredd (skalar likformigt), hörnet/mitten i origo, lås → sedan planvalet
-  (även yta på modellen); geometrin hamnar i en ny skiss med filens namn. Lösaren klarar inte
-  många fria punkter (1000 fria = minnet tar slut i planegcs; fixerade är billiga): över 150
-  punkter låses som standard, över 600 alltid, över 6000 vägras.
-  Tester: tests/svg.test.ts, tools/browser/import.mjs (pwa.mjs körs med ?sw i adressen).
+Import (src/ui/importer.ts, Import in the part toolbar)
+  STL (binary/ASCII, at most 64 MB) → feature "Imported body" (features/mesh.ts): centered on the plate
+  (bottom at Z = 0), scale %, rotate, move, add/remove/intersect. The file is kept in IndexedDB
+  by content hash (src/blobs.ts; the document only saves the hash). The engine (scad.ts) sees
+  import("/imports/<hash>.stl") in the code and writes the file to the worker's file system. "Save as file"
+  embeds the files (base64, "files") and "Open file" saves them; the .scad export points to the
+  original file's name. If the file is missing in the browser, that is an error in the tree. Files are not deleted
+  when the model is deleted (IndexedDB "scadshape-files").
+  SVG (src/svg.ts, own XML reader): path (all commands), rect (rx/ry), circle, ellipse, line,
+  polyline, polygon, g/transform, viewBox/units → mm, y up. Text, images and use are skipped
+  (listed in the dialog). Circular arcs become sketch arcs if the transform is uniform, Béziers are flattened
+  (0.02 mm). Dialog: width (scales uniformly), the corner/center at the origin, lock → then the plane picker
+  (also a face on the model); the geometry ends up in a new sketch with the file's name. The solver cannot handle
+  many free points (1000 free = planegcs runs out of memory; fixed ones are cheap): over 150
+  points are locked by default, over 600 always, over 6000 refused.
+  Tests: tests/svg.test.ts, tools/browser/import.mjs (pwa.mjs runs with ?sw in the address).
 
-Tema (src/theme.ts, ☰ → Tema: Som telefonen / Ljust / Mörkt)
-  Valet sparas (scadshape.theme); det lösta temat blir data-theme på <html>. Alla färger i
-  style.css är variabler med mörka värden (+ media-fråga innan skriptet körts, color-scheme för
-  formulär). Skissens canvas har två paletter (editor.ts LIGHT/DARK; fullt bestämt = ljust i
-  mörkt), 3D-vyn byter rutnät och skisslinjer (viewer.setTheme). Test: tools/browser/theme.mjs.
+Theme (src/theme.ts, ☰ → Theme: Same as the phone / Light / Dark)
+  The choice is saved (scadshape.theme); the resolved theme becomes data-theme on <html>. All colors in
+  style.css are variables with dark values (+ a media query before the script has run, color-scheme for
+  forms). The sketch canvas has two palettes (editor.ts LIGHT/DARK; fully defined = light in
+  dark), the 3D view changes its grid and sketch lines (viewer.setTheme). Test: tools/browser/theme.mjs.
 
-Snäpplås
-  Snäpphake (features/snap.ts) vid punkter i en skiss (inga valda = fristående punkter, annars
-  origo; utan skiss en mallskiss i XY): Hake = böjbalk längs planets normal, centrerad på punkten,
-  hulling åt Riktning (grader i planet), 30° infasning, baksida låsande 90° eller lösbar 45°,
-  45°-fas i roten. Panelen visar töjningen i roten ε = 1,5·t·y/L² och varnar över 2,5 % (PLA),
-  plus tips om utskriftsriktning (stående hake böjs tvärs lagren). Urtag = fack (t + y + 2·spel)
-  × (b + 2·spel) × djup som skärs in i kroppen. Fälttypen 'note' (common.ts) visar uträknad text.
-  Snäpplock (behållare, lock "Snäpp"): insticks­lock vars kant buktar ut snapDepth (0,6) med
-  45°-flanker nära spetsen, och ett spår på samma höjd i väggen (+0,15 mm). Ingrepp = utstick −
-  spel. Vulst och spår byggs som skikt på 0,2 mm-lagren (skikt som delar ett lager ger trappsteg
-  som slicern inte kan skriva ut); kantväggen behåller sin tjocklek. scadcheck: inga anmärkningar.
-  Tester: model.test "snäpplock …", "snäpphake …" (monterat lock: 0 mm³ överlapp med spår,
-  ~84 mm³ ingrepp utan), tools/browser/snap.mjs.
+Snap fits
+  Snap hook (features/snap.ts) at points in a sketch (none picked = standalone points, otherwise
+  the origin; without a sketch a template sketch in XY): Hook = a bending beam along the plane's normal, centered on the point,
+  a barb toward Direction (degrees in the plane), 30° lead-in, back face locking 90° or releasable 45°,
+  a 45° chamfer at the root. The panel shows the strain at the root ε = 1.5·t·y/L² and warns above 2.5 % (PLA),
+  plus a tip about the print orientation (an upright hook bends across the layers). Catch = a pocket (t + y + 2·clearance)
+  × (b + 2·clearance) × depth cut into the body. The field type 'note' (common.ts) shows computed text.
+  Snap lid (container, lid "Snap"): a push-fit lid whose rim bulges out snapDepth (0.6) with
+  45° flanks near the tip, and a groove at the same height in the wall (+0.15 mm). Interference = bead −
+  clearance. The bead and groove are built as layers on the 0.2 mm print layers (layers that share a print layer give steps
+  that the slicer cannot print); the rim wall keeps its thickness. scadcheck: no remarks.
+  Tests: model.test "container with snap lid …", "snap hook and catch …" (assembled lid: 0 mm³ overlap with the groove,
+  ~84 mm³ interference without), tools/browser/snap.mjs.
 
-Punkter och hål
-  Punkt-verktyget (P) i skissen ritar fristående punkter (SPoint.standalone) – de fäster
-  mot mittpunkter/kurvor, kan måttsättas och få villkor som andra punkter.
-  Hål-featuren borrar i valda punkter (standard: alla fristående punkter; utan sådana
-  cirkel-/bågcentrum). Välj/avvälj genom att trycka på punkterna i 3D-vyn. Typ: enkelt,
-  cylindrisk försänkning, konisk försänkning. Storlek M2–M8 fyller i frigångshål (ISO 273
-  medel), försänkning för insexskruv och 90° för försänkt skruv; ändrade mått → "Eget".
-  Djup eller genom allt. Borra uppåt/nedåt längs planets normal, med start (mm från
-  skissplanet) – t.ex. start = plattans tjocklek och nedåt för försänkning på ovansidan.
-  Hålen dras alltid bort och kräver en kropp före sig i trädet.
+Points and holes
+  The Point tool (P) in the sketch draws standalone points (SPoint.standalone) – they snap
+  to midpoints/curves, can get dimensions and constraints like other points.
+  The Hole feature drills at the picked points (default: all standalone points; without any,
+  circle/arc centers). Select/deselect by tapping the points in the 3D view. Type: simple,
+  counterbore, countersink. Size M2–M8 fills in the clearance hole (ISO 273
+  medium), a counterbore for a socket head screw and 90° for a countersunk screw; changed dimensions → "Custom".
+  Depth or through all. Drill up/down along the plane's normal, with a start (mm from
+  the sketch plane) – e.g. start = the plate's thickness and downward for a counterbore on the top.
+  Holes are always subtracted and need a body before them in the tree.
 
-Filer
-  src/main.ts          UI: delläge (3D, källa, kod, features) och skissläge
-  src/doc.ts           dokument v2 (features, variabler, rollback), migrering, localStorage
-  src/model3d.ts       features → OpenSCAD (extrudera, revolve, operationer, fel per feature)
-  src/params.ts, src/paramsync.ts  variabler; räkna om skissmått när de ändras
-  src/sketch/model.ts  skissdata: punkter + entiteter (linje/cirkel/båge) + constraints
-  src/sketch/geom.ts   2D-geometri, tessellering (kordafel ≤ 0,01 mm)
-  src/sketch/regions.ts  slutna profiler och nästling
-  src/sketch/codegen.ts  profiler → OpenSCAD 2D (polygon/circle, difference för hål)
-  src/sketch/editor.ts   canvas-editorn (verktyg, snäpp, förstoringsglas, villkor, ångra)
-  src/sketch/solver.ts   skiss ↔ planegcs: lösning, dragning, frihetsanalys
-  src/sketch/annotate.ts mått och villkorssymboler (mätning, ritning, träffytor)
-  src/expr.ts          uttryck i måttfält
-  src/sketch3d.ts      skisskurvor som linjer i 3D-vyn
-  tests/               enhetstester: node tests/run.mjs (skiss, lösare, projekt, modeller med riktig
-                       OpenSCAD-rendering – volymer, mått, gängriktning, lockpassning)
+Files
+  src/main.ts          UI: part mode (3D, source, code, features) and sketch mode
+  src/doc.ts           document v2 (features, variables, rollback), migration, localStorage
+  src/model3d.ts       features → OpenSCAD (extrude, revolve, operations, errors per feature)
+  src/params.ts, src/paramsync.ts  variables; recompute sketch dimensions when they change
+  src/sketch/model.ts  sketch data: points + entities (line/circle/arc) + constraints
+  src/sketch/geom.ts   2D geometry, tessellation (chord error ≤ 0.01 mm)
+  src/sketch/regions.ts  closed profiles and nesting
+  src/sketch/codegen.ts  profiles → OpenSCAD 2D (polygon/circle, difference for holes)
+  src/sketch/editor.ts   the canvas editor (tools, snapping, magnifier, constraints, undo)
+  src/sketch/solver.ts   sketch ↔ planegcs: solving, dragging, freedom analysis
+  src/sketch/annotate.ts dimensions and constraint symbols (measuring, drawing, hit areas)
+  src/expr.ts          expressions in dimension fields
+  src/sketch3d.ts      sketch curves as lines in the 3D view
+  tests/               unit tests: node tests/run.mjs (sketch, solver, projects, models with a real
+                       OpenSCAD render – volumes, dimensions, thread direction, lid fit)
   tools/browser/{container,export,pattern,projects,text,history,sketchtools,pwa}.mjs
-                       webbläsartester för dagens features (pwa.mjs mot http://127.0.0.1:8791/?sw)
-  tools/browser/sketch.mjs  ritar en skiss med riktiga pekhändelser (CDP) och kontrollerar allt
-  tools/browser/constraints.mjs  villkor/mått: rektangel → fullt definierad, krock, tangent, drag, ta bort/ångra
-  tools/browser/threads.mjs  gängor (utvändig/invändig, cirkelval i 3D) och språkbyte sv↔en
-  tools/browser/holes.mjs  punktverktyget, hål: punktval i 3D, försänkning, M-storlekar, redigering
-  tools/browser/features.mjs  migrering, variabler, extrudera/ta bort, regionval och axelval i 3D, revolve,
-                       rollback/undertryck, variabeländring, omladdning, stående läge
-  node build.mjs --out dist-next  bygg utan att publicera (testa med python3 -m http.server)
-  src/scad.ts          klient mot workern: render(src) → STL + logg, cancel()
-  src/scad.worker.ts   kör OpenSCAD; wasm kompileras en gång, ny instans per rendering
-  src/viewer.ts        three.js, Z upp, OrbitControls (1 finger rotera, 2 zooma/panorera)
-  src/stl.ts           binär STL → positioner/normaler
-  src/examples/*.scad  exempel (paketeras som text)
-  public/              index.html, style.css (kopieras till dist/)
-  vendor/openscad/     OpenSCAD-WASM (web-build), se VERSION
-  build.mjs            esbuild → dist/ (+ .gz). `node build.mjs --watch` under utveckling
-  serve.py             server för dist/ + POST /api/bench → data/bench.jsonl
-  scadshape-web.service  user-tjänst (systemctl --user restart scadshape-web)
-  tools/bench-node.mjs   mät en .scad i Node: node tools/bench-node.mjs fil.scad [manifold|cgal]
-  tools/browser/smoke.mjs  röktest i headless Chromium (Playwright):
-                           cd tools/browser && node smoke.mjs [url] [utkatalog] [--bench]
+                       browser tests for the current features (pwa.mjs against http://127.0.0.1:8791/?sw)
+  tools/browser/sketch.mjs  draws a sketch with real touch events (CDP) and checks everything
+  tools/browser/constraints.mjs  constraints/dimensions: rectangle → fully defined, conflict, tangent, drag, delete/undo
+  tools/browser/threads.mjs  threads (external/internal, circle picking in 3D) and language switch en↔sv
+  tools/browser/holes.mjs  the point tool, holes: point picking in 3D, counterbore, M sizes, editing
+  tools/browser/features.mjs  migration, variables, extrude/remove, region and axis picking in 3D, revolve,
+                       rollback/suppress, variable change, reload, portrait mode
+  node build.mjs --out dist-next  build without publishing (test with python3 -m http.server)
+  src/scad.ts          client for the worker: render(src) → STL + log, cancel()
+  src/scad.worker.ts   runs OpenSCAD; the wasm is compiled once, a new instance per render
+  src/viewer.ts        three.js, Z up, OrbitControls (1 finger rotates, 2 zoom/pan)
+  src/stl.ts           binary STL → positions/normals
+  src/examples/*.scad  examples (packaged as text)
+  public/              index.html, style.css (copied to dist/)
+  vendor/openscad/     OpenSCAD-WASM (web build), see VERSION
+  build.mjs            esbuild → dist/ (+ .gz). `node build.mjs --watch` during development
+  serve.py             server for dist/ + POST /api/bench → data/bench.jsonl
+  scadshape-web.service  user service (systemctl --user restart scadshape-web)
+  tools/bench-node.mjs   benchmark a .scad in Node: node tools/bench-node.mjs file.scad [manifold|cgal]
+  tools/browser/smoke.mjs  smoke test in headless Chromium (Playwright):
+                           cd tools/browser && node smoke.mjs [url] [outdir] [--bench]
 
-Bygga
-  cd ~/opt/scadshape && npx tsc --noEmit -p . && node build.mjs
-  Ombyggnad publiceras direkt (dist/ töms men tas inte bort – tjänsten bind-monterar den).
+Building
+  npx tsc --noEmit -p . && node build.mjs
+  A rebuild is published at once (dist/ is emptied but not removed – the service bind-mounts it).
 
-Uppdatera OpenSCAD-WASM
-  Hämta OpenSCAD-<datum>-WebAssembly-web.zip + .sha256 från
-  https://files.openscad.org/snapshots/ i en tom katalog, `sha256sum -c`,
-  packa upp (python3 -I -m zipfile -e zip ut/), ersätt vendor/openscad/openscad.{js,wasm},
-  uppdatera VERSION, kör bench-node + smoke.mjs, bygg.
+Updating OpenSCAD-WASM
+  Download OpenSCAD-<date>-WebAssembly-web.zip + .sha256 from
+  https://files.openscad.org/snapshots/ into an empty directory, `sha256sum -c`,
+  unpack (python3 -I -m zipfile -e zip out/), replace vendor/openscad/openscad.{js,wasm},
+  update VERSION, run bench-node + smoke.mjs, build.
 
-Mätvärden på servern (i5-10500, WASM, Manifold), 2026-10-16
-  platta med 28 hål + sfär   13 416 tri    ~250 ms   (CGAL: ~70 s)
-  kopp                       17 552 tri    ~120 ms
-  tung, 144 sfärer          114 880 tri    ~1,8 s
-  ny instans per rendering   ~35 ms
-  Telefonens värden: data/bench.jsonl (från "Mät"-knappen), förlopp/fel i data/client.jsonl.
+Measurements on the development machine (i5-10500, WASM, Manifold), 2026-10-16
+  plate with 28 holes + sphere   13 416 tri    ~250 ms   (CGAL: ~70 s)
+  cup                            17 552 tri    ~120 ms
+  heavy, 144 spheres            114 880 tri    ~1.8 s
+  new instance per render        ~35 ms
+  The phone's values: data/bench.jsonl (from the "Benchmark" button), progress/errors in data/client.jsonl.
 
-Telefonen (Chrome 155), 2026-10-16
-  3D-vyn: 60 fps när tunga modellen (115k tri) snurrar.
-  OpenSCAD plattan: 0,27 s med JIT – lika snabbt som servern; worker = huvudtråd.
-  VIKTIGT: Chromes "JavaScript-optimering" (V8 optimizer) var avstängd för sidan
-  → allt JS/WASM tolkades och blev ~18–30× långsammare (plattan 4,7 s, tung 33 s).
-  Om det känns segt: kör diag.html (JS-loop ska ta ~20 ms, inte ~1300 ms) och
-  tillåt JavaScript-optimering för sidan i Chrome. APK:ns WebView styr vi själva.
+The phone (Chrome 155), 2026-10-16
+  The 3D view: 60 fps while the heavy model (115k tri) spins.
+  OpenSCAD plate: 0.27 s with JIT – as fast as the development machine; worker = main thread.
+  IMPORTANT: Chrome's "JavaScript optimizer" (V8 optimizer) was turned off for the site
+  → all JS/WASM was interpreted and became ~18–30× slower (plate 4.7 s, heavy 33 s).
+  If it feels sluggish: run diag.html (the JS loop should take ~20 ms, not ~1300 ms) and
+  allow the JavaScript optimizer for the site in Chrome. The APK's WebView is under our own control.

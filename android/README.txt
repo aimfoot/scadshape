@@ -1,64 +1,66 @@
-scadshape för Android – omslag (påbörjat 2026-10-22)
+scadshape for Android – wrapper (started 2026-10-22)
 ====================================================
 
-Webbappen (../dist-bygget) i en WebView, helt offline. Byggs utan Gradle som ~/opt/messenger-web.
+The web app (the ../dist build) in a WebView, fully offline. Built without Gradle.
 
-  ./build.sh            → dist/scadshape.apk (för test: Taildrop) och dist/scadshape.aab (för Play)
-                          (bygger webbappen till build/assets/www, inte ../dist)
-  tailscale file cp dist/scadshape.apk <telefon>:
+  ./build.sh            → dist/scadshape.apk (for testing and GitHub releases) and dist/scadshape.aab (for Play)
+                          (builds the web app into build/assets/www, not ../dist)
+  adb install dist/scadshape.apk   (or copy the APK to the phone some other way)
 
-AAB (2026-10-22): samma kompilering som APK:n. aapt2 länkar en gång till i protobuf-format med
-samma resurs-id:n (--emit-ids/--stable-ids), basmodulen (manifest/, dex/, res/, assets/,
-resources.pb) packas till en AAB med bundletool (~/opt/android-build/bundletool, 1.18.3 från
-github.com/google/bundletool, sha256 kontrollerad) och signeras med jarsigner (SHA256withRSA).
-build.sh kör bundletool validate. Kontrollerat: en universal-APK som bundletool bygger ur AAB:n har
-samma filer, dex och certifikat som APK:n; bara bundletools meta-data i manifestet skiljer.
-Nedladdning från Play ≈ 5,4 MB (bundletool get-size).
-Play App Signing (väljs när appen skapas i Play Console):
-  a) Google skapar appens signeringsnyckel, release.jks blir bara uppladdningsnyckel. Då kan en
-     APK härifrån inte installeras över Play-versionen (olika signatur).
-  b) release.jks laddas upp som appens signeringsnyckel (Googles PEPK-verktyg) och en separat
-     uppladdningsnyckel skapas. Då är APK:er härifrån (GitHub/Obtainium/F-Droid) och Play-versionen
-     utbytbara.
+AAB (2026-10-22): the same compilation as the APK. aapt2 links once more in protobuf format with
+the same resource ids (--emit-ids/--stable-ids), the base module (manifest/, dex/, res/, assets/,
+resources.pb) is packed into an AAB with bundletool (~/opt/android-build/bundletool, 1.18.3 from
+github.com/google/bundletool, sha256 checked) and signed with jarsigner (SHA256withRSA).
+build.sh runs bundletool validate. Checked: a universal APK that bundletool builds from the AAB has
+the same files, dex and certificate as the APK; only bundletool's metadata in the manifest differs.
+Download size from Play ≈ 5.4 MB (bundletool get-size).
+Play App Signing (chosen when the app is created in Play Console):
+  a) Google creates the app's signing key, and release.jks becomes only the upload key. Then an
+     APK from here cannot be installed over the Play version (different signature).
+  b) release.jks is uploaded as the app's signing key (Google's PEPK tool) and a separate
+     upload key is created. Then APKs from here (GitHub/Obtainium/F-Droid) and the Play version
+     are interchangeable.
 
-Version: VERSION_CODE/VERSION_NAME i build.sh – höj VERSION_CODE för varje utskick.
-signing/ = nyckeln. Tappas den går uppdateringar inte att installera över appen (behåll en kopia).
-Paketnamn io.github.aimfoot.scadshape (slutligt sedan 0.3.1, 2026-10-22, första publika
-releasen). Det går inte att byta: ett annat paketnamn är en annan app.
-Releaser: ../tools/release.sh (GitHub-release med APK och SHA-256, se skriptets huvud).
+Version: VERSION_CODE/VERSION_NAME in build.sh – bump VERSION_CODE for every release.
+signing/ = the key. If it is lost, updates cannot be installed over the app (keep a copy).
+Package name io.github.aimfoot.scadshape (final since 0.3.1, 2026-10-22, the first public
+release). It cannot be changed: a different package name is a different app.
+Releases: ../tools/release.sh (GitHub release with the APK and SHA-256, see the script's header).
 
-Inga behörigheter alls, inte ens INTERNET (0.2.0, fungerar på telefonen 2026-10-22).
-Modellerna ligger i IndexedDB (src/kv.ts, sedan 2026-10-22) i WebViews data, som Androids
-automatiska säkerhetskopiering tar med (allowBackup="true"). Uppdateras appen över en äldre version
-flyttas modellerna från localStorage vid första starten.
+No permissions at all, not even INTERNET (0.2.0, works on the phone 2026-10-22).
+The models are kept in IndexedDB (src/kv.ts, since 2026-10-22) in the WebView's data, which Android's
+automatic backup includes (allowBackup="true"). When the app is updated over an older version, the
+models are moved from localStorage at the first start.
 
-Så fungerar det (src/io/github/aimfoot/scadshape/)
-  MainActivity  Filerna serveras från https://appassets.androidplatform.net/ ur assets/www
-                (säkert ursprung: WASM, workers, IndexedDB som på webben). Alla andra adresser
-                får 403 – appen använder aldrig nätet. Länkar ut öppnas i webbläsaren.
-                Kant till kant med padding för system-/tangentbordsrader (som messenger-web).
-                Bryggan window.ScadshapeAndroid:
-                  saveFile  → Hämtade filer (MediaStore, ingen behörighet krävs från Android 10)
-                  shareFile → dela-menyn (cache/share/<namn> via Files, bara senaste delningen)
-                  setBars   → systemradernas färg/ikoner efter appens tema
-                  takeFile  → fil som en annan app öppnade/delade hit (VIEW/SEND)
-                Bakåt: sidan stänger översta dialog/panel/skissläge (src/ui/android.ts back());
-                inget öppet → appen läggs i bakgrunden.
-  Files         ContentProvider för delade filer (inte exporterad, läsrätt per delning).
-Sidans del: src/android.ts (bryggan) och src/ui/android.ts. I webbläsaren finns ingen brygga och
-allt går som förut. Service workern registreras inte i appen.
-Appbygget (SCADSHAPE_VERSION satt) har __DEV_TOOLS__ = false (src/globals.d.ts): mätknappen och all
-kod som skickar loggar/mätningar till servern (api/log, api/bench, serverns adress) tas bort vid
-minifieringen. Kontroll: grep efter "api/" i build/assets/www/*.js ska ge noll träffar.
+How it works (src/io/github/aimfoot/scadshape/)
+  MainActivity  The files are served from https://appassets.androidplatform.net/ out of assets/www
+                (a secure origin: WASM, workers and IndexedDB work as on the web). All other
+                addresses get 403 – the app never uses the network. Outgoing links open in the browser.
+                Edge to edge with padding for the system and keyboard bars.
+                The bridge window.ScadshapeAndroid:
+                  saveFile  → Downloads (MediaStore, no permission needed from Android 10)
+                  shareFile → the share sheet (cache/share/<name> via Files, only the latest share)
+                  setBars   → the system bars' color/icons follow the app's theme
+                  takeFile  → a file that another app opened/shared here (VIEW/SEND)
+                Back: the page closes the topmost dialog/panel/sketch mode (src/ui/android.ts back());
+                nothing open → the app goes to the background.
+                Toasts come from res/values/strings.xml (English) and res/values-sv/ (Swedish),
+                so they follow the phone's language.
+  Files         ContentProvider for shared files (not exported, read access per share).
+The page side: src/android.ts (the bridge) and src/ui/android.ts. In a browser there is no bridge and
+everything works as before. The service worker is not registered in the app.
+The app build (SCADSHAPE_VERSION set) has __DEV_TOOLS__ = false (src/globals.d.ts): the benchmark button
+and all code that sends logs/benchmarks to the server (api/log, api/bench, the server's address) are
+removed during minification. Check: grep for "api/" in build/assets/www/*.js should give zero hits.
 
 Test
-  tools/browser/android.mjs – låtsad brygga mot appens egna filer (se filens huvud). Kontrollerar
-  fil vid start, spara/dela 3MF, bakåt, skissläge, delad STL, mörkt tema, ingen service worker.
-  Riktigt test = på telefonen.
+  tools/browser/android.mjs – a fake bridge against the app's own files (see the file's header). Checks
+  the file at start, save/share 3MF, back, sketch mode, a shared STL, dark theme, no service worker.
+  The real test = on the phone.
 
-Kvar inför Play
-  Välja Play App Signing a/b (se ovan).
-  GPL kräver att källkoden till OpenSCAD-motorn finns att få: "Om" pekar på
-  github.com/openscad/openscad + openscad-wasm; spara gärna en egen kopia av källkoden för den
-  snapshot som ligger i vendor/openscad (2026.10.15) när appen släpps.
-Källkoden: https://github.com/aimfoot/scadshape (publik 2026-10-22, länken i "Om").
+Left before Play
+  Choose Play App Signing a/b (see above).
+  The GPL requires the source code of the OpenSCAD engine to be available: "About" points to
+  github.com/openscad/openscad + openscad-wasm; preferably keep an own copy of the source code for the
+  snapshot in vendor/openscad (2026.10.15) when the app is released.
+Source code: https://github.com/aimfoot/scadshape (public 2026-10-22, the link in "About").

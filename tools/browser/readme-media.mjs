@@ -1,9 +1,10 @@
-// Skärmbilder och GIF:ar till README.md (docs/media/): engelska, ljust tema, telefon på höjden.
-//   node build.mjs --out dist-next
-//   python3 -I -m http.server 8799 --bind 127.0.0.1 --directory dist-next
-//   node readme-media.mjs [url]
-// GIF:arna byggs som en bildserie med bestämd visningstid per bild (inte realtid), så de blir
-// jämna oavsett hur snabbt datorn är. gifenc kodar, pngjs läser skärmbilderna.
+// Screenshots and GIFs for README.md (docs/media/): English, light theme, phone in portrait.
+// node build.mjs --out dist-next
+// python3 -I -m http.server 8799 --bind 127.0.0.1 --directory dist-next
+// node readme-media.mjs [url]
+// The GIFs are built as a series of frames with a fixed display time per frame (not real time), so
+// they come out
+// smooth no matter how fast the computer is. gifenc encodes, pngjs reads the screenshots.
 import { chromium } from 'playwright';
 import gifenc from 'gifenc';
 import { PNG } from 'pngjs';
@@ -34,14 +35,14 @@ async function openExample(page, i) {
   await page.click(`#startExamples button >> nth=${i}`);
   await page.waitForFunction(b => window.__scadshape.doc !== b, before);
   await rendered(page);
-  await page.waitForTimeout(3500); // tills toasten har försvunnit
+  await page.waitForTimeout(3500); // until the toast has disappeared
 }
 
-/** Dialogerna ligger mitt i bilden: flytta upp modellen med två fingrar så att den syns ovanför. */
+/** The dialogs sit in the middle of the picture: move the model up with two fingers so it shows above them. */
 async function liftModel(page, touch, zoomOut = 0) {
   const box = await page.locator('#viewport canvas').boundingBox();
   const c = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  // Två fingrar uppåt (och, med zoomOut, närmare varandra = zooma ut).
+  // Two fingers upward (and, with zoomOut, closer together = zoom out).
   const half = i => 80 - (zoomOut * i) / 8;
   await touch('touchStart', [{ x: c.x - 80, y: c.y }, { x: c.x + 80, y: c.y }]);
   for (let i = 1; i <= 8; i++) await touch('touchMove', [{ x: c.x - half(i), y: c.y - i * 30 }, { x: c.x + half(i), y: c.y - i * 30 }]);
@@ -49,7 +50,7 @@ async function liftModel(page, touch, zoomOut = 0) {
   await page.waitForTimeout(500);
 }
 
-/** Bildserie → GIF. Likadana bilder i följd slås ihop (längre visningstid). */
+/** Frame series → GIF. Identical consecutive frames are merged (longer display time). */
 function recorder(page) {
   const frames = [];
   return {
@@ -60,7 +61,7 @@ function recorder(page) {
       else frames.push({ data: png.data, w: png.width, h: png.height, ms });
     },
     save(name) {
-      // DUMP=<katalog>: spara också bilderna som PNG, för att granska dem.
+      // DUMP=<dir>: also save the frames as PNG, to review them.
       if (process.env.DUMP) frames.forEach((f, i) => {
         const png = new PNG({ width: f.w, height: f.h });
         f.data.copy(png.data);
@@ -73,7 +74,7 @@ function recorder(page) {
       }
       gif.finish();
       writeFileSync(out + name, gif.bytes());
-      console.log(`${name}: ${frames.length} bilder, ${(gif.bytes().length / 1024).toFixed(0)} kB`);
+      console.log(`${name}: ${frames.length} frames, ${(gif.bytes().length / 1024).toFixed(0)} kB`);
     },
   };
 }
@@ -83,7 +84,7 @@ function recorder(page) {
   const { ctx, page, touch } = await session(1);
   const rec = recorder(page);
   await page.waitForTimeout(800);
-  await rec.frame(1600); // startkortet
+  await rec.frame(1600); // the start card
   await page.click('#btnNewSketch');
   await rec.frame(900);
   await page.click('#planeDlg [data-plane="XY"]');
@@ -103,7 +104,7 @@ function recorder(page) {
   await rec.frame(1100);
   await page.click('#btnDone');
   await page.waitForFunction(() => document.body.dataset.mode === 'part');
-  await page.waitForTimeout(4000); // tipset (toast) försvinner – annars ligger det kvar över bilden
+  await page.waitForTimeout(4000); // the tip (toast) disappears – otherwise it stays over the picture
   await rec.frame(700);
   await page.click('#btnExtrude');
   await page.waitForSelector('#featPanel:not([hidden])');
@@ -114,7 +115,7 @@ function recorder(page) {
   await rendered(page);
   await page.waitForTimeout(400);
   await rec.frame(900);
-  // Vrid vyn med ett finger.
+  // Rotate the view with one finger.
   const box = await page.locator('#viewport canvas').boundingBox();
   const c = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   await touch('touchStart', [c]);
@@ -128,11 +129,11 @@ function recorder(page) {
   await ctx.close();
 }
 
-// ---- GIF 2: ändra en variabel ----------------------------------------------------------------------
+// ---- GIF 2: change a variable ----------------------------------------------------------------------
 {
   const { ctx, page, touch } = await session(1);
   await openExample(page, 1); // Mounting plate
-  await liftModel(page, touch, 30); // syns ovanför dialogen, med plats för den längre plattan
+  await liftModel(page, touch, 30); // shows above the dialog, with room for the longer plate
   const rec = recorder(page);
   await rec.frame(1500);
   await page.click('#btnParams');
@@ -157,7 +158,7 @@ function recorder(page) {
   await ctx.close();
 }
 
-// ---- Skärmbilder ------------------------------------------------------------------------------------
+// ---- Screenshots ------------------------------------------------------------------------------------
 {
   const { ctx, page, touch } = await session(1.5);
   const shot = async name => { await page.waitForTimeout(300); await page.screenshot({ path: out + name }); console.log(name); };
@@ -169,14 +170,14 @@ function recorder(page) {
 
   await openExample(page, 1); // Mounting plate
   if (await page.isHidden('#tree')) await page.click('#btnTree');
-  await page.locator('#featureList button.feature').first().click(); // första skissen
+  await page.locator('#featureList button.feature').first().click(); // the first sketch
   await page.waitForFunction(() => window.__scadshape.editor?.solverReady, null, { timeout: 15000 });
   await page.waitForTimeout(600);
   await shot('sketch.png');
   await page.click('#btnDone');
   await rendered(page);
 
-  // Featurepanelen (stående: nertill) – modellen flyttas upp ovanför den.
+  // The feature panel (portrait: at the bottom) – the model is moved up above it.
   if (await page.isHidden('#tree')) await page.click('#btnTree');
   await page.locator('#featureList button.feature', { hasText: 'Hole' }).click();
   await page.waitForSelector('#featPanel:not([hidden])');
@@ -186,7 +187,7 @@ function recorder(page) {
 
   await page.click('[data-view="iso"]');
   await page.click('#btnFit');
-  await liftModel(page, touch); // exportdialogen ligger mitt i bilden
+  await liftModel(page, touch); // the export dialog sits in the middle of the picture
   await page.click('#btnExport');
   await page.waitForSelector('#exDownload:not([disabled])', { timeout: 60000 });
   await shot('export.png');
@@ -194,5 +195,5 @@ function recorder(page) {
 }
 
 await browser.close();
-console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga sidfel.');
+console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No page errors.');
 if (errors.length) process.exit(1);

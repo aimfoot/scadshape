@@ -1,12 +1,12 @@
-// Fas 2-test: villkor och mått med pekhändelser (CDP) i headless Chromium.
-//   node constraints.mjs [url] [utkatalog]
+// Phase 2 test: constraints and dimensions with touch events (CDP) in headless Chromium.
+// node constraints.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 const url = process.argv[2] ?? 'http://127.0.0.1:8799/';
 const out = process.argv[3] ?? '.';
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
 const errors = [];
-const ctx = await browser.newContext({ viewport: { width: 915, height: 412 }, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, locale: 'sv-SE' });
+const ctx = await browser.newContext({ viewport: { width: 915, height: 412 }, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, locale: 'en-US' });
 const page = await ctx.newPage();
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => m.type() === 'error' && errors.push(m.text()));
@@ -32,71 +32,71 @@ const info = () => page.textContent('#loopInfo');
 const pts = () => page.evaluate(() => Object.values(window.__scadshape.editor.sketch.points).map(p => [Math.round(p.x * 1000) / 1000, Math.round(p.y * 1000) / 1000]));
 const hasPt = async (x, y) => (await pts()).some(([px, py]) => Math.abs(px - x) < 1e-3 && Math.abs(py - y) < 1e-3);
 const ctxLabels = () => page.$$eval('#ctxbar button', bs => bs.map(b => b.textContent.slice(1)));
-const ctxClick = async label => { const i = (await ctxLabels()).indexOf(label); assert.ok(i >= 0, `${label} saknas: ${await ctxLabels()}`); await page.locator('#ctxbar button').nth(i).click(); };
+const ctxClick = async label => { const i = (await ctxLabels()).indexOf(label); assert.ok(i >= 0, `${label} missing: ${await ctxLabels()}`); await page.locator('#ctxbar button').nth(i).click(); };
 const setDim = async v => { await page.waitForSelector('#dimDlg[open]'); await page.fill('#dimValue', v); await page.click('#dimDlg button[type=submit]'); };
 
-// 1. Rektangel från origo
+// 1. Rectangle from the origin
 await page.click('[data-tool="rect"]');
 await drag({ x: 0, y: 0 }, { x: 30, y: 20 });
-assert.match(await info(), /2 frihetsgrader/, await info());
-console.log('rektangel:', await info());
+assert.match(await info(), /2 degrees of freedom/, await info());
+console.log('rectangle:', await info());
 
-// 2. Mått: bredd 40, höjd 25/2+5
+// 2. Dimensions: width 40, height 25/2+5
 await page.click('[data-tool="select"]');
 await tap({ x: 15, y: 0 });
-assert.deepEqual(await ctxLabels(), ['Vågrät', 'Lodrät', 'Mått']);
-await ctxClick('Mått');
+assert.deepEqual(await ctxLabels(), ['Horizontal', 'Vertical', 'Dimension']);
+await ctxClick('Dimension');
 assert.equal(await page.inputValue('#dimValue'), '30');
 await setDim('40');
 assert.ok(await hasPt(40, 0), JSON.stringify(await pts()));
 await tap({ x: 40, y: 10 });
-await ctxClick('Mått');
+await ctxClick('Dimension');
 await setDim('25/2+5');
 assert.ok(await hasPt(40, 17.5), JSON.stringify(await pts()));
-assert.match(await info(), /Fullt definierad/);
-console.log('mått:', await info());
+assert.match(await info(), /Fully defined/);
+console.log('dimensions:', await info());
 await page.screenshot({ path: `${out}/c-rect.png` });
 
-// 3. Överflödigt mått avvisas
+// 3. A redundant dimension is rejected
 await tap({ x: 20, y: 17.5 });
-await ctxClick('Mått');
+await ctxClick('Dimension');
 await page.waitForSelector('#toast:not([hidden])');
-assert.match(await page.textContent('#toast'), /Överflödigt/);
+assert.match(await page.textContent('#toast'), /Redundant/);
 assert.equal(await page.isVisible('#dimDlg'), false);
-console.log('överflödigt:', await page.textContent('#toast'));
-await tap({ x: 20, y: 60 }); // avmarkera (tom yta)
+console.log('redundant:', await page.textContent('#toast'));
+await tap({ x: 20, y: 60 }); // deselect (empty area)
 
-// 4. Cirkel som tangerar högerkanten, radie 6
+// 4. Circle tangent to the right edge, radius 6
 await page.click('[data-tool="circle"]');
 await tap({ x: 60, y: 10 }); await tap({ x: 65, y: 10 });
 await page.click('[data-tool="select"]');
-await tap({ x: 60, y: 15 }); // cirkelns kant
-await tap({ x: 40, y: 5 }); // högerkanten
+await tap({ x: 60, y: 15 }); // the circle's edge
+await tap({ x: 40, y: 5 }); // the right edge
 assert.ok((await ctxLabels()).includes('Tangent'), String(await ctxLabels()));
 await ctxClick('Tangent');
 const circ = () => page.evaluate(() => { const sk = window.__scadshape.editor.sketch; const c = Object.values(sk.entities).find(e => e.type === 'circle'); return { x: sk.points[c.c].x, y: sk.points[c.c].y, r: c.r }; });
 let c = await circ();
 assert.ok(Math.abs(Math.abs(c.x - 40) - c.r) < 1e-4, JSON.stringify(c));
 await tap({ x: c.x, y: c.y + c.r });
-await ctxClick('Mått');
+await ctxClick('Dimension');
 await page.waitForSelector('#dimDlg[open]');
 assert.equal(await page.textContent('#dimTitle'), 'Diameter');
 await page.click('[data-rd="radius"]');
 await setDim('6');
 c = await circ();
 assert.ok(Math.abs(c.r - 6) < 1e-6 && Math.abs(c.x - 46) < 1e-4, JSON.stringify(c));
-console.log('tangent + radie:', JSON.stringify(c));
+console.log('tangent + radius:', JSON.stringify(c));
 
-// 5. Dra cirkelns centrum: förblir tangent
+// 5. Drag the circle's center: stays tangent
 await drag({ x: c.x, y: c.y }, { x: c.x + 10, y: c.y + 4 });
 const c2 = await circ();
-assert.ok(Math.abs(c2.x - 46) < 1e-3 && c2.y > c.y + 2, 'centrum glider längs kanten (rutnätssnäpp): ' + JSON.stringify(c2));
+assert.ok(Math.abs(c2.x - 46) < 1e-3 && c2.y > c.y + 2, 'the center slides along the edge (grid snap): ' + JSON.stringify(c2));
 console.log('drag:', JSON.stringify(c2));
 await page.screenshot({ path: `${out}/c-tangent.png` });
 
-// 6. Tryck på ett mått → dialog → ta bort → ångra
+// 6. Tap a dimension → dialog → delete → undo
 const spots = await page.evaluate(() => window.__scadshape.editor.hotspots.filter(h => h.dim));
-assert.ok(spots.length >= 3, `${spots.length} måttetiketter`);
+assert.ok(spots.length >= 3, `${spots.length} dimension labels`);
 const r = await page.evaluate(() => window.__scadshape.editor.canvas.getBoundingClientRect().toJSON());
 const s0 = spots[0];
 const cnt = () => page.evaluate(() => window.__scadshape.editor.sketch.constraints.length);
@@ -105,17 +105,17 @@ await touch('touchStart', [{ x: r.left + s0.x + s0.w / 2, y: r.top + s0.y + s0.h
 await page.waitForSelector('#dimDlg[open]');
 await page.click('#dimDelete');
 assert.equal(await cnt(), n0 - 1);
-assert.doesNotMatch(await info(), /Fullt definierad/);
+assert.doesNotMatch(await info(), /Fully defined/);
 await page.click('#btnUndo');
 assert.equal(await cnt(), n0);
-console.log('ta bort + ångra ok:', await info());
+console.log('delete + undo ok:', await info());
 
-// 7. Klar → 3D
+// 7. Done → 3D
 await page.click('#btnDone');
 await page.click('#btnExtrude');
 await page.waitForSelector('#featPanel:not([hidden])');
 await page.click('#fpOk');
-await page.waitForFunction(() => /trianglar|Fel/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
+await page.waitForFunction(() => /triangles|Error/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
 console.log('3D:', await page.textContent('#status'));
 await browser.close();
-console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga konsolfel. Alla kontroller ok.');
+console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');

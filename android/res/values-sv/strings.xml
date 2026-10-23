@@ -1,0 +1,4 @@
+<resources>
+    <string name="no_app_for_link">Ingen app kan öppna länken</string>
+    <string name="cannot_open_file">Kunde inte öppna filen</string>
+</resources>

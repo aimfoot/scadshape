@@ -1,4 +1,4 @@
-# Beroenden och byggen
+# Dependencies and builds
 node_modules
 dist/
 dist-next/
@@ -6,17 +6,17 @@ android/build/
 android/dist/
 tests/out/
 
-# Lokalt: signeringsnyckeln, loggar/mätningar från telefonen, egna testfiler, driftanteckningar
+# Local only: the signing key, logs/benchmarks from the phone, private test files, hosting notes
 android/signing
 data/
 tests/private/
 *.local.txt
 
-# Testernas utdata (skärmbilder, exporterade filer) hamnar bredvid skripten om ingen utkatalog anges
+# The tests' output (screenshots, exported files) ends up next to the scripts when no output dir is given
 tools/browser/*
 !tools/browser/*.mjs
 !tools/browser/package.json
 !tools/browser/package-lock.json
 
-# Claude Codes worktrees
+# Claude Code's worktrees
 .claude/

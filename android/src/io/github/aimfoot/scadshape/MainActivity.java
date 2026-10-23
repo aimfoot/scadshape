@@ -45,16 +45,16 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * scadshape offline: webbappen (assets/www, byggd av build.sh) i en WebView. Filerna serveras från
- * https://appassets.androidplatform.net/ (säkert ursprung: WASM, workers, IndexedDB fungerar som på
- * webben); allt annat nät blockeras. Bryggan ScadshapeAndroid (src/android.ts på webbsidan) sparar
- * och delar filer, färgar systemraderna och lämnar över filer som andra appar öppnar.
+ * scadshape offline: the web app (assets/www, built by build.sh) in a WebView. The files are served from
+ * https://appassets.androidplatform.net/ (a secure origin: WASM, workers and IndexedDB work as on the
+ * web); all other network access is blocked. The bridge ScadshapeAndroid (src/android.ts on the page side)
+ * saves and shares files, colors the system bars and hands over files that other apps open.
  */
 public class MainActivity extends Activity {
     static final String HOST = "appassets.androidplatform.net";
     static final String HOME = "https://" + HOST + "/index.html";
     static final int REQ_FILE = 1;
-    static final long MAX_IN = 64L << 20; // samma storleksordning som importens STL-gräns
+    static final long MAX_IN = 64L << 20; // the same order of magnitude as the import's STL limit
     static final Map<String, String> MIME = new HashMap<>();
 
     static {
@@ -76,7 +76,7 @@ public class MainActivity extends Activity {
     WebView web;
     FrameLayout root;
     ValueCallback<Uri[]> fileCallback;
-    volatile String pendingFile = ""; // JSON { name, data } tills sidan hämtar den (takeFile)
+    volatile String pendingFile = ""; // JSON { name, data } until the page fetches it (takeFile)
 
     @Override
     protected void onCreate(Bundle state) {
@@ -93,11 +93,11 @@ public class MainActivity extends Activity {
         handleIntent(getIntent());
     }
 
-    @SuppressWarnings("deprecation") // setDecorFitsSystemWindows: behövs för Android 11–14
+    @SuppressWarnings("deprecation") // setDecorFitsSystemWindows: needed for Android 11–14
     void applyInsets(View v) {
         if (Build.VERSION.SDK_INT >= 30) {
-            // Kant till kant (tvingas från Android 15) och padding för hand, så att verktygsraden
-            // inte hamnar under statusraden och fälten hålls ovanför tangentbordet.
+            // Edge to edge (forced from Android 15) and padding by hand, so the toolbar does not
+            // end up under the status bar and the fields stay above the keyboard.
             getWindow().setDecorFitsSystemWindows(false);
             v.setOnApplyWindowInsetsListener((view, ins) -> {
                 Insets i = ins.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.ime() | WindowInsets.Type.displayCutout());
@@ -115,14 +115,14 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
-        s.setSupportZoom(false); // appen har egna pekgester
+        s.setSupportZoom(false); // the app has its own touch gestures
         s.setMediaPlaybackRequiresUserGesture(true);
         web.addJavascriptInterface(new Bridge(), "ScadshapeAndroid");
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
     }
 
-    // --- Appens filer ---
+    // --- The app's files ---
 
     static String ext(String path) {
         int slash = path.lastIndexOf('/'), dot = path.lastIndexOf('.');
@@ -154,7 +154,7 @@ public class MainActivity extends Activity {
         public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
             Uri u = r.getUrl();
             if ("https".equals(u.getScheme()) && HOST.equals(u.getHost())) return asset(u);
-            // data:/blob: hanterar WebView själv; nätet används aldrig.
+            // WebView handles data:/blob: itself; the network is never used.
             String scheme = u.getScheme();
             if ("data".equals(scheme) || "blob".equals(scheme)) return null;
             return status(403, "Offline");
@@ -170,7 +170,7 @@ public class MainActivity extends Activity {
 
         @Override
         public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail detail) {
-            // Renderaren dog (oftast minnet): starta om sidan. Modellen ligger sparad i sidans lagring.
+            // The renderer died (usually memory): restart the page. The model is saved in the page's storage.
             ((ViewGroup) v.getParent()).removeView(v);
             v.destroy();
             recreate();
@@ -184,11 +184,11 @@ public class MainActivity extends Activity {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE));
         } catch (ActivityNotFoundException e) {
-            Toast.makeText(this, "Ingen app kan öppna länken", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.no_app_for_link, Toast.LENGTH_SHORT).show();
         }
     }
 
-    // --- Filväljare (<input type=file>) ---
+    // --- File chooser (<input type=file>) ---
 
     class Chrome extends WebChromeClient {
         @Override
@@ -212,9 +212,9 @@ public class MainActivity extends Activity {
         fileCallback = null;
     }
 
-    // --- Bryggan till sidan (anropas på WebViews JavaBridge-tråd) ---
+    // --- The bridge to the page (called on WebView's JavaBridge thread) ---
 
-    /** Bara ett filnamn: inga kataloger, inget som börjar med punkt. */
+    /** Only a file name: no directories, nothing that starts with a dot. */
     static String safeName(String name) {
         String n = name.replaceAll("[\\\\/:*?\"<>|\\x00-\\x1f]+", "_").trim();
         while (n.startsWith(".")) n = n.substring(1);
@@ -229,7 +229,7 @@ public class MainActivity extends Activity {
                 String n = safeName(name);
                 ContentValues cv = new ContentValues();
                 cv.put(MediaStore.MediaColumns.DISPLAY_NAME, n);
-                // MediaStore lägger annars till ett eget filändelse för typer den inte känner till.
+                // Otherwise MediaStore adds its own file extension for types it does not know.
                 cv.put(MediaStore.MediaColumns.MIME_TYPE, Files.mime(n));
                 cv.put(MediaStore.MediaColumns.IS_PENDING, 1);
                 ContentResolver cr = getContentResolver();
@@ -252,7 +252,7 @@ public class MainActivity extends Activity {
             try {
                 File dir = Files.dir(MainActivity.this);
                 File[] old = dir.listFiles();
-                if (old != null) for (File f : old) f.delete(); // bara den senaste delningen ligger kvar
+                if (old != null) for (File f : old) f.delete(); // only the latest share is kept
                 if (!dir.isDirectory() && !dir.mkdirs()) return "cache";
                 File f = new File(dir, safeName(name));
                 try (OutputStream out = new FileOutputStream(f)) {
@@ -296,7 +296,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    // --- Filer som andra appar öppnar eller delar till appen ---
+    // --- Files that other apps open or share to the app ---
 
     void handleIntent(Intent i) {
         if (i == null) return;
@@ -313,10 +313,10 @@ public class MainActivity extends Activity {
                 o.put("name", name);
                 o.put("data", Base64.getEncoder().encodeToString(bytes));
                 pendingFile = o.toString();
-                // Laddad sida hämtar filen direkt; annars gör initAndroid() det när den startar.
+                // A loaded page fetches the file right away; otherwise initAndroid() does it when it starts.
                 runOnUiThread(() -> web.evaluateJavascript("window.scadshapeOpenPending && scadshapeOpenPending()", null));
             } catch (IOException | JSONException | SecurityException e) {
-                runOnUiThread(() -> Toast.makeText(this, "Kunde inte öppna filen", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> Toast.makeText(this, R.string.cannot_open_file, Toast.LENGTH_SHORT).show());
             }
         }).start();
     }
@@ -330,20 +330,20 @@ public class MainActivity extends Activity {
         try (Cursor c = getContentResolver().query(u, new String[] {OpenableColumns.DISPLAY_NAME}, null, null, null)) {
             if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getString(0);
         } catch (Exception ignored) {
-            // inte alla källor svarar på query
+            // not every source answers query
         }
         String last = u.getLastPathSegment();
-        return last != null ? last.substring(last.lastIndexOf('/') + 1) : "fil";
+        return last != null ? last.substring(last.lastIndexOf('/') + 1) : "file";
     }
 
     byte[] read(Uri u) throws IOException {
         try (InputStream in = getContentResolver().openInputStream(u)) {
-            if (in == null) throw new IOException("ingen data");
+            if (in == null) throw new IOException("no data");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buf = new byte[1 << 16];
             for (int n; (n = in.read(buf)) > 0; ) {
                 out.write(buf, 0, n);
-                if (out.size() > MAX_IN) throw new IOException("för stor");
+                if (out.size() > MAX_IN) throw new IOException("too large");
             }
             return out.toByteArray();
         }
@@ -356,10 +356,10 @@ public class MainActivity extends Activity {
         handleIntent(i);
     }
 
-    // --- Bakåt och livscykel ---
+    // --- Back and lifecycle ---
 
     void goBack() {
-        // Sidan stänger det översta (dialog, panel, skissläge …); finns inget öppet går appen i bakgrunden.
+        // The page closes the topmost thing (dialog, panel, sketch mode …); if nothing is open the app goes to the background.
         web.evaluateJavascript("window.scadshapeBack ? scadshapeBack() : false", v -> {
             if (!"true".equals(v)) moveTaskToBack(true);
         });
@@ -368,7 +368,7 @@ public class MainActivity extends Activity {
     @Override
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        goBack(); // Android 12 och äldre; nyare använder återanropet i onCreate
+        goBack(); // Android 12 and older; newer ones use the callback in onCreate
     }
 
     @Override

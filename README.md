@@ -17,8 +17,7 @@ printer apps such as Bambu Handy can't slice files themselves.
 </p>
 <p align="center"><em>Sketch → part in a few taps · change a variable and the model follows</em></p>
 
-> Status: early. The user interface is Swedish and English; the developer notes in `README.txt`
-> are in Swedish.
+> Status: early. The user interface is English and Swedish.
 
 ## Screenshots
 

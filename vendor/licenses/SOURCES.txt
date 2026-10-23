@@ -1,4 +1,4 @@
-Hämtat 2026-10-22. SPDX-texterna (GPL, LGPL, MPL, Apache, BSL) från /usr/share/licenses/spdx.
+Fetched 2026-10-22. The SPDX texts (GPL, LGPL, MPL, Apache, BSL) from /usr/share/licenses/spdx.
 openscad             https://raw.githubusercontent.com/openscad/openscad/04834adb1ba3c9a6e4160747c91cbadbce9c37b3/COPYING
 manifold             https://raw.githubusercontent.com/elalish/manifold/master/LICENSE
 clipper2             https://raw.githubusercontent.com/AngusJohnson/Clipper2/main/LICENSE

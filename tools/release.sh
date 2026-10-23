@@ -1,11 +1,11 @@
 #!/bin/sh
-# GitHub-release av Android-appen: bygger (android/build.sh), taggar v<version> och skapar en release
-# på github.com/aimfoot/scadshape med APK:n, dess SHA-256 och signeringscertifikatets fingeravtryck.
-#   tools/release.sh             allt (ren arbetskopia på main, pushad, taggen får inte finnas)
-#   tools/release.sh --dry-run   bara bygg och visa releasetexten
-# Releasetexten: android/release-notes/<version>.md (version = VERSION_NAME i android/build.sh).
-# Token: en fine-grained GitHub-token med "Contents: Read and write" för bara det här förrådet, i
-# ~/.config/scadshape/github-token (chmod 600). Den skrivs aldrig ut och hamnar inte på kommandoraden.
+# GitHub release of the Android app: builds (android/build.sh), tags v<version> and creates a release
+# on github.com/aimfoot/scadshape with the APK, its SHA-256 and the signing certificate's fingerprint.
+#   tools/release.sh             everything (clean working copy on main, pushed, the tag must not exist)
+#   tools/release.sh --dry-run   only build and show the release text
+# The release text: android/release-notes/<version>.md (version = VERSION_NAME in android/build.sh).
+# Token: a fine-grained GitHub token with "Contents: Read and write" for this repository only, in
+# ~/.config/scadshape/github-token (chmod 600). It is never printed and never ends up on the command line.
 set -eu
 cd "$(dirname "$0")/.."
 REPO=aimfoot/scadshape
@@ -17,14 +17,14 @@ DRY=0
 VERSION=$(sed -n 's/^VERSION_NAME=//p' android/build.sh)
 TAG=v$VERSION
 NOTES=android/release-notes/$VERSION.md
-[ -f "$NOTES" ] || { echo "Saknar $NOTES" >&2; exit 1; }
+[ -f "$NOTES" ] || { echo "Missing $NOTES" >&2; exit 1; }
 if [ "$DRY" = 0 ]; then
-    [ -z "$(git status --porcelain)" ] || { echo "Arbetskopian är inte ren" >&2; exit 1; }
-    [ "$(git branch --show-current)" = main ] || { echo "Inte på main" >&2; exit 1; }
+    [ -z "$(git status --porcelain)" ] || { echo "The working copy is not clean" >&2; exit 1; }
+    [ "$(git branch --show-current)" = main ] || { echo "Not on main" >&2; exit 1; }
     git fetch -q origin main
-    [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main är inte pushad" >&2; exit 1; }
-    if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "$TAG finns redan" >&2; exit 1; fi
-    [ -f "$TOKEN_FILE" ] || { echo "Saknar token: $TOKEN_FILE" >&2; exit 1; }
+    [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main is not pushed" >&2; exit 1; }
+    if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "$TAG already exists" >&2; exit 1; fi
+    [ -f "$TOKEN_FILE" ] || { echo "Missing token: $TOKEN_FILE" >&2; exit 1; }
 fi
 
 android/build.sh
@@ -40,12 +40,12 @@ trap 'rm -f "$BODY"' EXIT
     printf '\n---\n\n| | SHA-256 |\n|---|---|\n| `%s` | `%s` |\n| Signing certificate | `%s` |\n' "$APK" "$SHA" "$CERT"
 } > "$BODY"
 if [ "$DRY" = 1 ]; then
-    echo "--- $TAG (torrkörning, inget laddas upp) ---"
+    echo "--- $TAG (dry run, nothing is uploaded) ---"
     cat "$BODY"
     exit 0
 fi
 
-# Token bara i en tillfällig headerfil (chmod 600), aldrig som argument.
+# The token only in a temporary header file (chmod 600), never as an argument.
 HDR=$(mktemp)
 trap 'rm -f "$BODY" "$HDR"' EXIT
 chmod 600 "$HDR"

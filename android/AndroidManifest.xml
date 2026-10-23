@@ -2,8 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.aimfoot.scadshape">
 
-    <!-- Ingen nätbehörighet (sedan 2026-10-22): appens filer serveras ur APK:n via
-         shouldInterceptRequest, och allt annat blockeras där ändå. -->
+    <!-- No network permission (since 2026-10-22): the app's files are served from the APK via
+         shouldInterceptRequest, and everything else is blocked there anyway. -->
 
     <application
         android:label="@string/app_name"
@@ -23,8 +23,8 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Öppna/dela modeller, STL, SVG och OpenSCAD-kod till appen. Filhanterare skickar ofta
-                 .scad och .stl som octet-stream eller text/plain. -->
+            <!-- Open/share models, STL, SVG and OpenSCAD code to the app. File managers often send
+                 .scad and .stl as octet-stream or text/plain. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.SEND" />

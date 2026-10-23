@@ -1,8 +1,8 @@
-# systemd user service för den publika scadshape-webben (bakom Cloudflare-tunneln):
+# systemd user service for the public scadshape web (behind the Cloudflare tunnel):
 #   cp scadshape-public.service ~/.config/systemd/user/ && systemctl --user enable --now scadshape-public
-# Lyssnar bara på 127.0.0.1:8791 (nås utifrån först när tunneln pekar hit). Samma dist/ som utvecklingsservern.
+# Listens only on 127.0.0.1:8791 (reachable from outside once the tunnel points here). Same dist/ as the development server.
 [Unit]
-Description=scadshape publik webb (för Cloudflare-tunneln) på 127.0.0.1:8791
+Description=scadshape public web (for the Cloudflare tunnel) on 127.0.0.1:8791
 
 [Service]
 Environment=SCADSHAPE_PUBLIC=1 SCADSHAPE_HOST=127.0.0.1 SCADSHAPE_PORT=8791
@@ -10,7 +10,7 @@ ExecStart=/usr/bin/python3 -I %h/opt/scadshape/serve.py
 Restart=always
 RestartSec=5
 
-# Skydd: processen ser bara serve.py och dist/ (skrivskyddat) av hemkatalogen; inget skrivbart.
+# Hardening: of the home directory the process only sees serve.py and dist/ (read-only); nothing writable.
 ProtectHome=tmpfs
 BindReadOnlyPaths=%h/opt/scadshape/serve.py %h/opt/scadshape/dist
 ProtectSystem=strict

@@ -1,17 +1,17 @@
-# systemd user service för scadshape (utvecklingsversion), bara över Tailscale:
+# systemd user service for scadshape (development version), Tailscale only:
 #   cp scadshape-web.service ~/.config/systemd/user/ && systemctl --user enable --now scadshape-web
-# Lyssnar på 127.0.0.1:8790. För att nå den från telefonen: en drop-in med Tailscale-IP:n, t.ex.
+# Listens on 127.0.0.1:8790. To reach it from the phone: a drop-in with the Tailscale IP, e.g.
 #   ~/.config/systemd/user/scadshape-web.service.d/host.conf:  [Service]  Environment=SCADSHAPE_HOST=<ip>
-# Startar den innan Tailscale har sin IP så startar den om tills det går.
+# If it starts before Tailscale has its IP, it restarts until it works.
 [Unit]
-Description=scadshape webb (utveckling) på port 8790
+Description=scadshape web (development) on port 8790
 
 [Service]
 ExecStart=/usr/bin/python3 %h/opt/scadshape/serve.py
 Restart=always
 RestartSec=5
 
-# Skydd: processen ser bara serve.py, dist/ (skrivskyddat) och data/ (mätresultat) av hemkatalogen.
+# Hardening: of the home directory the process only sees serve.py, dist/ (read-only) and data/ (benchmark results).
 ProtectHome=tmpfs
 BindReadOnlyPaths=%h/opt/scadshape/serve.py %h/opt/scadshape/dist
 BindPaths=%h/opt/scadshape/data

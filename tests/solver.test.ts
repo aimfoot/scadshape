@@ -1,4 +1,4 @@
-// Enhetstester för villkorslösaren (planegcs-WASM i Node).
+// Unit tests for the constraint solver (planegcs WASM in Node).
 import { setLang } from '../src/i18n';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -9,7 +9,7 @@ import { arcGeom } from '../src/sketch/model';
 import { evalExpr } from '../src/expr';
 import { cornersFor, cutCorners, defaultCornerSize } from '../src/sketch/fillet';
 import { findLoops } from '../src/sketch/regions';
-setLang('sv'); // testerna förväntar sig svenska namn och fel
+setLang('en'); // the tests expect English names and errors
 
 const near = (a: number, b: number, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} ≉ ${b}`);
 let n = 0;
@@ -19,7 +19,7 @@ const solver = await loadSolver(process.env.WASM);
 function pt(sk: SketchData, x: number, y: number) { const id = newId(sk, 'p'); sk.points[id] = { x, y }; return id; }
 function line(sk: SketchData, p1: string, p2: string) { const id = newId(sk, 'e'); sk.entities[id] = { type: 'line', p1, p2 }; return id; }
 function con(sk: SketchData, c: NewConstraint) { const id = newId(sk, 'c'); sk.constraints.push({ ...c, id } as Constraint); return id; }
-/** Sned rektangel med H/V-villkor (som rektangelverktyget). */
+/** Slanted rectangle with H/V constraints (like the rectangle tool). */
 function rect(sk: SketchData) {
   const p = [pt(sk, 0.5, -0.3), pt(sk, 21, 1), pt(sk, 19, 11), pt(sk, 1, 9)];
   const l = [line(sk, p[0], p[1]), line(sk, p[1], p[2]), line(sk, p[2], p[3]), line(sk, p[3], p[0])];
@@ -32,18 +32,18 @@ const isRect = (sk: SketchData, p: string[]) => {
   near(a.y, b.y); near(b.x, c.x); near(c.y, d.y); near(d.x, a.x);
 };
 
-await test('uttryck', () => {
+await test('expressions', () => {
   assert.equal(evalExpr('20'), 20); assert.equal(evalExpr('12,5'), 12.5); assert.equal(evalExpr('20/2 + 5'), 15);
   assert.equal(evalExpr('(3+4)*2'), 14); assert.equal(evalExpr('-3+10'), 7); assert.equal(evalExpr('10 mm'), 10);
   assert.equal(evalExpr('2*'), null); assert.equal(evalExpr('abc'), null); assert.equal(evalExpr(''), null);
 });
-await test('rektangel rätas upp, 4 frihetsgrader, allt fritt', () => {
+await test('the rectangle straightens up, 4 degrees of freedom, everything free', () => {
   const sk = emptySketch(); const { p } = rect(sk);
   const r = solver.solve(sk);
   assert.ok(r.ok); assert.equal(r.dof, 4); isRect(sk, p);
   assert.equal(solver.freedom(sk).points.size, 4);
 });
-await test('fixerat hörn + bredd + höjd = fullt bestämd', () => {
+await test('fixed corner + width + height = fully defined', () => {
   const sk = emptySketch(); const { p } = rect(sk);
   con(sk, { type: 'fix', p: p[0] });
   con(sk, { type: 'distance', p1: p[0], p2: p[1], dir: 'aligned', value: 30 });
@@ -53,29 +53,29 @@ await test('fixerat hörn + bredd + höjd = fullt bestämd', () => {
   near(sk.points[p[1]].x - sk.points[p[0]].x, 30, 1e-6);
   assert.equal(solver.freedom(sk).points.size, 0);
 });
-await test('motstridigt mått avvisas och pekar ut villkoren', () => {
+await test('a conflicting dimension is rejected and points out the constraints', () => {
   const sk = emptySketch(); const { p } = rect(sk);
   con(sk, { type: 'distance', p1: p[0], p2: p[1], dir: 'aligned', value: 30 });
   const bad = con(sk, { type: 'distance', p1: p[2], p2: p[3], dir: 'aligned', value: 25 });
   const before = JSON.stringify(sk);
   const r = solver.solve(sk);
   assert.equal(r.ok, false); assert.ok(r.conflicting.includes(bad));
-  assert.equal(JSON.stringify(sk), before, 'skissen orörd');
+  assert.equal(JSON.stringify(sk), before, 'the sketch untouched');
 });
-await test('överflödigt villkor rapporteras', () => {
+await test('a redundant constraint is reported', () => {
   const sk = emptySketch(); const { l } = rect(sk);
   con(sk, { type: 'parallel', e1: l[0], e2: l[2] });
   const r = solver.solve(sk);
   assert.ok(r.redundant.length > 0, JSON.stringify(r));
 });
-await test('dra ett hörn: rektangeln förblir rektangel', () => {
+await test('drag a corner: the rectangle stays a rectangle', () => {
   const sk = emptySketch(); const { p } = rect(sk);
   solver.solve(sk);
   const r = solver.solve(sk, { points: [{ id: p[2], x: 40, y: 25 }] });
   assert.ok(r.ok); isRect(sk, p);
   near(sk.points[p[2]].x, 40, 1e-3); near(sk.points[p[2]].y, 25, 1e-3);
 });
-await test('dra mot omöjligt mål: villkoren håller ändå', () => {
+await test('drag towards an impossible target: the constraints still hold', () => {
   const sk = emptySketch(); const { p } = rect(sk);
   con(sk, { type: 'fix', p: p[0] });
   con(sk, { type: 'distance', p1: p[0], p2: p[1], dir: 'aligned', value: 30 });
@@ -83,7 +83,7 @@ await test('dra mot omöjligt mål: villkoren håller ändå', () => {
   solver.solve(sk, { points: [{ id: p[1], x: 50, y: 20 }] });
   isRect(sk, p); near(sk.points[p[1]].x - sk.points[p[0]].x, 30, 1e-5);
 });
-await test('tangent linje–båge i gemensam ändpunkt', () => {
+await test('tangent line–arc at a shared end point', () => {
   const sk = emptySketch();
   const a = pt(sk, 0, 0), b = pt(sk, 20, 0), c = pt(sk, 22, 8), e = pt(sk, 30, 12);
   const L = line(sk, a, b);
@@ -91,13 +91,14 @@ await test('tangent linje–båge i gemensam ändpunkt', () => {
   con(sk, { type: 'tangent', e1: L, e2: A });
   assert.ok(solver.solve(sk).ok);
   const g = arcGeom(sk, sk.entities[A] as never);
-  // Radien vid b ska vara vinkelrät mot linjen.
+  // The radius at b must be perpendicular to the line.
   const rv = { x: sk.points[b].x - g.c.x, y: sk.points[b].y - g.c.y }, lv = { x: sk.points[b].x - sk.points[a].x, y: sk.points[b].y - sk.points[a].y };
   near((rv.x * lv.x + rv.y * lv.y) / (Math.hypot(rv.x, rv.y) * Math.hypot(lv.x, lv.y)), 0, 1e-5);
-  // Linje (4) + båge (centrum 2, radie, två vinklar; ändpunkten delad) − arc_rules (4) … − tangens = 6
+  // Line (4) + arc (center 2, radius, two angles; end point shared) − arc_rules (4) … − tangency =
+  // 6
   assert.equal(solver.solve(sk).dof, 6);
 });
-await test('slits (två bågar + två linjer, tangenta, lika radier) har 5 frihetsgrader', () => {
+await test('slot (two arcs + two lines, tangent, equal radii) has 5 degrees of freedom', () => {
   const sk = emptySketch();
   const A = pt(sk, 0, 0), B = pt(sk, 20, 0), aL = pt(sk, 0, 4), aR = pt(sk, 0, -4), bL = pt(sk, 20, 4), bR = pt(sk, 20, -4);
   const arcA = newId(sk, 'e'); sk.entities[arcA] = { type: 'arc', c: A, p1: aL, p2: aR };
@@ -106,9 +107,9 @@ await test('slits (två bågar + två linjer, tangenta, lika radier) har 5 frihe
   for (const [l, a] of [[l1, arcA], [l1, arcB], [l2, arcA], [l2, arcB]]) con(sk, { type: 'tangent', e1: l, e2: a });
   con(sk, { type: 'equal', e1: arcA, e2: arcB });
   const r = solver.solve(sk);
-  assert.ok(r.ok); assert.deepEqual(r.redundant, []); assert.equal(r.dof, 5, 'två ändar + bredd');
+  assert.ok(r.ok); assert.deepEqual(r.redundant, []); assert.equal(r.dof, 5, 'two ends + width');
 });
-await test('vågrätt avstånd behåller tecknet', () => {
+await test('a horizontal distance keeps its sign', () => {
   const sk = emptySketch();
   const a = pt(sk, 10, 0), b = pt(sk, 2, 5);
   con(sk, { type: 'fix', p: a });
@@ -116,7 +117,7 @@ await test('vågrätt avstånd behåller tecknet', () => {
   assert.ok(solver.solve(sk).ok);
   near(sk.points[b].x, -10); near(sk.points[b].y, 5);
 });
-await test('vinkel: synlig vinkel ↔ lagrad', () => {
+await test('angle: visible angle ↔ stored', () => {
   const sk = emptySketch();
   const o = pt(sk, 0, 0), x = pt(sk, 20, 0), y = pt(sk, 10, 10);
   const l1 = line(sk, o, x), l2 = line(sk, o, y);
@@ -128,7 +129,7 @@ await test('vinkel: synlig vinkel ↔ lagrad', () => {
   near(signedAngle(L(l1), L(l2)), 60, 1e-6);
   near(measure(sk, sk.constraints.find(k => k.id === c)!)!, 60, 1e-6);
 });
-await test('cirkel: diameter och koncentrisk', () => {
+await test('circle: diameter and concentric', () => {
   const sk = emptySketch();
   const c1 = pt(sk, 0, 0), c2 = pt(sk, 3, 1);
   const A = newId(sk, 'e'); sk.entities[A] = { type: 'circle', c: c1, r: 10 };
@@ -138,7 +139,7 @@ await test('cirkel: diameter och koncentrisk', () => {
   near((sk.entities[A] as { r: number }).r, 15); near((sk.entities[B] as { r: number }).r, 15);
   near(sk.points[c1].x, sk.points[c2].x); near(sk.points[c1].y, sk.points[c2].y);
 });
-await test('punkt på cirkel och mittpunkt', () => {
+await test('point on circle and midpoint', () => {
   const sk = emptySketch();
   const c = pt(sk, 0, 0), q = pt(sk, 7, 7), a = pt(sk, -10, -20), b = pt(sk, 10, -20), m = pt(sk, 3, -15);
   const C = newId(sk, 'e'); sk.entities[C] = { type: 'circle', c, r: 5 };
@@ -148,21 +149,21 @@ await test('punkt på cirkel och mittpunkt', () => {
   near(Math.hypot(sk.points[q].x - sk.points[c].x, sk.points[q].y - sk.points[c].y), (sk.entities[C] as { r: number }).r, 1e-6);
   near(sk.points[m].x, (sk.points[a].x + sk.points[b].x) / 2); near(sk.points[m].y, (sk.points[a].y + sk.points[b].y) / 2);
 });
-await test('fas 1-villkor utan id migreras', () => {
+await test('phase 1 constraints without ids are migrated', () => {
   const sk = emptySketch(); const { l } = rect(sk);
   for (const c of sk.constraints) delete (c as { id?: string }).id;
   normalizeSketch(sk);
   assert.ok(sk.constraints.every(c => c.id)); assert.equal(new Set(sk.constraints.map(c => c.id)).size, 4);
   assert.ok(l.length === 4 && solver.solve(sk).ok);
 });
-await test('telefonens skisser löses utan problem', () => {
+await test('the hand-drawn sketches solve without problems', () => {
   const phone = JSON.parse(readFileSync(process.env.TESTDIR + '/phone-sketches.json', 'utf8')) as Record<string, SketchData>;
   for (const [k, v] of Object.entries(phone)) {
     const sk = normalizeSketch({ ...emptySketch(), ...v, constraints: [], nextId: 1000 });
     const before = JSON.stringify(sk.points);
     const r = solver.solve(sk);
     assert.ok(r.ok, k);
-    // Utan villkor ska inget flytta sig (förutom bågändar som läggs exakt på radien).
+    // Without constraints nothing should move (except arc ends that are put exactly on the radius).
     const moved = Object.entries(sk.points).filter(([id, p]) => Math.hypot(p.x - JSON.parse(before)[id].x, p.y - JSON.parse(before)[id].y) > 0.5);
     assert.equal(moved.length, 0, `${k}: ${JSON.stringify(moved)}`);
   }
@@ -170,7 +171,7 @@ await test('telefonens skisser löses utan problem', () => {
 
 const dist2 = (sk: SketchData, l: string) => { const e = sk.entities[l] as { p1: string; p2: string }; return Math.hypot(sk.points[e.p1].x - sk.points[e.p2].x, sk.points[e.p1].y - sk.points[e.p2].y); };
 
-/** Rak rektangel 0..40 × 0..20 med H/V; fixed = hörn i origo-punkten fixerad + bredd/höjd-mått (fullt definierad). */
+/** Straight rectangle 0..40 × 0..20 with H/V; fixed = the corner at the origin point fixed + width/height dimensions (fully defined). */
 function axisRect(sk: SketchData, fixed: boolean) {
   const p = [pt(sk, 0, 0), pt(sk, 40, 0), pt(sk, 40, 20), pt(sk, 0, 20)];
   const l = [line(sk, p[0], p[1]), line(sk, p[1], p[2]), line(sk, p[2], p[3]), line(sk, p[3], p[0])];
@@ -186,16 +187,16 @@ function axisRect(sk: SketchData, fixed: boolean) {
 const arcs = (sk: SketchData) => Object.values(sk.entities).filter(e => e.type === 'arc') as { type: 'arc'; c: string; p1: string; p2: string }[];
 const setDimValue = (sk: SketchData, id: string, v: number) => { const c = sk.constraints.find(c => c.id === id) as { value: number }; c.value = v; };
 
-await test('avrunda: fri rektangel, ett hörn', () => {
+await test('fillet: free rectangle, one corner', () => {
   const sk = emptySketch();
   const { p } = axisRect(sk, false);
   const dof0 = solver.solve(sk).dof;
   assert.equal(defaultCornerSize(sk, cornersFor(sk, [p[2]], []), 'fillet'), 5);
   const dim = cutCorners(sk, [p[2]], 'fillet', 5)!;
   assert.ok(dim);
-  assert.ok(!(p[2] in sk.points), 'hörnpunkten utan villkor tas bort');
+  assert.ok(!(p[2] in sk.points), 'the corner point without constraints is removed');
   const r = solver.solve(sk);
-  assert.ok(r.ok); assert.deepEqual(r.redundant, []); assert.equal(r.dof, dof0, 'samma frihetsgrader');
+  assert.ok(r.ok); assert.deepEqual(r.redundant, []); assert.equal(r.dof, dof0, 'the same degrees of freedom');
   const [a] = arcs(sk);
   const g = arcGeom(sk, a as never);
   near(g.r, 5); near(g.c.x, 35); near(g.c.y, 15); near(g.sweep, Math.PI / 2);
@@ -204,7 +205,7 @@ await test('avrunda: fri rektangel, ett hörn', () => {
   assert.ok(solver.solve(sk).ok); near(arcGeom(sk, arcs(sk)[0] as never).r, 8);
 });
 
-await test('avrunda: fullt definierad rektangel, alla hörn (virtuella hörn behåller måtten)', () => {
+await test('fillet: fully defined rectangle, all corners (virtual corners keep the dimensions)', () => {
   const sk = emptySketch();
   const { p, l } = axisRect(sk, true);
   assert.equal(solver.solve(sk).dof, 0);
@@ -212,8 +213,8 @@ await test('avrunda: fullt definierad rektangel, alla hörn (virtuella hörn beh
   assert.equal(corners.length, 4);
   const dim = cutCorners(sk, corners.map(c => c.p), 'fillet', 4)!;
   let r = solver.solve(sk);
-  assert.ok(r.ok, JSON.stringify(r)); assert.deepEqual(r.redundant, []); assert.equal(r.dof, 0, 'fortfarande fullt definierad');
-  assert.ok(p[0] in sk.points && p[1] in sk.points && p[2] in sk.points, 'refererade hörn finns kvar');
+  assert.ok(r.ok, JSON.stringify(r)); assert.deepEqual(r.redundant, []); assert.equal(r.dof, 0, 'still fully defined');
+  assert.ok(p[0] in sk.points && p[1] in sk.points && p[2] in sk.points, 'referenced corners are still there');
   assert.equal(arcs(sk).length, 4);
   assert.equal(findLoops(sk).loops.length, 1);
   setDimValue(sk, dim, 6);
@@ -221,14 +222,14 @@ await test('avrunda: fullt definierad rektangel, alla hörn (virtuella hörn beh
   assert.ok(r.ok); assert.equal(r.dof, 0);
   for (const a of arcs(sk)) near(arcGeom(sk, a as never).r, 6);
   near(sk.points[p[2]].x, 40); near(sk.points[p[2]].y, 20);
-  // Bredden ändras: hörnen följer med.
+  // The width changes: the corners follow.
   setDimValue(sk, sk.constraints.find(c => c.type === 'distance' && c.p2 === p[1])!.id, 50);
   assert.ok(solver.solve(sk).ok);
   const xs = arcs(sk).map(a => sk.points[a.c].x).sort((a, b) => a - b);
   near(xs[0], 6); near(xs[3], 44);
 });
 
-await test('avrunda: hexagon (Lika-sidor på konstruktionscirkel)', () => {
+await test('fillet: hexagon (Equal sides on a construction circle)', () => {
   const sk = emptySketch();
   const c = pt(sk, 0, 0);
   const circ = newId(sk, 'e');
@@ -241,12 +242,12 @@ await test('avrunda: hexagon (Lika-sidor på konstruktionscirkel)', () => {
   assert.ok(cutCorners(sk, [ps[0]], 'fillet', 3));
   const r = solver.solve(sk);
   assert.ok(r.ok); assert.deepEqual(r.redundant, []); assert.equal(r.dof, dof0);
-  // Sidorna är fortfarande lika långa (konstruktionslinjerna i full längd).
+  // The sides are still equally long (the construction lines at full length).
   for (const l of ls) near(dist2(sk, l), 20, 1e-6);
   assert.equal(findLoops(sk).loops.length, 1);
 });
 
-await test('fasa: två hörn, ett mått, lika ben', () => {
+await test('chamfer: two corners, one dimension, equal legs', () => {
   const sk = emptySketch();
   const { p } = axisRect(sk, true);
   const dim = cutCorners(sk, [p[1], p[2]], 'chamfer', 3)!;
@@ -261,14 +262,14 @@ await test('fasa: två hörn, ett mått, lika ben', () => {
   assert.equal(findLoops(sk).loops.length, 1);
 });
 
-await test('avrunda: för stor radie och icke-hörn avvisas', () => {
+await test('fillet: too large a radius and non-corners are rejected', () => {
   const sk = emptySketch();
   const { p } = axisRect(sk, false);
   assert.equal(cutCorners(sk, [p[0]], 'fillet', 25), null);
   const q = pt(sk, 60, 0); line(sk, p[1], q);
-  assert.equal(cornersFor(sk, [p[1]], []).length, 0, 'tre linjer i punkten');
+  assert.equal(cornersFor(sk, [p[1]], []).length, 0, 'three lines at the point');
 });
-await test('avstånd punkt–cirkelkant: utanför, innanför och till en båge', () => {
+await test('distance point–circle edge: outside, inside and to an arc', () => {
   for (const [px, arc, want] of [[30, false, 13], [4, false, 7], [30, true, 13]] as const) {
     const sk = emptySketch();
     const c = pt(sk, 0, 0); con(sk, { type: 'fix', p: c });
@@ -283,7 +284,7 @@ await test('avstånd punkt–cirkelkant: utanför, innanför och till en båge',
     near(measure(sk, sk.constraints.at(-1)!)!, 3);
   }
 });
-await test('avstånd mellan cirkelkanter: bredvid, inuti och mot en båge', () => {
+await test('distance between circle edges: beside, inside and to an arc', () => {
   for (const [x2, r2, arc, want] of [[40, 5, false, 17], [3, 4, false, 4], [40, 5, true, 17]] as const) {
     const sk = emptySketch();
     const c1 = pt(sk, 0, 0); con(sk, { type: 'fix', p: c1 });
@@ -299,7 +300,7 @@ await test('avstånd mellan cirkelkanter: bredvid, inuti och mot en båge', () =
     near(measure(sk, sk.constraints.at(-1)!)!, 2);
   }
 });
-await test('avstånd cirkelkant–linje: ovanför, genom (flyttas ut), under och mot en båge', () => {
+await test('distance circle edge–line: above, through (moved out), below and to an arc', () => {
   for (const [y0, arc, want] of [[20, false, 12], [3, false, 12], [-20, false, -12], [20, true, 12]] as const) {
     const sk = emptySketch();
     const c = pt(sk, 0, 0); con(sk, { type: 'fix', p: c });
@@ -315,7 +316,7 @@ await test('avstånd cirkelkant–linje: ovanför, genom (flyttas ut), under och
     near(measure(sk, sk.constraints.at(-1)!)!, 2);
   }
 });
-await test('vinkel mot X-axeln: ovanför och under axeln', () => {
+await test('angle to the X axis: above and below the axis', () => {
   for (const [y, v, want] of [[5, 30, 30], [-5, -30, -30], [5, 135, 135]] as const) {
     const sk = emptySketch();
     const a = pt(sk, 0, 0); con(sk, { type: 'fix', p: a });
@@ -327,4 +328,4 @@ await test('vinkel mot X-axeln: ovanför och under axeln', () => {
     near(measure(sk, sk.constraints.at(-1)!)!, Math.abs(want), 1e-6);
   }
 });
-console.log(`${n} lösartester ok`);
+console.log(`${n} solver tests ok`);

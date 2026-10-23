@@ -1,5 +1,5 @@
-// Fas 1-test: rita en skiss med riktiga pekhändelser (CDP) i headless Chromium.
-//   node sketch.mjs [url] [utkatalog]
+// Phase 1 test: draw a sketch with real touch events (CDP) in headless Chromium.
+// node sketch.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 const url = process.argv[2] ?? 'http://127.0.0.1:8799/';
@@ -8,7 +8,7 @@ const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '-
 const errors = [];
 
 async function session(viewport) {
-  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, locale: 'sv-SE' });
+  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, locale: 'en-US' });
   const page = await ctx.newPage();
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
@@ -24,10 +24,10 @@ await page.goto(url);
 await page.waitForSelector('body:not(.loading)');
 await page.evaluate(async () => { localStorage.clear(); await window.__scadshape.storage.clear(); });
 await page.reload();
-await page.waitForFunction(() => /Börja med Skiss/.test(document.querySelector('#status').textContent));
-console.log('tom modell:', await page.textContent('#status'));
+await page.waitForFunction(() => /Start with Sketch/.test(document.querySelector('#status').textContent));
+console.log('empty model:', await page.textContent('#status'));
 
-// Ny skiss på toppen
+// New sketch on the top
 await page.click('#btnNewSketch');
 await page.click('[data-plane="XY"]');
 await page.waitForSelector('#sketchArea:not([hidden])');
@@ -47,14 +47,14 @@ const state = () => page.evaluate(() => {
 });
 const tool = t => page.click(`[data-tool="${t}"]`);
 
-// Rektangel genom att dra (förstoringsglaset fotas mitt i draget)
+// Rectangle by dragging (the magnifier is captured mid-drag)
 await tool('rect');
 await drag({ x: -30, y: -20 }, { x: 30, y: 20 }, 'loupe');
 let s = await state();
 assert.equal(s.ents, 4); assert.equal(s.loops, 1);
-console.log('rektangel:', s);
+console.log('rectangle:', s);
 
-// Mittpunktsrektangel: centrum + hörn → 4 sidor + konstruktionsdiagonal, centrerad
+// Center rectangle: center + corner → 4 sides + construction diagonal, centered
 await tool('rectc');
 await tap({ x: 0, y: 40 }); await tap({ x: 20, y: 50 });
 s = await state(); assert.equal(s.ents, 9); assert.equal(s.loops, 2);
@@ -68,23 +68,23 @@ s = await state(); assert.equal(s.ents, 9); assert.equal(s.loops, 2);
   assert.ok(Math.abs(r.x0 + 20) < 0.01 && Math.abs(r.x1 - 20) < 0.01 && Math.abs(r.y0 - 30) < 0.01 && Math.abs(r.y1 - 50) < 0.01, JSON.stringify(r));
   assert.ok(r.mid);
 }
-console.log('mittpunktsrektangel:', s);
+console.log('center rectangle:', s);
 await page.click('#btnUndo');
 s = await state(); assert.equal(s.ents, 4);
 
-// Cirkel i origo genom två tryck
+// Circle at the origin with two taps
 await tool('circle');
 await tap({ x: 0, y: 0 }); await tap({ x: 10, y: 0 });
-s = await state(); assert.equal(s.ents, 5); assert.equal(s.loops, 1, 'cirkeln ska vara ett hål, inte en ny profil');
+s = await state(); assert.equal(s.ents, 5); assert.equal(s.loops, 1, 'the circle should be a hole, not a new profile');
 
-// Triangel med linjekedja som stängs på första punkten
+// Triangle with a line chain that closes on the first point
 await tool('line');
 for (const p of [{ x: 40, y: -20 }, { x: 60, y: -20 }, { x: 50, y: 0 }, { x: 40, y: -20 }]) await tap(p);
 s = await state(); assert.equal(s.ents, 8); assert.equal(s.loops, 2);
-assert.match(s.hint, /tryck där linjen ska börja/, 'kedjan ska vara avslutad');
-console.log('triangel:', s);
+assert.match(s.hint, /tap where the line starts/, 'the chain should be finished');
+console.log('triangle:', s);
 
-// D-form: linje + 3-punktsbåge mellan samma punkter
+// D shape: line + 3-point arc between the same points
 await tap({ x: -60, y: -10 }); await tap({ x: -60, y: 10 });
 assert.equal(await page.isVisible('#btnFinish'), true);
 await page.click('#btnFinish');
@@ -93,7 +93,7 @@ await tap({ x: -60, y: 10 }); await tap({ x: -60, y: -10 }); await tap({ x: -45,
 s = await state(); assert.equal(s.ents, 10); assert.equal(s.loops, 3);
 console.log('D-form:', s);
 
-// Mittpunktsbåge (öppen): centrum, start, svep över toppen till slut
+// Center arc (open): center, start, sweep over the top to the end
 await tool('arcc');
 await tap({ x: 0, y: 35 }); await tap({ x: 15, y: 35 });
 {
@@ -106,70 +106,70 @@ await tap({ x: 0, y: 35 }); await tap({ x: 15, y: 35 });
 }
 s = await state(); assert.equal(s.ents, 11); assert.equal(s.loops, 3);
 const arc = await page.evaluate(() => { const sk = window.__scadshape.editor.sketch; const a = Object.values(sk.entities).at(-1); return { type: a.type, p1: sk.points[a.p1], p2: sk.points[a.p2] }; });
-assert.equal(arc.type, 'arc'); assert.ok(Math.abs(arc.p1.x - 15) < 0.01 && Math.abs(arc.p2.x + 15) < 0.01, 'moturs från höger till vänster: ' + JSON.stringify(arc));
-console.log('mittpunktsbåge ok, moturs över toppen');
+assert.equal(arc.type, 'arc'); assert.ok(Math.abs(arc.p1.x - 15) < 0.01 && Math.abs(arc.p2.x + 15) < 0.01, 'counterclockwise from right to left: ' + JSON.stringify(arc));
+console.log('center arc ok, counterclockwise over the top');
 await page.screenshot({ path: `${out}/sketch.png` });
 
-// Ångra / gör om
+// Undo / redo
 await page.click('#btnUndo'); s = await state(); assert.equal(s.ents, 10);
 await page.click('#btnRedo'); s = await state(); assert.equal(s.ents, 11);
 
-// Nyp-zoom med två fingrar
+// Pinch zoom with two fingers
 const scale0 = await page.evaluate(() => window.__scadshape.editor.view.scale);
 await touch('touchStart', [{ x: 400, y: 200 }, { x: 500, y: 200 }]);
 for (let i = 1; i <= 5; i++) await touch('touchMove', [{ x: 400 - i * 10, y: 200 }, { x: 500 + i * 10, y: 200 }]);
 await touch('touchEnd', []);
 const scale1 = await page.evaluate(() => window.__scadshape.editor.view.scale);
 assert.ok(scale1 / scale0 > 1.9 && scale1 / scale0 < 2.1, `zoom ${scale1 / scale0}`);
-s = await state(); assert.equal(s.ents, 11, 'nypning får inte rita något');
+s = await state(); assert.equal(s.ents, 11, 'pinching must not draw anything');
 console.log('nyp-zoom ×' + (scale1 / scale0).toFixed(2));
 await page.click('#btnSketchFit');
 
-// Markera och ta bort den öppna bågen
+// Select and delete the open arc
 await tool('select');
 await tap({ x: 0, y: 50 });
 assert.equal(await page.isDisabled('#btnDelete'), false);
 await page.click('#btnDelete');
 s = await state(); assert.equal(s.ents, 10);
 
-// Dra en punkt: triangelns topp (50,0) → (50,10)
+// Drag a point: the triangle's top (50,0) → (50,10)
 await drag({ x: 50, y: 0 }, { x: 50, y: 10 });
 const top = await page.evaluate(() => Object.values(window.__scadshape.editor.sketch.points).some(p => Math.abs(p.x - 50) < 1e-6 && Math.abs(p.y - 10) < 1e-6));
-assert.ok(top, 'punkten ska ha flyttats');
+assert.ok(top, 'the point should have moved');
 s = await state(); assert.equal(s.loops, 3);
 
-// Klar → 3D
+// Done → 3D
 await page.click('#btnDone');
 await page.click('#btnExtrude');
 await page.waitForSelector('#featPanel:not([hidden])');
 await page.click('#fpOk');
-await page.waitForFunction(() => /trianglar|Fel/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
+await page.waitForFunction(() => /triangles|Error/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
 console.log('3D:', await page.textContent('#status'));
 await page.click('#btnCode');
 const codeText = await page.inputValue('#code');
-assert.match(codeText, /module extrudera_1\(\)/); assert.match(codeText, /difference\(\)/);
+assert.match(codeText, /module extrude_1\(\)/); assert.match(codeText, /difference\(\)/);
 await page.screenshot({ path: `${out}/model3d.png` });
 
-// Sparat efter omladdning
+// Saved after reload
 await page.reload();
-await page.waitForFunction(() => /trianglar/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
+await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
 await page.click('#btnTree');
-assert.equal(await page.locator('#featureList li').count(), 2, 'skiss + extrudering');
+assert.equal(await page.locator('#featureList li').count(), 2, 'sketch + extrude');
 await page.screenshot({ path: `${out}/tree.png` });
-console.log('efter omladdning:', await page.textContent('#status'));
+console.log('after reload:', await page.textContent('#status'));
 
-// Stående läge
+// Portrait mode
 const docJson = await page.evaluate(() => { const s = window.__scadshape.storage; return s.get('scadshape.doc.' + s.get('scadshape.current')); });
 const p2 = await session({ width: 412, height: 915 });
 await p2.page.goto(url);
 await p2.page.waitForSelector('body:not(.loading)');
 await p2.page.evaluate(async d => { const s = window.__scadshape.storage; s.set('scadshape.doc.' + s.get('scadshape.current'), d); await s.saved(); }, docJson);
 await p2.page.reload();
-await p2.page.waitForFunction(() => /trianglar/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
+await p2.page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
 await p2.page.click('#btnTree');
 await p2.page.click('button.feature');
 await p2.page.waitForTimeout(150);
 await p2.page.screenshot({ path: `${out}/portrait-sketch.png` });
 
 await browser.close();
-console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga konsolfel. Alla kontroller ok.');
+console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');

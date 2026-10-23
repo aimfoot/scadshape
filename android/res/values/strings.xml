@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">scadshape</string>
+    <string name="no_app_for_link">No app can open the link</string>
+    <string name="cannot_open_file">Could not open the file</string>
 </resources>

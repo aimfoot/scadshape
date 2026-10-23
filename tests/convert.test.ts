@@ -1,6 +1,6 @@
-// Tester för .scad → skisser och features (convert/scad2doc.ts) med riktig OpenSCAD-WASM.
-// Konverteringen är lyckad när den nya modellen har samma volym och mått som originalet
-// (originalet renderas med fin upplösning: cirklar utan $fn blir riktiga cirklar i skisserna).
+// Tests for .scad → sketches and features (convert/scad2doc.ts) with the real OpenSCAD WASM. The
+// conversion succeeds when the new model has the same volume and size as the original (the original
+// is rendered at fine resolution: circles without $fn become real circles in the sketches).
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -12,7 +12,7 @@ import { parseBinaryStl } from '../src/stl';
 import { fontsFor } from '../src/fonts';
 import { loadSolver } from '../src/sketch/solver';
 import type { SketchData } from '../src/sketch/model';
-setLang('sv');
+setLang('en');
 const solver = await loadSolver(process.env.WASM);
 
 const ROOT = process.env.ROOT!;
@@ -56,7 +56,7 @@ async function mesh(src: string) {
 let n = 0;
 const test = async (name: string, fn: () => Promise<void> | void) => { await fn(); n++; console.log('ok', name); };
 
-/** Konvertera, rendera båda och jämför. Returnerar statistik och avvikelser. */
+/** Convert, render both and compare. Returns statistics and deviations. */
 async function compare(src: string) {
   const t0 = performance.now();
   const r = await scadToDoc(src, engine);
@@ -70,7 +70,7 @@ async function compare(src: string) {
   return { ...r, ms, dv, db, features: r.doc.features.length };
 }
 
-await test('CSG-parsern läser och skriver tillbaka', () => {
+await test('the CSG parser reads and writes back', () => {
   const nodes = parseCsg('group() {\n multmatrix([[1, 0, 0, 3], [0, 1, 0, 3], [0, 0, 1, 0], [0, 0, 0, 1]]) {\n  cylinder($fn = 48, h = 8.4, r1 = 3, r2 = 3, center = false);\n }\n text(text = "Hej \\"du\\"", size = 10);\n polygon(points = [[0, 0], [1, 0.5e-3], [-2, 3]], paths = undef, convexity = 1);\n}');
   assert.equal(nodes[0].children.length, 3);
   assert.equal(nodes[0].children[0].children[0].args.h, 8.4);
@@ -81,10 +81,10 @@ await test('CSG-parsern läser och skriver tillbaka', () => {
   assert.deepEqual(svgLoops('<path d="M 1,2 L 3,-4 L 5,6 z M 0,0 L 1,0 L 1,1 z"/>'), [[{ x: 1, y: -2 }, { x: 3, y: 4 }, { x: 5, y: -6 }], [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: -1 }]]);
 });
 
-await test('platta med två hål: två skisser, mått, exakt volym', async () => {
+await test('plate with two holes: two sketches, dimensions, exact volume', async () => {
   const r = await compare('difference() {\n  cube([40, 30, 10]);\n  translate([10, 10, -1]) cylinder(h = 12, r = 3);\n  translate([30, 20, -1]) cylinder(h = 12, d = 6);\n}');
   assert.deepEqual([r.sketches, r.extrudes, r.codeBlocks], [2, 2, 0], JSON.stringify(r.doc.features.map(f => f.type)));
-  assert.ok(r.dv < 0.002 && r.db < 1e-3, `volym ${r.dv}, mått ${r.db}`);
+  assert.ok(r.dv < 0.002 && r.db < 1e-3, `volume ${r.dv}, size ${r.db}`);
   const sk = r.doc.features[0] as { constraints: { type: string; value?: number }[] };
   assert.deepEqual(sk.constraints.filter(c => c.type === 'distance').map(c => c.value), [40, 30]);
   const holes = r.doc.features[2] as { constraints: { type: string; value?: number }[]; offset?: string };
@@ -92,7 +92,7 @@ await test('platta med två hål: två skisser, mått, exakt volym', async () =>
   assert.equal((r.doc.features[3] as { op: string }).op, 'remove');
 });
 
-await test('rundad låda (hull av cylindrar), rotation till XZ, sexkant, kon och klot som Revolve', async () => {
+await test('rounded box (hull of cylinders), rotation to XZ, hexagon, cone and sphere as Revolve', async () => {
   const src = `
     $fn = 64;
     hull() for (x = [0, 50], y = [0, 30]) translate([x, y, 0]) cylinder(r = 5, h = 20);
@@ -107,31 +107,34 @@ await test('rundad låda (hull av cylindrar), rotation till XZ, sexkant, kon och
   assert.ok(kinds.includes('XZ'), kinds.join());
   const box = r.doc.features[0] as SketchData & { entities: Record<string, { type: string }> };
   assert.deepEqual(Object.values(box.entities).map(e => e.type).sort(), ['arc', 'arc', 'arc', 'arc', 'line', 'line', 'line', 'line']);
-  // Parametrisk: bara läget är fritt; mått 60 × 40 och radie 5 – och lösaren flyttar ingenting.
+  // Parametric: only the position is free; dimensions 60 × 40 and radius 5 – and the solver moves
+  // nothing.
   const before = JSON.stringify(box.points);
   const sol = solver.solve(box);
   assert.ok(sol.ok, JSON.stringify(sol)); assert.equal(sol.dof, 2); assert.deepEqual(sol.redundant, []);
   for (const [id, p] of Object.entries(box.points)) { const q = JSON.parse(before)[id]; assert.ok(Math.hypot(p.x - q.x, p.y - q.y) < 1e-6, id); }
   assert.deepEqual(box.constraints.filter(c => 'value' in c).map(c => (c as { value: number }).value).sort((a, b) => a - b), [5, 40, 60]);
-  // OpenSCADs klot når inte ända upp till polerna (punkterna ligger mellan dem) – därav 0,02 mm.
-  assert.ok(r.dv < 0.002 && r.db < 0.02, `volym ${r.dv}, mått ${r.db}`);
+  // OpenSCAD's sphere does not reach all the way to the poles (the points lie between them) – hence
+  // 0.02 mm.
+  assert.ok(r.dv < 0.002 && r.db < 0.02, `volume ${r.dv}, size ${r.db}`);
 });
 
-await test('offset och text ritas av OpenSCAD och blir linjer och bågar', async () => {
+await test('offset and text are drawn by OpenSCAD and become lines and arcs', async () => {
   const r = await compare('linear_extrude(3) offset(r = 4, $fn = 32) square([30, 20]);\ntranslate([0, 40, 0]) linear_extrude(2) text("Hej", size = 10, font = "Liberation Sans");');
   assert.equal(r.codeBlocks, 0);
   const s = r.doc.features[0] as { entities: Record<string, { type: string }> };
-  assert.equal(Object.values(s.entities).filter(e => e.type === 'arc').length, 4, 'fyra rundade hörn');
-  assert.ok(r.dv < 0.005, `volym ${r.dv}`);
+  assert.equal(Object.values(s.entities).filter(e => e.type === 'arc').length, 4, 'four rounded corners');
+  assert.ok(r.dv < 0.005, `volume ${r.dv}`);
 });
 
-// tests/fixtures: publika testmodeller. tests/private (finns bara lokalt, publiceras inte): egna filer.
+// tests/fixtures: public test models. tests/private (only exists locally, not published): own
+// files.
 const fixtureDirs = ['fixtures', 'private'].filter(d => existsSync(`${ROOT}/tests/${d}`));
 for (const [dir, f] of fixtureDirs.flatMap(d => readdirSync(`${ROOT}/tests/${d}`).filter(f => f.endsWith('.scad')).map(f => [d, f]))) {
-  await test(`fil: ${dir}/${f}`, async () => {
+  await test(`file: ${dir}/${f}`, async () => {
     const r = await compare(readFileSync(`${ROOT}/tests/${dir}/${f}`, 'utf8'));
-    console.log(`   ${f}: ${r.sketches} skisser, ${r.extrudes} extruderingar, ${r.revolves} revolve, ${r.codeBlocks} kodblock, ${r.features} features, volym ±${(r.dv * 100).toFixed(2)} %, mått ±${r.db.toFixed(3)} mm, ${Math.round(r.ms)} ms`);
-    assert.ok(r.dv < 0.01, `volym avviker ${(r.dv * 100).toFixed(2)} %`);
+    console.log(`   ${f}: ${r.sketches} sketches, ${r.extrudes} extrudes, ${r.revolves} revolves, ${r.codeBlocks} code blocks, ${r.features} features, volume ±${(r.dv * 100).toFixed(2)} %, size ±${r.db.toFixed(3)} mm, ${Math.round(r.ms)} ms`);
+    assert.ok(r.dv < 0.01, `the volume differs by ${(r.dv * 100).toFixed(2)} %`);
   });
 }
-console.log(`${n} konverteringstester ok`);
+console.log(`${n} conversion tests ok`);

@@ -1,8 +1,8 @@
 #!/bin/sh
-# Bygger utan Gradle (som ~/opt/messenger-web). Verktygen ligger i ~/opt/android-build.
-#   dist/scadshape.apk  installeras direkt (Taildrop), för test
-#   dist/scadshape.aab  laddas upp till Play (signerad med uppladdningsnyckeln)
-# Webbappen byggs till build/assets/www (inte ../dist, så webbversionen påverkas inte).
+# Builds without Gradle. The tools are in ~/opt/android-build.
+#   dist/scadshape.apk  installed directly, for testing and GitHub releases
+#   dist/scadshape.aab  uploaded to Play (signed with the upload key)
+# The web app is built into build/assets/www (not ../dist, so the web version is not affected).
 set -eu
 cd "$(dirname "$0")"
 VERSION_CODE=6
@@ -16,7 +16,7 @@ BUNDLETOOL="java -jar $B/bundletool/bundletool.jar"
 KS=signing/release.jks
 ALIAS=scadshape
 
-# En nyckel för alltid: uppdateringar installeras bara över en APK med samma nyckel.
+# One key forever: updates only install over an APK signed with the same key.
 if [ ! -f "$KS" ]; then
     mkdir -p signing && chmod 700 signing
     head -c 24 /dev/urandom | base64 > signing/password && chmod 600 signing/password
@@ -27,7 +27,7 @@ fi
 
 rm -rf build && mkdir -p build/classes build/gen build/assets dist
 (cd .. && SCADSHAPE_VERSION=$VERSION_NAME node build.mjs --out android/build/assets/www)
-# Sådant som bara behövs på webben: förkomprimerat, service worker, diagnossidan.
+# Things only needed on the web: precompressed files, the service worker, the diagnostics page.
 find build/assets/www \( -name '*.gz' -o -name 'sw.js' -o -name 'diag.*' \) -delete
 
 "$BT/aapt2" compile --dir res -o build/res.zip
@@ -37,7 +37,7 @@ link() {
         --version-code "$VERSION_CODE" --version-name "$VERSION_NAME" "$@"
 }
 link -o build/base.apk --java build/gen --emit-ids build/ids.txt
-# Samma resurser i protobuf-format (det bundletool läser), med samma resurs-id:n som R.java.
+# The same resources in protobuf format (what bundletool reads), with the same resource ids as R.java.
 link -o build/proto.apk --proto-format --stable-ids build/ids.txt
 
 javac -Xlint:all,-options -Werror --release 17 -classpath "$JAR" -d build/classes \
@@ -50,7 +50,7 @@ python3 -I -c 'import zipfile; z = zipfile.ZipFile("build/base.apk", "a"); z.wri
 "$BT/apksigner" sign --ks "$KS" --ks-key-alias "$ALIAS" --ks-pass file:signing/password --out dist/scadshape.apk build/aligned.apk
 "$BT/apksigner" verify dist/scadshape.apk
 
-# --- AAB: basmodulen = manifest/, dex/, res/, assets/, resources.pb ---
+# --- AAB: the base module = manifest/, dex/, res/, assets/, resources.pb ---
 python3 -I - <<'EOF'
 import zipfile
 src = zipfile.ZipFile('build/proto.apk')
@@ -61,10 +61,10 @@ with zipfile.ZipFile('build/base-module.zip', 'w', zipfile.ZIP_DEFLATED) as out:
     out.write('build/classes.dex', 'dex/classes.dex')
 EOF
 $BUNDLETOOL build-bundle --modules=build/base-module.zip --output=build/unsigned.aab
-# Play kräver jarsigner-signatur på AAB:n (apksigner signerar bara APK:er).
+# Play requires a jarsigner signature on the AAB (apksigner only signs APKs).
 jarsigner -keystore "$KS" -storepass:file signing/password -keypass:file signing/password \
     -sigalg SHA256withRSA -digestalg SHA-256 -signedjar dist/scadshape.aab build/unsigned.aab "$ALIAS" >/dev/null
-# (-strict passar inte: Android-nycklar är alltid självsignerade.)
+# (-strict does not fit: Android keys are always self-signed.)
 jarsigner -verify dist/scadshape.aab | grep -q '^jar verified'
 $BUNDLETOOL validate --bundle=dist/scadshape.aab >/dev/null
 

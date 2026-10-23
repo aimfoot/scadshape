@@ -1,4 +1,4 @@
-// Rita appens PNG-ikoner från public/icons/*.svg (körs vid ändrad ikon):  node make-icons.mjs
+// Draw the app's PNG icons from public/icons/*.svg (run when an icon changes):  node make-icons.mjs
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 const dir = new URL('../../public/icons/', import.meta.url).pathname;

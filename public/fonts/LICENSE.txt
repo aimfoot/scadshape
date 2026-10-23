@@ -1,6 +1,5 @@
-Typsnitt i scadshape / Fonts in scadshape
+Fonts in scadshape
 
-Alla typsnitt här är licensierade under SIL Open Font License 1.1 (fulltext nedan).
 All fonts here are licensed under the SIL Open Font License 1.1 (full text below).
 
   LiberationSans-Regular.ttf, LiberationSans-Bold.ttf

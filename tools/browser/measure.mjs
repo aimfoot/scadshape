@@ -1,12 +1,12 @@
-// Mätverktyget i 3D med pekhändelser (CDP) i headless Chromium.
-//   node measure.mjs [url] [utkatalog]
+// The measure tool in 3D with touch events (CDP) in headless Chromium.
+// node measure.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 const url = process.argv[2] ?? 'http://127.0.0.1:8799/';
 const out = process.argv[3] ?? '.';
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
 const errors = [];
-const ctx = await browser.newContext({ viewport: { width: 915, height: 412 }, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, locale: 'sv-SE' });
+const ctx = await browser.newContext({ viewport: { width: 915, height: 412 }, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, locale: 'en-US' });
 const page = await ctx.newPage();
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => m.type() === 'error' && errors.push(m.text()));
@@ -33,7 +33,7 @@ const result = async () => [await page.textContent('#measureMain'), await page.t
 await page.goto(url);
 await page.evaluate(() => localStorage.clear());
 await page.reload();
-// Platta 40 × 20 × 10 med ett hål i (10, 10).
+// Plate 40 × 20 × 10 with a hole at (10, 10).
 await page.click('#btnNewSketch'); await page.click('[data-plane="XY"]');
 await page.waitForFunction(() => window.__scadshape.editor?.solverReady, null, { timeout: 15000 });
 await page.click('[data-tool="rect"]');
@@ -44,44 +44,44 @@ const R = await page.evaluate(() => Object.values(window.__scadshape.editor.sket
 const fmt = v => String(Math.round(v * 100) / 100).replace('.', ',');
 await page.click('#btnDone');
 await page.click('#btnExtrude'); await page.waitForSelector('#featPanel:not([hidden])'); await page.fill('#fp-depth', '10'); await page.click('#fpOk');
-await page.waitForFunction(() => /trianglar/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
+await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 await page.click('[data-view="iso"]');
 
 await page.click('#btnMeasure');
-assert.deepEqual(await result(), ['Tryck på ett hörn, en kant eller en yta', '']);
-// 1. Hålkanten → Ø, sedan hörnet i origo → avstånd från centrum.
+assert.deepEqual(await result(), ['Tap a corner, an edge or a face', '']);
+// 1. The hole edge → Ø, then the corner at the origin → distance from the center.
 await tap3d(10 + R * Math.cos(-0.7), 10 + R * Math.sin(-0.7), 10);
 let r = await result();
 assert.equal(r[0], `Ø ${fmt(2 * R)} mm · R ${fmt(R)}`, r.join(' | '));
 await tap3d(0, 0, 10);
 r = await result();
-assert.equal(r[0], 'Avstånd 14,14 mm', r.join(' | ')); assert.equal(r[1], 'ΔX 10 · ΔY 10 · ΔZ 0');
+assert.equal(r[0], 'Distance 14,14 mm', r.join(' | ')); assert.equal(r[1], 'ΔX 10 · ΔY 10 · ΔZ 0');
 await page.screenshot({ path: `${out}/me-hole.png` });
-console.log('hål → hörn:', r.join(' | '));
-// 2. Tredje trycket börjar om: framkanten → 40 mm.
+console.log('hole → corner:', r.join(' | '));
+// 2. The third tap starts over: the front edge → 40 mm.
 await tap3d(25, 0, 10);
 r = await result();
-assert.equal(r[0], 'Kant 40 mm', r.join(' | '));
-// 3. Ovansidan + framsidan → 90°.
+assert.equal(r[0], 'Edge 40 mm', r.join(' | '));
+// 3. The top + the front → 90°.
 await page.click('#measureClear');
 await tap3d(30, 14, 10);
-assert.equal((await result())[0], 'Yta');
+assert.equal((await result())[0], 'Face');
 await tap3d(28, 0, 4);
 r = await result();
-assert.equal(r[0], 'Vinkel mellan ytorna 90°', r.join(' | '));
-// 4. Högra sidan + hålkanten → 30 mm vinkelrätt.
+assert.equal(r[0], 'Angle between faces 90°', r.join(' | '));
+// 4. The right side + the hole edge → 30 mm perpendicular.
 await page.click('#measureClear');
 await tap3d(40, 6, 5);
 await tap3d(10 + R * Math.cos(-0.7), 10 + R * Math.sin(-0.7), 10);
 r = await result();
-assert.equal(r[0], 'Avstånd 30 mm', r.join(' | ')); assert.equal(r[1], 'vinkelrätt mot ytan');
+assert.equal(r[0], 'Distance 30 mm', r.join(' | ')); assert.equal(r[1], 'perpendicular to the face');
 await page.screenshot({ path: `${out}/me-face.png` });
-console.log('yta → hål:', r.join(' | '));
-// 5. Klar: baren försvinner och 3D-trycken går tillbaka till det vanliga.
+console.log('face → hole:', r.join(' | '));
+// 5. Done: the bar disappears and 3D taps go back to normal.
 await page.click('#measureDone');
 assert.equal(await page.isHidden('#measureBar'), true);
 assert.equal(await page.evaluate(() => window.__scadshape.viewer.tapOverride), null);
-// Mät i porträttläge (smal skärm): baren får plats.
+// Measure in portrait mode (narrow screen): the bar fits.
 await page.setViewportSize({ width: 412, height: 860 });
 await page.click('#btnMeasure');
 await page.waitForTimeout(300);
@@ -91,4 +91,4 @@ const box = await page.locator('#measureBar').boundingBox();
 assert.ok(box.x >= 0 && box.x + box.width <= 412, JSON.stringify(box));
 await page.screenshot({ path: `${out}/me-portrait.png` });
 await browser.close();
-console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga konsolfel. Alla kontroller ok.');
+console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');

@@ -1,5 +1,5 @@
-// Mät OpenSCAD-WASM (samma webb-build som appen) i Node.
-//   node tools/bench-node.mjs <fil.scad> [manifold|cgal] [binstl|off]
+// Benchmark OpenSCAD-WASM (the same web build as the app) in Node.
+// node tools/bench-node.mjs <file.scad> [manifold|cgal] [binstl|off]
 import { readFileSync } from 'node:fs';
 const [scadPath, backend = 'manifold', fmt = 'binstl'] = process.argv.slice(2);
 const { default: OpenSCAD } = await import('../vendor/openscad/openscad.js');
@@ -17,6 +17,6 @@ for (let i = 0; i < 3; i++) {
   catch (e) { rc = e?.status ?? String(e); }
   const t2 = performance.now();
   let size = 0; try { size = inst.FS.readFile(out).length; } catch {}
-  console.log(`körning ${i}: init ${(t1 - t0).toFixed(0)} ms, render ${(t2 - t1).toFixed(0)} ms, rc=${rc}, ut=${size} B${fmt === 'binstl' ? ', tri=' + (size - 84) / 50 : ''}`);
+  console.log(`run ${i}: init ${(t1 - t0).toFixed(0)} ms, render ${(t2 - t1).toFixed(0)} ms, rc=${rc}, out=${size} B${fmt === 'binstl' ? ', tri=' + (size - 84) / 50 : ''}`);
   if (i === 0 && rc !== 0) console.log(log.join('\n'));
 }

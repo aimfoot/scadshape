@@ -1,5 +1,5 @@
-// Exempelmodellerna (src/examples/models.ts): fullt bestämda skisser, bygger utan fel, renderar i
-// OpenSCAD, och en ändrad variabel ändrar modellen – på båda språken.
+// The example models (src/examples/models.ts): fully defined sketches, build without errors, render
+// in OpenSCAD, and a changed variable changes the model – in both languages.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { setLang } from '../src/i18n';
@@ -18,7 +18,7 @@ const solver = await loadSolver(process.env.WASM);
 const wasmBinary = readFileSync(process.env.ROOT + '/vendor/openscad/openscad.wasm');
 const { default: OpenSCAD } = (await import(process.env.ROOT + '/vendor/openscad/openscad.js')) as { default: (o: object) => Promise<any> }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-/** Rendera och ge mått (bounding box) och volym. */
+/** Render and return the size (bounding box) and volume. */
 async function render(code: string) {
   const log: string[] = [];
   const inst = await OpenSCAD({ noInitialRun: true, wasmBinary, preRun: [(m: { ENV: Record<string, string> }) => { m.ENV.FONTCONFIG_FILE = '/fonts/fonts.conf'; }], print: (s: string) => log.push(s), printErr: (s: string) => log.push(s) });
@@ -39,7 +39,7 @@ async function render(code: string) {
   return { size: max.map((v, i) => v - min[i]), triangles: p.length / 9, vol };
 }
 
-/** Ändra första variabeln (×1,5) och synka skissernas mått, som när man ändrar i Variabler. */
+/** Change the first variable (×1.5) and sync the sketches' dimensions, as when changing them under Variables. */
 function scaleFirstParam(doc: ReturnType<typeof buildExample>) {
   doc.params[0].expr = String(Number(doc.params[0].expr) * 1.5);
   const vars = evalParams(doc.params).vars;
@@ -52,24 +52,25 @@ function scaleFirstParam(doc: ReturnType<typeof buildExample>) {
 for (const lang of ['sv', 'en'] as const) {
   setLang(lang);
   for (const ex of EXAMPLES) {
-    await test(`exempel ${ex.id} (${lang})`, async () => {
+    await test(`example ${ex.id} (${lang})`, async () => {
       const doc = buildExample(ex.id);
       for (const f of doc.features) if (f.type === 'sketch') {
         const r = solver.solve(f as SketchFeature);
         assert.ok(r.ok, `${ex.id}/${f.name}: ${JSON.stringify(r)}`);
-        assert.equal(r.dof, 0, `${ex.id}/${f.name}: ska vara fullt bestämd`);
+        assert.equal(r.dof, 0, `${ex.id}/${f.name}: should be fully defined`);
       }
       const m = buildModel(doc);
       assert.equal(m.errors.size, 0, [...m.errors.values()].join('; '));
       assert.ok(m.solids > 0);
       const a = await render(m.code);
-      assert.ok(a.triangles > 12, `${ex.id}: ${a.triangles} trianglar`);
+      assert.ok(a.triangles > 12, `${ex.id}: ${a.triangles} triangles`);
       if (ex.id === 'plate') {
-        // Två genomgående M4-hål (Ø 4,5, försänkning Ø 8,8): mer än 2 × π·2,25²·4 ≈ 127 mm³ borta ur plattan.
-        const solid = 70 * 30 * 4 - (4 - Math.PI) * 5 * 5 * 4; // rundade hörn r 5
-        assert.ok(solid - a.vol > 127, `${ex.id}: hålen tar bara ${(solid - a.vol).toFixed(1)} mm³`);
+        // Two through M4 holes (Ø 4.5, countersink Ø 8.8): more than 2 × π·2.25²·4 ≈ 127 mm³
+        // removed from the plate.
+        const solid = 70 * 30 * 4 - (4 - Math.PI) * 5 * 5 * 4; // rounded corners r 5
+        assert.ok(solid - a.vol > 127, `${ex.id}: the holes only remove ${(solid - a.vol).toFixed(1)} mm³`);
       }
-      // Större första variabel → större modell (bredd/längd/diameter).
+      // Larger first variable → larger model (width/length/diameter).
       scaleFirstParam(doc);
       const m2 = buildModel(doc);
       assert.equal(m2.errors.size, 0, [...m2.errors.values()].join('; '));
@@ -79,4 +80,4 @@ for (const lang of ['sv', 'en'] as const) {
     });
   }
 }
-console.log(`${n} exempeltester ok`);
+console.log(`${n} example tests ok`);

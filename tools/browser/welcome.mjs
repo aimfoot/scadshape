@@ -1,12 +1,12 @@
-// Startkortet (src/ui/welcome.ts) och exempelmodellerna (src/examples/models.ts).
-//   node welcome.mjs [url] [utkatalog]
+// The start card (src/ui/welcome.ts) and the example models (src/examples/models.ts).
+// node welcome.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 const url = process.argv[2] ?? 'http://127.0.0.1:8799/';
 const out = process.argv[3] ?? '.';
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
 const errors = [];
-const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, locale: 'sv-SE' });
+const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, locale: 'en-US' });
 const page = await ctx.newPage();
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errors.push(m.text()));
@@ -18,30 +18,30 @@ const done = () => page.waitForFunction(() => /trianglar|triangles/.test(documen
 await page.goto(url);
 await page.waitForSelector('body:not(.loading)');
 
-// 1. Första start: kortet med fyra steg och fyra exempel.
-assert.ok(await card(), 'kortet ska synas i en tom modell');
+// 1. First start: the card with four steps and four examples.
+assert.ok(await card(), 'the card should show in an empty model');
 assert.equal(await page.locator('#startCard .steps li').count(), 4);
-assert.deepEqual(await page.$$eval('#startExamples b', bs => bs.map(b => b.textContent)), ['Låda med lock', 'Monteringsplatta', 'Skylt', 'Kopp']);
+assert.deepEqual(await page.$$eval('#startExamples b', bs => bs.map(b => b.textContent)), ['Box with lid', 'Mounting plate', 'Sign', 'Cup']);
 await page.screenshot({ path: `${out}/welcome.png` });
 
-// 2. Skissläget döljer kortet; en tom skiss som lämnas tas bort → kortet tillbaka.
+// 2. Sketch mode hides the card; an empty sketch that is left is removed → the card comes back.
 await page.click('#btnNewSketch');
 await page.click('#planeDlg [data-plane="XY"]');
 assert.equal(await page.evaluate(() => document.body.dataset.mode), 'sketch');
-assert.equal(await card(), false, 'inte i skissläget');
+assert.equal(await card(), false, 'not in sketch mode');
 await page.click('#btnDone');
-assert.ok(await card(), 'tillbaka efter en tom skiss');
+assert.ok(await card(), 'back after an empty sketch');
 
-// 3. × stänger; ☰ → Kom igång visar igen.
+// 3. × closes; ☰ → Get started shows it again.
 await page.click('#startClose');
 assert.equal(await card(), false);
 await page.click('#btnTree');
 await page.click('#btnStart');
-assert.ok(await card(), 'Kom igång visar kortet');
-assert.ok(await page.isHidden('#tree'), 'lådan stängs');
+assert.ok(await card(), 'Get started shows the card');
+assert.ok(await page.isHidden('#tree'), 'the drawer closes');
 
-// 4. Varje exempel blir en ny modell, utan fel, och kortet försvinner.
-const want = { 'Låda med lock': ['sketch', 'container'], Monteringsplatta: ['sketch', 'extrude', 'sketch', 'hole'], Skylt: ['sketch', 'extrude', 'sketch', 'text'], Kopp: ['sketch', 'revolve'] };
+// 4. Every example becomes a new model, without errors, and the card disappears.
+const want = { 'Box with lid': ['sketch', 'container'], 'Mounting plate': ['sketch', 'extrude', 'sketch', 'hole'], Sign: ['sketch', 'extrude', 'sketch', 'text'], Cup: ['sketch', 'revolve'] };
 for (const [i, name] of Object.keys(want).entries()) {
   if (!(await card())) { await page.click('#btnTree'); await page.click('#btnStart'); }
   const before = await doc();
@@ -52,23 +52,23 @@ for (const [i, name] of Object.keys(want).entries()) {
   assert.deepEqual(st.types, want[name], name);
   assert.deepEqual(st.errors, [], name);
   assert.ok(st.solids > 0, name);
-  assert.equal(await card(), false, `${name}: kortet ska döljas`);
+  assert.equal(await card(), false, `${name}: the card should be hidden`);
   assert.equal(await page.textContent('#projName'), name);
-  console.log(`${name}: ${st.types.join(' + ')} · variabler ${st.params.join(', ')} · ${await page.textContent('#status')}`);
+  console.log(`${name}: ${st.types.join(' + ')} · variables ${st.params.join(', ')} · ${await page.textContent('#status')}`);
   if (i === 1) await page.screenshot({ path: `${out}/welcome-plate.png` });
 }
 
-// 5. Engelska: exemplens namn och variabler följer språket.
+// 5. Swedish: the examples' names and variables follow the language.
 await page.click('#btnTree');
-await page.selectOption('#lang', 'en');
+await page.selectOption('#lang', 'sv');
 await page.click('#btnStart');
-assert.deepEqual(await page.$$eval('#startExamples b', bs => bs.map(b => b.textContent)), ['Box with lid', 'Mounting plate', 'Sign', 'Cup']);
+assert.deepEqual(await page.$$eval('#startExamples b', bs => bs.map(b => b.textContent)), ['Låda med lock', 'Monteringsplatta', 'Skylt', 'Kopp']);
 const before = await doc();
 await page.click('#startExamples button >> nth=0');
 await page.waitForFunction(b => window.__scadshape.doc !== b, before);
-assert.deepEqual(await page.evaluate(() => window.__scadshape.doc.params.map(p => p.name)), ['width', 'depth', 'height']);
-console.log('engelska: Box with lid · width, depth, height');
+assert.deepEqual(await page.evaluate(() => window.__scadshape.doc.params.map(p => p.name)), ['bredd', 'djup', 'höjd']);
+console.log('swedish: Låda med lock · bredd, djup, höjd');
 
 await browser.close();
-console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga konsolfel. Alla kontroller ok.');
+console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');
 if (errors.length) process.exit(1);

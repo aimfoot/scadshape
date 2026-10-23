@@ -12,8 +12,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 
 /**
- * Lämnar ut filer som delas till andra appar (cache/share/<namn>) som content://-adresser.
- * Läsrätten ges per delning (FLAG_GRANT_READ_URI_PERMISSION); providern är inte exporterad.
+ * Hands out files shared to other apps (cache/share/<name>) as content:// addresses.
+ * Read access is granted per share (FLAG_GRANT_READ_URI_PERMISSION); the provider is not exported.
  */
 public class Files extends ContentProvider {
     static final String AUTHORITY = "io.github.aimfoot.scadshape.files";
@@ -26,7 +26,7 @@ public class Files extends ContentProvider {
         return new Uri.Builder().scheme("content").authority(AUTHORITY).appendPath(f.getName()).build();
     }
 
-    /** Bara ett filnamn direkt i share/ – inga kataloger eller "..". */
+    /** Only a file name directly in share/ – no directories or "..". */
     File file(Uri uri) throws FileNotFoundException {
         String name = uri.getLastPathSegment();
         if (name == null || name.isEmpty() || name.startsWith(".") || uri.getPathSegments().size() != 1)
