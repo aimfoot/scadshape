@@ -5,8 +5,8 @@
 # The web app is built into build/assets/www (not ../dist, so the web version is not affected).
 set -eu
 cd "$(dirname "$0")"
-VERSION_CODE=7
-VERSION_NAME=0.4.0
+VERSION_CODE=8
+VERSION_NAME=0.5.0
 
 B=$HOME/opt/android-build
 export JAVA_HOME=$B/jdk PATH=$B/jdk/bin:$PATH
