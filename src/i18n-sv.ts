@@ -52,7 +52,7 @@ export const sv: Record<keyof typeof en, string> = {
   'about.showLicense': 'Visa licensen (GPL-3.0)',
   'about.source': 'Källkod',
   'about.builtWith': 'Byggt med',
-  'about.engineSource': '3D-motorn är OpenSCAD byggd för WebAssembly. Källkoden finns på github.com/openscad/openscad och bygget på github.com/openscad/openscad-wasm. Tryck på en licens för att läsa den.',
+  'about.engineSource': '3D-motorn är OpenSCAD byggd för WebAssembly. Källkoden finns på github.com/openscad/openscad och bygget på github.com/openscad/openscad-wasm. scadshape är ett fristående projekt utan koppling till OpenSCAD-projektet. Tryck på en licens för att läsa den.',
   'about.group.engine': '3D-motor (OpenSCAD)',
   'about.group.text': 'Text i 3D',
   'about.group.files': 'Filer och komprimering',

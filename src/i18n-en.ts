@@ -50,7 +50,7 @@ export const en = {
   'about.showLicense': 'Show the license (GPL-3.0)',
   'about.source': 'Source code',
   'about.builtWith': 'Built with',
-  'about.engineSource': 'The 3D engine is OpenSCAD built for WebAssembly. Its source code is at github.com/openscad/openscad and the build at github.com/openscad/openscad-wasm. Tap a license to read it.',
+  'about.engineSource': 'The 3D engine is OpenSCAD built for WebAssembly. Its source code is at github.com/openscad/openscad and the build at github.com/openscad/openscad-wasm. scadshape is an independent project, not affiliated with or endorsed by the OpenSCAD project. Tap a license to read it.',
   'about.group.engine': '3D engine (OpenSCAD)',
   'about.group.text': 'Text in 3D',
   'about.group.files': 'Files and compression',

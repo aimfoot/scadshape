@@ -93,3 +93,6 @@ Manifold, planegcs, three.js, fonts and OpenSCAD libraries); the full list and t
 app under ☰ → About, in `src/licenses.ts` and in `vendor/licenses/`. The source code of the
 OpenSCAD WebAssembly engine is at [openscad/openscad](https://github.com/openscad/openscad), built
 with [openscad/openscad-wasm](https://github.com/openscad/openscad-wasm).
+
+scadshape is an independent project and is not affiliated with or endorsed by the OpenSCAD
+project. Other product names are trademarks of their respective owners.
