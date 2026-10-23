@@ -207,6 +207,8 @@ export const en = {
   'convert.extrudes': '{n} extrudes',
   'convert.revolves': '{n} revolves',
   'convert.codeBlocks': '{n} code blocks',
+  'convert.params': '{n} variables driving {m} dimensions',
+  'convert.linking': 'Linking the variables …',
   'convert.verified': 'Checked: same volume as the code (±{d} %)',
   'convert.differs': 'Note: the volume differs by {d} % from the code – check the model',
   'convert.failed': 'Could not convert the code',

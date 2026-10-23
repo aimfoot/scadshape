@@ -41,7 +41,7 @@ export async function convertCode() {
   btn.disabled = true;
   setStatus(t('convert.running'), 'busy');
   try {
-    const r = await scadToDoc(src, convertEngine);
+    const r = await scadToDoc(src, convertEngine, () => setStatus(t('convert.linking'), 'busy'));
     const example = EXAMPLES.find(x => x.id === app.source);
     const name = example ? t(example.name) : store.get('codeName') || t('convert.defaultName');
     switchProject(createProject(name, r.doc));
@@ -50,9 +50,10 @@ export async function convertCode() {
       r.extrudes ? t('convert.extrudes', { n: r.extrudes }) : '',
       r.revolves ? t('convert.revolves', { n: r.revolves }) : '',
       r.codeBlocks ? t('convert.codeBlocks', { n: r.codeBlocks }) : '',
+      r.params ? t('convert.params', { n: r.params, m: r.linked }) : '',
     ].filter(Boolean);
     showToast(`${t('convert.done')}: ${parts.join(', ')}`);
-    remoteLog('convert', { sketches: r.sketches, extrudes: r.extrudes, revolves: r.revolves, code: r.codeBlocks, bytes: src.length });
+    remoteLog('convert', { sketches: r.sketches, extrudes: r.extrudes, revolves: r.revolves, code: r.codeBlocks, params: r.params, linked: r.linked, bytes: src.length });
     // Check: the same volume as the original (circles without $fn are drawn finely in both)?
     const [a, b] = await Promise.all([volume(`${src}\n$fa = 1; $fs = 0.2;\n`), volume(buildModel(r.doc).code)]);
     if (a && b) {

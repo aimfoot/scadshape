@@ -7,6 +7,10 @@ import { join, relative } from 'node:path';
 import { setLang } from '../src/i18n';
 import { scadToDoc, svgLoops, type ConvertEngine } from '../src/convert/scad2doc';
 import { parseCsg, csgToScad } from '../src/convert/csg';
+import { scadParams } from '../src/convert/params';
+import { evalParams } from '../src/params';
+import { syncSketchParams } from '../src/paramsync';
+import type { SketchFeature } from '../src/doc';
 import { buildModel } from '../src/model3d';
 import { parseBinaryStl } from '../src/stl';
 import { fontsFor } from '../src/fonts';
@@ -88,7 +92,10 @@ await test('plate with two holes: two sketches, dimensions, exact volume', async
   const sk = r.doc.features[0] as { constraints: { type: string; value?: number }[] };
   assert.deepEqual(sk.constraints.filter(c => c.type === 'distance').map(c => c.value), [40, 30]);
   const holes = r.doc.features[2] as { constraints: { type: string; value?: number }[]; offset?: string };
-  assert.deepEqual(holes.constraints.map(c => c.value), [6, 6]); assert.equal(holes.offset, '-1');
+  assert.deepEqual(holes.constraints.filter(c => c.type === 'diameter').map(c => c.value), [6, 6]); assert.equal(holes.offset, '-1');
+  // Each hole is placed from the origin: x and y as dimensions.
+  assert.deepEqual(holes.constraints.filter(c => c.type === 'distance').map(c => c.value), [10, 10, 30, 20]);
+  assert.equal(solver.solve(holes as unknown as SketchData).dof, 0);
   assert.equal((r.doc.features[3] as { op: string }).op, 'remove');
 });
 
@@ -107,13 +114,14 @@ await test('rounded box (hull of cylinders), rotation to XZ, hexagon, cone and s
   assert.ok(kinds.includes('XZ'), kinds.join());
   const box = r.doc.features[0] as SketchData & { entities: Record<string, { type: string }> };
   assert.deepEqual(Object.values(box.entities).map(e => e.type).sort(), ['arc', 'arc', 'arc', 'arc', 'line', 'line', 'line', 'line']);
-  // Parametric: only the position is free; dimensions 60 × 40 and radius 5 – and the solver moves
-  // nothing.
+  // Parametric and fully defined: dimensions 60 × 40, radius 5 and the bottom left corner's center at
+  // the origin – and the solver moves nothing.
   const before = JSON.stringify(box.points);
   const sol = solver.solve(box);
-  assert.ok(sol.ok, JSON.stringify(sol)); assert.equal(sol.dof, 2); assert.deepEqual(sol.redundant, []);
+  assert.ok(sol.ok, JSON.stringify(sol)); assert.equal(sol.dof, 0); assert.deepEqual(sol.redundant, []);
   for (const [id, p] of Object.entries(box.points)) { const q = JSON.parse(before)[id]; assert.ok(Math.hypot(p.x - q.x, p.y - q.y) < 1e-6, id); }
   assert.deepEqual(box.constraints.filter(c => 'value' in c).map(c => (c as { value: number }).value).sort((a, b) => a - b), [5, 40, 60]);
+  assert.deepEqual(box.constraints.filter(c => c.type === 'hpoints' || c.type === 'vpoints').map(c => c.type).sort(), ['hpoints', 'vpoints']);
   // OpenSCAD's sphere does not reach all the way to the poles (the points lie between them) – hence
   // 0.02 mm.
   assert.ok(r.dv < 0.002 && r.db < 0.02, `volume ${r.dv}, size ${r.db}`);
@@ -125,6 +133,67 @@ await test('offset and text are drawn by OpenSCAD and become lines and arcs', as
   const s = r.doc.features[0] as { entities: Record<string, { type: string }> };
   assert.equal(Object.values(s.entities).filter(e => e.type === 'arc').length, 4, 'four rounded corners');
   assert.ok(r.dv < 0.005, `volume ${r.dv}`);
+});
+
+await test('top-level variables are read from the code (vectors, Hidden, modules and include skipped)', () => {
+  const ps = scadParams(`include <BOSL2/std.scad>
+/* [Size] */
+width = 60; // [30:100]
+size = [40, 30.5, 2];
+outer = width + 2*wall; // uses wall before it is set: allowed in OpenSCAD, not in the variables list
+label = "a;b";
+round = true;
+module m(r = 3) { inner = 5; cylinder(r = r); }
+twice = 1; twice = 2;
+/* [Hidden] */
+wall = 2;
+eps = 0.01;
+$fn = 64;
+z = size[2] + size.y;
+top = 1;
+/* [Shape] */
+lip = top + width/2;
+`);
+  // Hidden: eps, z and wall are unused (outer was dropped); top comes along because lip uses it.
+  assert.deepEqual(ps.map(p => `${p.name}=${p.expr}`), ['width=60', 'size_x=40', 'size_y=30,5', 'size_z=2', 'top=1', 'lip=top + width/2']);
+});
+
+await test('converted AI-style code gets its variables, and changing them gives the same model as OpenSCAD', async () => {
+  const src = `// Mounting plate
+/* [Size] */
+width = 60;
+depth = 40;
+thickness = 4;
+hole_r = 2.5;
+corner_r = 3;
+/* [Hidden] */
+$fn = 48;
+
+difference() {
+  hull() for (x = [corner_r, width - corner_r], y = [corner_r, depth - corner_r]) translate([x, y, 0]) cylinder(r = corner_r, h = thickness);
+  for (x = [8, 18]) translate([x, 8, -1]) cylinder(h = thickness + 2, r = hole_r);
+}
+translate([0, 0, thickness]) cube([10, depth, 7]);
+`;
+  const r = await scadToDoc(src, engine);
+  assert.deepEqual(r.doc.params.map(p => p.name), ['width', 'depth', 'thickness', 'hole_r', 'corner_r']);
+  const sks = r.doc.features.filter((f): f is SketchFeature => f.type === 'sketch');
+  const exprs = sks.map(sk => sk.constraints.flatMap(c => ('expr' in c && c.expr ? [c.expr] : [])).sort());
+  // The rounded plate is placed by its outer edges on the axes; the holes at fixed numbers.
+  assert.deepEqual(exprs, [['corner_r', 'depth', 'width'], ['2*hole_r', '2*hole_r'], ['depth']], JSON.stringify(exprs));
+  assert.deepEqual(r.doc.features.flatMap(f => (f.type === 'extrude' ? [f.depth] : [])), ['thickness', 'thickness + 2', '7']);
+  assert.deepEqual(sks.map(s => s.offset), [undefined, '-1', 'thickness']);
+  assert.equal(r.linked, 9);
+  // Change the variables as in the variables dialog and compare with OpenSCAD's own result.
+  const set: Record<string, string> = { width: '80', depth: '50', thickness: '6', hole_r: '2', corner_r: '5' };
+  for (const p of r.doc.params) p.expr = set[p.name];
+  const { vars } = evalParams(r.doc.params);
+  for (const sk of sks) assert.ok(!syncSketchParams(sk, vars, solver).error, sk.name);
+  const a = await mesh(src + Object.entries(set).map(([k, v]) => `${k} = ${v};`).join('\n') + '\n$fa = 1; $fs = 0.2;\n');
+  const b = await mesh(buildModel(r.doc).code);
+  const dv = Math.abs(a.vol - b.vol) / a.vol;
+  const db = Math.max(...[0, 1, 2].flatMap(i => [Math.abs(a.min[i] - b.min[i]), Math.abs(a.max[i] - b.max[i])]));
+  assert.ok(dv < 0.005 && db < 1e-3, `volume ${dv}, size ${db}`);
 });
 
 // tests/fixtures: public test models. tests/private (only exists locally, not published): own

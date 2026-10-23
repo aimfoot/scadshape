@@ -209,6 +209,8 @@ export const sv: Record<keyof typeof en, string> = {
   'convert.extrudes': '{n} extruderingar',
   'convert.revolves': '{n} revolve',
   'convert.codeBlocks': '{n} kodblock',
+  'convert.params': '{n} variabler styr {m} mått',
+  'convert.linking': 'Kopplar variablerna …',
   'convert.verified': 'Kontrollerat: samma volym som koden (±{d} %)',
   'convert.differs': 'Obs: volymen skiljer {d} % från koden – kontrollera modellen',
   'convert.failed': 'Kunde inte göra om koden',

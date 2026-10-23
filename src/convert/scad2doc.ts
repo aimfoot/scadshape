@@ -9,8 +9,9 @@
 
 import { emptyDoc, newFeature, newSketch, type Doc } from '../doc';
 import type { Op } from '../features/common';
-import { newId, type Plane, type SketchData } from '../sketch/model';
+import { newId, ORIGIN, type Plane, type SketchData } from '../sketch/model';
 import { csgToScad, parseCsg, type CsgNode, type CsgValue } from './csg';
+import { ParamLinker } from './params';
 
 export interface ConvertEngine {
   /** Run the code and return the CSG export. */
@@ -25,6 +26,9 @@ export interface ConvertResult {
   extrudes: number;
   revolves: number;
   codeBlocks: number;
+  /** Variables read from the code, and how many dimensions/depths/offsets use them. */
+  params: number;
+  linked: number;
 }
 
 type Vec = { x: number; y: number };
@@ -159,7 +163,7 @@ const axisAligned = (t: Aff) => (Math.abs(t.b) < 1e-12 && Math.abs(t.c) < 1e-12)
 type Shape =
   | { kind: 'rect'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'circle'; c: Vec; r: number }
-  | { kind: 'loop'; pts: Vec[] } // polygon (arcs are found when the sketch is built)
+  | { kind: 'loop'; pts: Vec[]; text?: true } // polygon (arcs are found when the sketch is built); text: one of many glyph outlines
   | { kind: 'rhull'; centers: Vec[]; r: number }; // convex hull of equal circles (rounded box)
 
 interface Box2 {
@@ -233,7 +237,7 @@ function mapShape(s: Shape, t: Aff): Shape | null {
       return k === null ? null : { kind: 'circle', c: affApply(t, s.c), r: s.r * k };
     }
     case 'loop':
-      return { kind: 'loop', pts: s.pts.map(p => affApply(t, p)) };
+      return { ...s, pts: s.pts.map(p => affApply(t, p)) };
     case 'rhull': {
       const k = uniformScale(t);
       return k === null ? null : { kind: 'rhull', centers: s.centers.map(p => affApply(t, p)), r: s.r * k };
@@ -561,7 +565,9 @@ class Converter {
     const src = children.map(c => csgToScad(fine(c))).join('\n');
     try {
       const loops = svgLoops(await this.engine.svg(src));
-      return loops.length ? loops.map(pts => ({ kind: 'loop', pts })) : null;
+      const hasText = (n: CsgNode): boolean => n.name === 'text' || n.children.some(hasText);
+      const text = children.some(hasText) ? { text: true as const } : {};
+      return loops.length ? loops.map(pts => ({ kind: 'loop', pts, ...text })) : null;
     } catch {
       return null;
     }
@@ -647,8 +653,32 @@ function fitSegments(pts: Vec[]): ({ kind: 'line'; a: number; b: number } | { ki
   return out;
 }
 
+/** A point that could place a shape along one axis: its coordinate, and the point id (made on demand). */
+type AnchorCand = { v: number; p: () => string };
+
+/**
+ * The sketch builder's choices (which point places a shape …). Recorded in the first conversion and
+ * replayed when the code is converted again with a variable nudged, so both documents have the same
+ * structure and their values can be compared one by one.
+ */
+class Choices {
+  private log: number[] = [];
+  private at = -1;
+  replay() {
+    this.at = 0;
+  }
+  pick(choose: () => number): number {
+    if (this.at < 0) {
+      const v = choose();
+      this.log.push(v);
+      return v;
+    }
+    return this.log[this.at++] ?? choose();
+  }
+}
+
 class SketchBuilder {
-  constructor(private sk: SketchData) {}
+  constructor(private sk: SketchData, private linker: ParamLinker, private choices: Choices) {}
   private pt(p: Vec) {
     const id = newId(this.sk, 'p');
     this.sk.points[id] = { x: p.x, y: p.y };
@@ -668,6 +698,31 @@ class SketchBuilder {
   private con(c: object) {
     this.sk.constraints.push({ id: newId(this.sk, 'c'), ...c } as SketchData['constraints'][number]);
   }
+  /** A dimension from the origin to point p along one axis (or "in line with the origin" for 0). */
+  fixAxis(axis: 'x' | 'y', p: string) {
+    const sk = this.sk, v = sk.points[p][axis];
+    sk.points[ORIGIN] ??= { x: 0, y: 0 };
+    if (Math.abs(v) < 1e-9) this.con({ type: axis === 'x' ? 'vpoints' : 'hpoints', p1: ORIGIN, p2: p });
+    else this.con({ type: 'distance', p1: ORIGIN, p2: p, dir: axis === 'x' ? 'h' : 'v', value: Math.abs(v), ...(v < 0 ? { sign: -1 } : {}) });
+  }
+  /**
+   * Place the shape along each axis by the candidate the code explains best (0 or a variable
+   * expression; the first on a tie), so changed sizes grow from where the code puts the shape
+   * instead of wherever the solver likes.
+   */
+  private place(xs: AnchorCand[], ys: AnchorCand[]) {
+    for (const [axis, cands] of [['x', xs], ['y', ys]] as const) {
+      const best = this.choices.pick(() => {
+        let best = 0, score = -1;
+        cands.forEach((c, i) => {
+          const s = this.linker.explains(c.v);
+          if (s > score) [best, score] = [i, s];
+        });
+        return best;
+      });
+      this.fixAxis(axis, cands[Math.min(best, cands.length - 1)].p());
+    }
+  }
 
   add(s: Shape): void {
     const sk = this.sk;
@@ -681,12 +736,29 @@ class SketchBuilder {
         this.line(p[3], p[0], 'vertical');
         sk.constraints.push({ id: newId(sk, 'c'), type: 'distance', p1: p[0], p2: p[1], dir: 'h', value: s.x1 - s.x0 });
         sk.constraints.push({ id: newId(sk, 'c'), type: 'distance', p1: p[1], p2: p[2], dir: 'v', value: s.y1 - s.y0 });
+        // Placed by a corner, an edge or – when centered (cube(center = true)) – the center on a
+        // construction diagonal, like the center rectangle tool.
+        let mid: string | undefined;
+        const center = () => {
+          if (mid) return mid;
+          const d = newId(sk, 'e');
+          mid = this.pt({ x: (s.x0 + s.x1) / 2, y: (s.y0 + s.y1) / 2 });
+          sk.entities[d] = { type: 'line', p1: p[0], p2: p[2], construction: true };
+          this.con({ type: 'midpoint', p: mid, e: d, quiet: true });
+          return mid;
+        };
+        this.place(
+          [{ v: s.x0, p: () => p[0] }, { v: (s.x0 + s.x1) / 2, p: center }, { v: s.x1, p: () => p[1] }],
+          [{ v: s.y0, p: () => p[0] }, { v: (s.y0 + s.y1) / 2, p: center }, { v: s.y1, p: () => p[3] }],
+        );
         return;
       }
       case 'circle': {
         const id = newId(sk, 'e');
-        sk.entities[id] = { type: 'circle', c: this.pt(s.c), r: s.r };
+        const c = this.pt(s.c);
+        sk.entities[id] = { type: 'circle', c, r: s.r };
         sk.constraints.push({ id: newId(sk, 'c'), type: 'diameter', e: id, value: 2 * s.r });
+        this.place([{ v: s.c.x, p: () => c }], [{ v: s.c.y, p: () => c }]);
         return;
       }
       case 'rhull': {
@@ -716,6 +788,7 @@ class SketchBuilder {
         }
         this.con({ type: 'radius', e: arcs[0], value: s.r });
         // Rounded rectangle: outer width and outer height as dimensions.
+        const xs: AnchorCand[] = [], ys: AnchorCand[] = [];
         if (k === 4) {
           const dirs = cs.map((_, i) => normal(i));
           const find = (x: number, y: number) => dirs.findIndex(d => Math.abs(d.x - x) < 1e-9 && Math.abs(d.y - y) < 1e-9);
@@ -724,8 +797,18 @@ class SketchBuilder {
             const box = shapeBox(s);
             this.con({ type: 'pldistance', p: starts[right], e: lines[left], value: box.x1 - box.x0 });
             this.con({ type: 'pldistance', p: starts[top], e: lines[bottom], value: box.y1 - box.y0 });
+            // The outer edges can also place it (translate([wall, wall]) of a rounded box).
+            xs.push({ v: box.x0, p: () => starts[left] }, { v: box.x1, p: () => starts[right] });
+            ys.push({ v: box.y0, p: () => starts[bottom] }, { v: box.y1, p: () => starts[top] });
           }
         }
+        // Or by a corner's center (the bottom left one first).
+        const centerOf = (i: number) => (sk.entities[arcs[(i + k - 1) % k]] as { c: string }).c;
+        const order = cs.map((_, i) => i).sort((a, b) => cs[a].x + cs[a].y - (cs[b].x + cs[b].y));
+        this.place(
+          [{ v: cs[order[0]].x, p: () => centerOf(order[0]) }, ...xs, ...order.slice(1).map(i => ({ v: cs[i].x, p: () => centerOf(i) }))],
+          [{ v: cs[order[0]].y, p: () => centerOf(order[0]) }, ...ys, ...order.slice(1).map(i => ({ v: cs[i].y, p: () => centerOf(i) }))],
+        );
         return;
       }
       case 'loop': {
@@ -737,13 +820,22 @@ class SketchBuilder {
           const c = segs[0].c;
           return this.add({ kind: 'circle', c, r: Math.hypot(pts[0].x - c.x, pts[0].y - c.y) });
         }
+        // A (rounded) rectangle drawn by OpenSCAD (offset(r) square, …) → the parametric shape. Not
+        // in text: a placed "-" or "I" would move away from the other letters.
+        const known = !s.text && roundedRect(pts);
+        if (known) return this.add(known);
         const ids = pts.map(p => this.pt(p));
+        // A small polygon whose corners come from variables (polygon([[t, t], [t + 30, t], …])):
+        // every corner placed from the origin, so they follow the variables.
+        const byCorners = !s.text && !!this.choices.pick(() =>
+          +(segs.length <= 12 && segs.every(g => g.kind === 'line') && pts.some(p => this.linker.explains(p.x) === 1 || this.linker.explains(p.y) === 1)));
         for (const g of segs) {
           if (g.kind === 'line') {
             const a = pts[g.a], b = pts[g.b];
-            this.line(ids[g.a], ids[g.b], Math.abs(a.y - b.y) < 1e-9 ? 'horizontal' : Math.abs(a.x - b.x) < 1e-9 ? 'vertical' : undefined);
+            this.line(ids[g.a], ids[g.b], byCorners ? undefined : Math.abs(a.y - b.y) < 1e-9 ? 'horizontal' : Math.abs(a.x - b.x) < 1e-9 ? 'vertical' : undefined);
           } else this.arc(g.c, ids[g.a], ids[g.b], g.ccw);
         }
+        if (byCorners) for (const id of ids) (['x', 'y'] as const).forEach(axis => this.fixAxis(axis, id));
         // Points in the middle of arcs are not used.
         const used = new Set(Object.values(sk.entities).flatMap(e => (e.type === 'circle' ? [e.c] : e.type === 'line' ? [e.p1, e.p2] : [e.c, e.p1, e.p2])));
         for (const id of ids) if (!used.has(id)) delete sk.points[id];
@@ -751,6 +843,30 @@ class SketchBuilder {
       }
     }
   }
+}
+/**
+ * An axis-aligned rectangle, or one with four equal rounded corners, as a rect/rhull shape: every
+ * corner and every edge midpoint of the polygon lies on its outline. The size and radius come from
+ * the straight edges (exact in the SVG export), not from the polygon's arcs.
+ */
+function roundedRect(pts: Vec[]): Shape | null {
+  const { x0, y0, x1, y1 } = box2(pts), w = x1 - x0, h = y1 - y0;
+  const eps = 1e-6 * Math.max(1, w, h);
+  const bottom = pts.filter(p => Math.abs(p.y - y0) < eps);
+  if (!(w > eps && h > eps) || bottom.length < 2) return null;
+  const r = Math.min(...bottom.map(p => p.x)) - x0;
+  if (r > Math.min(w, h) / 2 - eps) return null;
+  // The polygon's arcs (and offset(delta) of them) are a little inside the true arc.
+  const tol = Math.max(eps, r * 0.02);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, hx = w / 2 - r, hy = h / 2 - r;
+  const off = (p: Vec) => {
+    const qx = Math.abs(p.x - cx) - hx, qy = Math.abs(p.y - cy) - hy;
+    return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+  };
+  const mids = pts.map((p, i) => ({ x: (p.x + pts[(i + 1) % pts.length].x) / 2, y: (p.y + pts[(i + 1) % pts.length].y) / 2 }));
+  if ([...pts, ...mids].some(p => Math.abs(off(p)) > tol)) return null;
+  if (r < eps) return { kind: 'rect', x0, y0, x1, y1 };
+  return { kind: 'rhull', r, centers: [{ x: x0 + r, y: y0 + r }, { x: x1 - r, y: y0 + r }, { x: x1 - r, y: y1 - r }, { x: x0 + r, y: y1 - r }] };
 }
 const dedupe = (pts: Vec[]) => pts.filter((p, i) => {
   const q = pts[(i + 1) % pts.length];
@@ -773,8 +889,23 @@ function mergeTools(tools: Tool[]): Tool[] {
   return out;
 }
 
-/** Convert OpenSCAD code to a document with sketches and features. */
-export async function scadToDoc(src: string, engine: ConvertEngine): Promise<ConvertResult> {
+/**
+ * Convert OpenSCAD code to a document with sketches and features. The code's top-level variables
+ * become the document's variables, linked to the values that depend on them (convert/params.ts).
+ */
+export async function scadToDoc(src: string, engine: ConvertEngine, onLinking?: () => void): Promise<ConvertResult> {
+  const linker = new ParamLinker(src);
+  const choices = new Choices();
+  const r = await buildDoc(src, engine, linker, choices);
+  if (linker.params.length) onLinking?.();
+  const linked = await linker.link(r.doc, async nudged => {
+    choices.replay();
+    return (await buildDoc(nudged, engine, linker, choices)).doc;
+  });
+  return { ...r, params: linker.params.length, linked };
+}
+
+async function buildDoc(src: string, engine: ConvertEngine, linker: ParamLinker, choices: Choices) {
   const roots = parseCsg(await engine.csg(src));
   const conv = new Converter(engine);
   for (const n of roots) await conv.walk(n, I4, 'add');
@@ -791,14 +922,14 @@ export async function scadToDoc(src: string, engine: ConvertEngine): Promise<Con
       continue;
     }
     if (t.kind === 'revolve') {
-      doc.features.push(...revolveFeatures(doc, t));
+      doc.features.push(...revolveFeatures(doc, t, linker, choices));
       sketches++;
       revolves++;
       continue;
     }
     const sk = newSketch(doc, t.plane);
     if (Math.abs(t.offset) > 1e-9) sk.offset = fmt(t.offset);
-    const b = new SketchBuilder(sk);
+    const b = new SketchBuilder(sk, linker, choices);
     for (const s of t.shapes) b.add(s);
     doc.features.push(sk);
     const e = newFeature(doc, 'extrude', sk);
@@ -813,7 +944,7 @@ export async function scadToDoc(src: string, engine: ConvertEngine): Promise<Con
 }
 
 /** Sketch with profile and axis (construction line) + Revolve 360°. */
-function revolveFeatures(doc: Doc, t: Extract<Tool, { kind: 'revolve' }>) {
+function revolveFeatures(doc: Doc, t: Extract<Tool, { kind: 'revolve' }>, linker: ParamLinker, choices: Choices) {
   const sk = newSketch(doc, t.plane);
   if (Math.abs(t.offset) > 1e-9) sk.offset = fmt(t.offset);
   const pt = (p: Vec) => {
@@ -821,20 +952,34 @@ function revolveFeatures(doc: Doc, t: Extract<Tool, { kind: 'revolve' }>) {
     sk.points[id] = { x: p.x, y: p.y };
     return id;
   };
+  // Every point placed from the origin, so the profile follows the variables.
+  const b = new SketchBuilder(sk, linker, choices);
+  const place = (id: string) => (['x', 'y'] as const).forEach(axis => b.fixAxis(axis, id));
   const ids = t.profile.map(pt);
+  const [a0, a1] = t.axis;
+  const vertical = Math.abs(a0.x - a1.x) < 1e-9;
   if (t.arc) {
-    // Sphere: half circle (counterclockwise from ids[0] to ids[1]) + the line along the axis.
-    sk.entities[newId(sk, 'e')] = { type: 'arc', c: pt(t.arc.c), p1: ids[0], p2: ids[1] };
+    // Sphere: half circle (counterclockwise from ids[0] to ids[1]) + the line along the axis. The
+    // center is placed, the radius is a dimension, and the ends lie on the axis through the center.
+    const c = pt(t.arc.c), e = newId(sk, 'e');
+    sk.entities[e] = { type: 'arc', c, p1: ids[0], p2: ids[1] };
     sk.entities[newId(sk, 'e')] = { type: 'line', p1: ids[1], p2: ids[0] };
-  } else ids.forEach((id, i) => (sk.entities[newId(sk, 'e')] = { type: 'line', p1: id, p2: ids[(i + 1) % ids.length] }));
+    place(c);
+    const { x, y } = sk.points[c], p = sk.points[ids[0]];
+    sk.constraints.push({ id: newId(sk, 'c'), type: 'radius', e, value: Math.hypot(p.x - x, p.y - y) });
+    for (const id of ids) sk.constraints.push({ id: newId(sk, 'c'), type: vertical ? 'vpoints' : 'hpoints', p1: c, p2: id });
+  } else {
+    ids.forEach((id, i) => (sk.entities[newId(sk, 'e')] = { type: 'line', p1: id, p2: ids[(i + 1) % ids.length] }));
+    ids.forEach(place);
+  }
   // The axis: the sketch's Y/X axis if it goes through the origin, otherwise a construction line.
-  const [a, b] = t.axis;
   const r = newFeature(doc, 'revolve', sk);
-  if (Math.abs(a.x) < 1e-9 && Math.abs(b.x) < 1e-9) r.axis = { kind: 'y' };
-  else if (Math.abs(a.y) < 1e-9 && Math.abs(b.y) < 1e-9) r.axis = { kind: 'x' };
+  if (Math.abs(a0.x) < 1e-9 && Math.abs(a1.x) < 1e-9) r.axis = { kind: 'y' };
+  else if (Math.abs(a0.y) < 1e-9 && Math.abs(a1.y) < 1e-9) r.axis = { kind: 'x' };
   else {
-    const e = newId(sk, 'e');
-    sk.entities[e] = { type: 'line', p1: pt(a), p2: pt(b), construction: true };
+    const e = newId(sk, 'e'), p1 = pt(a0), p2 = pt(a1);
+    sk.entities[e] = { type: 'line', p1, p2, construction: true };
+    [p1, p2].forEach(place);
     r.axis = { kind: 'line', e };
   }
   r.op = t.op;

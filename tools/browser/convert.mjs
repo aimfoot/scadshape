@@ -39,8 +39,23 @@ assert.deepEqual([count("sketch"), count("extrude"), count("revolve"), count("co
 await page.waitForFunction(() => true);
 for (let i = 0; i < 60 && !toasts.some(t => /Checked|Note/.test(t)); i++) await page.waitForTimeout(500);
 assert.ok(toasts.some(t => /Checked: same volume/.test(t)), toasts.join(' | '));
+assert.ok(toasts.some(t => /7 variables driving \d+ dimensions/.test(t)), toasts.join(' | '));
 console.log(toasts.filter(t => /Done|Checked/.test(t)).join(' | '));
 await page.screenshot({ path: `${out}/v-model.png` });
+
+// The code's variables drive the model: a thicker wall makes the box wider (inner_x + 2*wall).
+const outer = () => page.evaluate(() => { const xs = Object.values(window.__scadshape.doc.features[0].points).map(p => p.x); return Math.max(...xs) - Math.min(...xs); });
+assert.deepEqual(await page.evaluate(() => window.__scadshape.doc.params.map(p => p.name)), ['inner_x', 'inner_y', 'inner_z', 'wall', 'r', 'lip_h', 'gap']);
+assert.ok(Math.abs(await outer() - 64) < 1e-6);
+await page.click('#btnParams');
+await page.screenshot({ path: `${out}/v-params.png` });
+const wall = page.getByLabel('Value of wall');
+await wall.fill('3'); await wall.dispatchEvent('change');
+await page.click('#paramsDlg form[method=dialog] button');
+await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent) && !/Rendering/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
+assert.ok(Math.abs(await outer() - 66) < 1e-6, String(await outer()));
+assert.equal((await page.evaluate(() => [...window.__scadshape.model.errors.values()])).length, 0);
+console.log('wall 2 → 3: outer width 64 → 66');
 
 // Edit a sketch: the first one (the box's bottom) has regions and can be opened
 if (await page.isHidden('#tree')) await page.click('#btnTree');
@@ -49,7 +64,7 @@ await page.locator('#featureList button.feature').first().click();
 await page.waitForFunction(() => window.__scadshape.editor?.solverReady, null, { timeout: 15000 });
 await page.waitForTimeout(400);
 assert.match(await page.textContent('#loopInfo'), /closed region|closed regions/);
-assert.match(await page.textContent('#loopInfo'), /2 degrees of freedom/, 'the rounded box: only the position is free');
+assert.match(await page.textContent('#loopInfo'), /Fully defined/, 'the rounded box: size and position from the code');
 // Make the box 20 mm wider via the outer width dimension
 const w = await page.evaluate(() => {
   const e = window.__scadshape.editor;
