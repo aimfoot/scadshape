@@ -8,6 +8,7 @@ import { fontById, fontsFor } from '../src/fonts';
 import { buildModel } from '../src/model3d';
 import { parseBinaryStl } from '../src/stl';
 import { emptySketch, newId, type SketchData } from '../src/sketch/model';
+import { segmentsFor } from '../src/sketch/geom';
 import { evalParams } from '../src/params';
 import { parseExpr } from '../src/expr';
 import { regionsOf, findLoops, selectRegions } from '../src/sketch/regions';
@@ -15,7 +16,7 @@ import { facePlane, findCurveRef, findFaceRef, offsetExpr, planeReference, sketc
 import { planeFrame, sketchFrame, toWorld } from '../src/frame';
 import { KINDS } from '../src/features';
 import { repeatCircles } from '../src/features/pattern';
-import { addFaceLoops, faceLoops, faceTriangles, smoothFace } from '../src/faceoutline';
+import { addFaceLoops, exactValue, faceLoops, faceTriangles, smoothFace } from '../src/faceoutline';
 import { featureEdges } from '../src/edges';
 import { WORLD_SKETCH } from '../src/features/code';
 setLang('en'); // the tests expect English names and errors
@@ -750,6 +751,50 @@ await test('snap hook and catch: volumes, direction and strain', async () => {
   near((await render(m.code)).vol, 30 * 20 * 3 - (1.5 + 1 + 0.4) * (6 + 0.4) * 2, 0.01);
   // Too short a hook.
   h.kind = 'hook'; h.length = '2'; assert.match(buildModel(doc).errors.get(h.id)!, /too short/);
+});
+await test('a face sketch lines up exactly with the face it came from (no step, no slivers)', async () => {
+  assert.equal(exactValue(Math.fround(22.36068)), 22.36068);
+  assert.equal(exactValue(Math.fround(24.36068)), 24.36068);
+  assert.equal(exactValue(Math.fround(-0.5)), -0.5);
+  // A cylinder (r = √500, off the origin), a ring around it, then a face sketch from the top and an
+  // extrude on it: the new cylinder must continue the ring's wall exactly.
+  const doc = emptyDoc(); const s = newSketch(doc, 'XY'); insertFeature(doc, s);
+  const cid = circle(s, 3.5, -1.25, Math.round(Math.sqrt(500) * 1e6) / 1e6);
+  const e = newExtrude(doc, s.id); e.depth = '10'; insertFeature(doc, e);
+  const vars = evalParams([]).vars;
+  const ring = newFeature(doc, 'surface', WORLD_SKETCH); ring.ref = findCurveRef(doc, vars, [1, 0, 0], [3.5 + 22.36068, -1.25, 5])!; ring.depth = '2'; insertFeature(doc, ring);
+  assert.ok(ring.ref, 'the side is found');
+  let r = await render(buildModel(doc).code);
+  const loops = faceLoops(r.pos, planeFrame('XY', 10), [3.5, -1.25, 10]);
+  assert.equal(loops.length, 1);
+  const l = loops[0];
+  assert.equal(l.kind, 'circle', JSON.stringify(l).slice(0, 200));
+  if (l.kind !== 'circle') return;
+  assert.deepEqual([l.c.x, l.c.y, l.r], [3.5, -1.25, 24.36068]);
+  const circ = s.entities[cid] as { r: number };
+  assert.equal(l.fn, segmentsFor(circ.r, 2 * Math.PI), 'the ring\'s segments');
+  const top = newSketch(doc, 'XY'); top.offset = '10'; addFaceLoops(top, loops); insertFeature(doc, top);
+  const e2 = newExtrude(doc, top.id); e2.depth = '5'; insertFeature(doc, e2);
+  r = await render(buildModel(doc).code);
+  // Perfect: the bottom and the top are exactly the ring's 106-gon, there is no horizontal face at any
+  // other height (no step), and the volume is that polygon × 15. (Manifold may leave triangles of
+  // three points on one line along seams; they have no area beyond float32 noise.)
+  const n = segmentsFor(circ.r, 2 * Math.PI), R = 24.36068;
+  const poly = (n / 2) * R * R * Math.sin((2 * Math.PI) / n);
+  const flat = new Map<number, number>();
+  for (let i = 0; i < r.pos.length; i += 9) {
+    const P = (k: number) => [r.pos[i + k * 3], r.pos[i + k * 3 + 1], r.pos[i + k * 3 + 2]];
+    const [p0, p1, p2] = [P(0), P(1), P(2)];
+    if (Math.abs(p0[2] - p1[2]) > 1e-4 || Math.abs(p0[2] - p2[2]) > 1e-4) continue;
+    const a = Math.abs((p1[0] - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (p1[1] - p0[1])) / 2;
+    const z = Math.round(p0[2] * 1000) / 1000;
+    flat.set(z, (flat.get(z) ?? 0) + a);
+  }
+  for (const [z, a] of flat) {
+    if (z === 0 || z === 15) near(a, poly, 1e-3);
+    else assert.ok(a < 1e-5, `a step at z = ${z}: ${a} mm²`);
+  }
+  near(r.vol, poly * 15, poly * 15 * 1e-6);
 });
 await test('needle triangles in flat faces: no edges across the face, clean outlines', async () => {
   // A disc with rings and a slightly different circle on top (106- and 110-gons meeting in one plane):

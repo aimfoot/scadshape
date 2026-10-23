@@ -10,7 +10,7 @@ export interface Loop {
   pts: Vec[]; // closed polygon (the last point is not repeated), counterclockwise
   area: number; // absolute area, mm²
   entityIds: string[]; // curves that form the edge
-  circle?: { c: Vec; r: number }; // a separate full circle
+  circle?: { c: Vec; r: number; fn?: number }; // a separate full circle
   component: number; // connected group of curves
   depth: number; // number of regions (in other components) that enclose this one
   parent: number; // index of the nearest enclosing region, −1 if none
@@ -21,7 +21,7 @@ const EPS = 1e-7;
 /** A curve in parametric form: line t∈[0,1] between a and b, or arc θ = a0 + t·sweep. */
 type Curve =
   | { id: string; kind: 'line'; a: Vec; b: Vec }
-  | { id: string; kind: 'arc'; c: Vec; r: number; a0: number; sweep: number; closed: boolean };
+  | { id: string; kind: 'arc'; c: Vec; r: number; a0: number; sweep: number; closed: boolean; fn?: number };
 
 function curveAt(cv: Curve, t: number): Vec {
   return cv.kind === 'line'
@@ -108,7 +108,7 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
       const a = sk.points[e.p1], b = sk.points[e.p2];
       if (dist(a, b) > EPS) curves.push({ id, kind: 'line', a, b });
     } else if (e.type === 'circle') {
-      if (e.r > EPS) curves.push({ id, kind: 'arc', c: sk.points[e.c], r: e.r, a0: 0, sweep: TAU, closed: true });
+      if (e.r > EPS) curves.push({ id, kind: 'arc', c: sk.points[e.c], r: e.r, a0: 0, sweep: TAU, closed: true, fn: e.fn });
     } else {
       const g = arcGeom(sk, e);
       if (g.r > EPS) curves.push({ id, kind: 'arc', c: g.c, r: g.r, a0: g.a0, sweep: g.sweep, closed: false });
@@ -221,7 +221,7 @@ export function findLoops(sk: SketchData): { loops: Loop[]; inLoop: Set<string> 
     const cv = curves[i] as Extract<Curve, { kind: 'arc' }>;
     const pts = arcPoints(cv.c, cv.r, 0, TAU);
     pts.pop();
-    loops.push({ pts, area: Math.PI * cv.r * cv.r, entityIds: [cv.id], circle: { c: cv.c, r: cv.r }, component: -1 - i });
+    loops.push({ pts, area: Math.PI * cv.r * cv.r, entityIds: [cv.id], circle: { c: cv.c, r: cv.r, fn: cv.fn }, component: -1 - i });
   }
 
   // 7. Nesting between components: B lies in A if (a sample of) B's points lie in A.

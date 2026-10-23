@@ -27,6 +27,8 @@ export interface CircleE extends Base {
   type: 'circle';
   c: string;
   r: number;
+  /** Segments ($fn) of a circle taken from the model's outline (a face sketch), so it matches the face exactly. */
+  fn?: number;
 }
 /** Arc counterclockwise from p1 to p2 around c; the radius is |p1 − c| (p2 is kept on the same radius). */
 export interface ArcE extends Base {

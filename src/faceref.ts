@@ -413,13 +413,15 @@ export interface CurveSide {
   a0: number;
   sweep: number;
   span: [number, number];
+  /** The circle's own segments, if set (see CircleE.fn). */
+  fn?: number;
 }
 
 function curveSide(sk: SketchFeature, f: ExtrudeFeature, entity: string, vars?: Vars): CurveSide | null {
   const e = sk.entities[entity];
   const span = extrudeSpan(f, vars);
   if (!e || e.construction || e.type === 'line' || !span) return null;
-  if (e.type === 'circle') return { sketch: sk, c: sk.points[e.c], r: e.r, a0: 0, sweep: 2 * Math.PI, span };
+  if (e.type === 'circle') return { sketch: sk, c: sk.points[e.c], r: e.r, a0: 0, sweep: 2 * Math.PI, span, fn: e.fn };
   const g = arcGeom(sk, e);
   return { sketch: sk, c: g.c, r: g.r, a0: g.a0, sweep: g.sweep, span };
 }

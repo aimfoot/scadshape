@@ -6,13 +6,23 @@ import { toPlane } from './frame';
 import type { Vec } from './sketch/geom';
 import { newId, type SketchData } from './sketch/model';
 
-export type FaceLoop = { kind: 'circle'; c: Vec; r: number } | { kind: 'poly'; pts: Vec[] };
+export type FaceLoop = { kind: 'circle'; c: Vec; r: number; fn: number } | { kind: 'poly'; pts: Vec[] };
 
-/** Remove float32 noise (the STL). */
-const tidy = (v: number) => {
-  const r = Math.round(v * 1e4) / 1e4;
-  return Object.is(r, -0) ? 0 : r;
-};
+/**
+ * The number the model was built with, from its float32 copy in the mesh: the shortest decimal (at most
+ * six decimals, like the generated code) within float32 precision. float32 keeps about seven
+ * significant digits, so a value written with up to seven comes back exactly – and a face sketch then
+ * lines up with the face without a step. `noise` widens the margin for averaged values.
+ */
+export function exactValue(v: number, noise = 1): number {
+  const tol = noise * 1.2e-7 * Math.max(1, Math.abs(v));
+  for (let d = 0; d <= 6; d++) {
+    const k = 10 ** d, c = Math.round(v * k) / k;
+    if (Math.abs(c - v) <= tol) return Object.is(c, -0) ? 0 : c;
+  }
+  const c = Math.round(v * 1e6) / 1e6;
+  return Object.is(c, -0) ? 0 : c;
+}
 
 /**
  * The outline of the flat face in the plane containing the point `at` (in the world): outer edge
@@ -104,22 +114,33 @@ export function faceLoops(positions: Float32Array, frame: Frame, at: V3): FaceLo
   return loops;
 }
 
-/** Merge straight pieces; a loop with many points at the same distance from the center becomes a circle. */
-function simplify(pts: Vec[]): FaceLoop {
-  const n = pts.length;
-  if (n >= 12) {
-    const c = { x: pts.reduce((s, p) => s + p.x, 0) / n, y: pts.reduce((s, p) => s + p.y, 0) / n };
-    const rs = pts.map(p => Math.hypot(p.x - c.x, p.y - c.y));
-    const r = rs.reduce((s, v) => s + v, 0) / n;
-    if (r > 0 && rs.every(v => Math.abs(v - r) < r * 0.01 + 1e-3)) return { kind: 'circle', c: { x: tidy(c.x), y: tidy(c.y) }, r: tidy(r) };
-  }
-  const keep = pts.filter((p, i) => {
-    const a = pts[(i + n - 1) % n], b = pts[(i + 1) % n];
+/**
+ * Merge straight pieces. A regular polygon of 12 or more corners, evenly spaced and starting at angle 0
+ * like OpenSCAD's circle(r, $fn), becomes a circle with that $fn – the same corners exactly.
+ */
+function simplify(raw: Vec[]): FaceLoop {
+  const keep = raw.filter((p, i) => {
+    const a = raw[(i + raw.length - 1) % raw.length], b = raw[(i + 1) % raw.length];
     const cross = (p.x - a.x) * (b.y - p.y) - (p.y - a.y) * (b.x - p.x);
     const len = Math.hypot(p.x - a.x, p.y - a.y) * Math.hypot(b.x - p.x, b.y - p.y);
     return len < 1e-18 || Math.abs(cross) / len > 1e-4;
   });
-  return { kind: 'poly', pts: keep.map(p => ({ x: tidy(p.x), y: tidy(p.y) })) };
+  const n = keep.length;
+  if (n >= 12) {
+    const c = { x: keep.reduce((s, p) => s + p.x, 0) / n, y: keep.reduce((s, p) => s + p.y, 0) / n };
+    const rs = keep.map(p => Math.hypot(p.x - c.x, p.y - c.y));
+    const r = rs.reduce((s, v) => s + v, 0) / n;
+    const step = (2 * Math.PI) / n;
+    const ang = keep.map(p => Math.atan2(p.y - c.y, p.x - c.x));
+    const even = ang.every((a, i) => {
+      const d = Math.abs(((ang[(i + 1) % n] - a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+      return Math.abs(d - step) < 1e-4;
+    });
+    const phase = ang.some(a => Math.abs(a / step - Math.round(a / step)) < 1e-4 / step);
+    if (r > 0 && even && phase && rs.every(v => Math.abs(v - r) < r * 1e-5 + 1e-5))
+      return { kind: 'circle', c: { x: exactValue(c.x, 4), y: exactValue(c.y, 4) }, r: exactValue(r, 4), fn: n };
+  }
+  return { kind: 'poly', pts: keep.map(p => ({ x: exactValue(p.x), y: exactValue(p.y) })) };
 }
 
 /** Add the loops to the sketch as locked geometry (fixed points, circles with dimensions). */
@@ -133,7 +154,7 @@ export function addFaceLoops(sk: SketchData, loops: FaceLoop[]) {
   for (const l of loops) {
     if (l.kind === 'circle') {
       const e = newId(sk, 'e');
-      sk.entities[e] = { type: 'circle', c: fixed(l.c), r: l.r };
+      sk.entities[e] = { type: 'circle', c: fixed(l.c), r: l.r, fn: l.fn };
       sk.constraints.push({ id: newId(sk, 'c'), type: 'diameter', e, value: 2 * l.r });
       continue;
     }

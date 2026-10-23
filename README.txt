@@ -154,6 +154,17 @@ Sketch on a face (faceref.ts, 2026-10-17)
   and edges (a new point, no constraint). The view fits the face only for sketches from a face.
   Tests: model.test "sketch on a face …", tools/browser/faces.mjs.
 
+Extrude a face (faceoutline.ts, features/surface.ts)
+  A flat face → a new sketch "… · face" with the face's outline as locked geometry, used by the extrude.
+  The outline is made to match the face exactly, so the new body joins it without a step: values come
+  back from the float32 mesh as the shortest decimal within float32 precision (exactValue – the code
+  writes at most six decimals, and float32 keeps about seven digits), and a regular polygon starting
+  at angle 0 becomes a circle with that $fn (CircleE.fn), corner for corner. Anything else stays a
+  polygon. A curved face becomes the feature "Extruded face": for the side of an extruded circle a
+  ring of circle()s with the circle's own $fn and no margin (its wall is the sketch circle itself),
+  for an arc a rotate_extrude sector with 0.02 mm overlap, otherwise a fixed copy of the surface.
+  Test: model.test "a face sketch lines up exactly …".
+
 Licence and "About scadshape" (2026-10-22)
   scadshape: GPL-3.0 or later (LICENSE). Required in practice: the OpenSCAD WASM contains CGAL
   (GPL-3); OpenSCAD itself is GPL-2 with an exception for CGAL. ☰ → About scadshape (src/ui/about.ts) shows

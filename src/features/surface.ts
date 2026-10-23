@@ -98,17 +98,22 @@ export const surface: FeatureKind<SurfaceFeature> = {
     if (r.error) return { error: r.error };
     const side = f.ref && ctx.doc ? resolveCurveRef(ctx.doc, f.ref, ctx.vars, f.id) : null;
     if (side) {
-      // A ring (or ring sector for an arc) around the circle's center, as tall as the extrude. The
-      // same $fn as the sketch circle and a 0.02 mm margin: overlaps the side cleanly (the circle
-      // deviates at most 0.01).
+      // A ring (or ring sector for an arc) around the circle's center, as tall as the extrude, with
+      // the same $fn as the sketch circle. A whole circle is a ring of circle()s: its wall against
+      // the body is the sketch circle itself, corner for corner, so it needs no margin and leaves
+      // no slivers (and a face sketch taken from its other edge matches it exactly). An arc sector
+      // (rotate_extrude) overlaps the side by 0.02 mm instead.
+      const whole = side.sweep >= 2 * Math.PI - 1e-9;
       const out = f.op === 'add' !== f.ref!.inside; // grows outwards from the center
-      const m = 0.02;
+      const m = whole ? 0 : 0.02;
       const [rin, rout] = out ? [side.r - m, side.r + d.v] : [side.r - d.v, side.r + m];
       if (!(rin > 0)) return { error: t('err.surfaceTooDeep') };
       const [lo, hi] = f.op === 'add' ? side.span : [side.span[0] - 0.01, side.span[1] + 0.01];
-      const fn = segmentsFor(side.r, 2 * Math.PI);
+      const fn = side.fn ?? segmentsFor(side.r, 2 * Math.PI);
       const deg = (a: number) => num((a * 180) / Math.PI);
-      const body = `translate([${num(side.c.x)}, ${num(side.c.y)}, ${num(lo)}]) rotate([0, 0, ${deg(side.a0)}]) rotate_extrude(angle = ${deg(side.sweep)}, $fn = ${fn}) translate([${num(rin)}, 0]) square([${num(rout - rin)}, ${num(hi - lo)}]);`;
+      const body = whole
+        ? `translate([${num(side.c.x)}, ${num(side.c.y)}, ${num(lo)}]) linear_extrude(height = ${num(hi - lo)}) difference() {\n    circle(r = ${num(rout)}, $fn = ${fn});\n    circle(r = ${num(rin)}, $fn = ${fn});\n  }`
+        : `translate([${num(side.c.x)}, ${num(side.c.y)}, ${num(lo)}]) rotate([0, 0, ${deg(side.a0)}]) rotate_extrude(angle = ${deg(side.sweep)}, $fn = ${fn}) translate([${num(rin)}, 0]) square([${num(rout - rin)}, ${num(hi - lo)}]);`;
       return { code: `module ${ctx.module}() {\n  ${ctx.place(side.sketch)}${body}\n}`, tools: [{ op: f.op, call: `${ctx.module}();` }] };
     }
     if (!f.tris.length) return { error: t('err.noSurface') };

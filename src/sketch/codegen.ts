@@ -4,15 +4,17 @@
 import { segmentsFor } from './geom';
 import type { Loop, Region } from './regions';
 
+// The same precision as the features (features/common.ts), so a face sketch can match the geometry it
+// was taken from exactly.
 const num = (n: number) => {
-  const s = (Math.round(n * 1e4) / 1e4).toString();
+  const s = (Math.round(n * 1e6) / 1e6).toString();
   return s === '-0' ? '0' : s;
 };
 
 function loopScad(l: Loop): string {
   if (l.circle) {
-    const { c, r } = l.circle;
-    const circ = `circle(r = ${num(r)}, $fn = ${segmentsFor(r, Math.PI * 2)});`;
+    const { c, r, fn } = l.circle;
+    const circ = `circle(r = ${num(r)}, $fn = ${fn ?? segmentsFor(r, Math.PI * 2)});`;
     return c.x === 0 && c.y === 0 ? circ : `translate([${num(c.x)}, ${num(c.y)}]) ${circ}`;
   }
   return `polygon([${l.pts.map(p => `[${num(p.x)}, ${num(p.y)}]`).join(', ')}]);`;
