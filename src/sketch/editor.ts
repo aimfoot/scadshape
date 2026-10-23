@@ -888,7 +888,11 @@ export class SketchEditor {
     }
     if (best) return best;
 
-    // 4. Grid.
+    // 4. A shape under way: round its size, not the position.
+    const sized = this.snapToGrid ? this.sizeSnap(w, touch) : null;
+    if (sized) return sized;
+
+    // 5. Grid.
     let x = w.x, y = w.y;
     let kind: Snap['kind'] = 'free';
     if (this.snapToGrid) {
@@ -897,19 +901,79 @@ export class SketchEditor {
       y = Math.round(y / g) * g;
       kind = 'grid';
     }
-    // 5. Horizontal/vertical from the previous point (line).
+    // 6. Horizontal/vertical from the previous point (line).
     const from = this.tool === 'line' ? this.placed[this.placed.length - 1] : undefined;
-    if (from) {
-      const hTol = (touch ? 14 : 8) / this.view.scale;
-      if (Math.abs(w.y - from.y) < hTol && Math.abs(w.x - from.x) > hTol) {
-        y = from.y;
-        kind = 'h';
-      } else if (Math.abs(w.x - from.x) < hTol && Math.abs(w.y - from.y) > hTol) {
-        x = from.x;
-        kind = 'v';
-      }
+    const hv = from ? this.hvLock(from, w, touch) : null;
+    if (from && hv === 'h') {
+      y = from.y;
+      kind = 'h';
+    } else if (from && hv === 'v') {
+      x = from.x;
+      kind = 'v';
     }
     return { x, y, kind };
+  }
+
+  /** Is `w` nearly level with (h) or straight above/below (v) `from`? */
+  private hvLock(from: Vec, w: Vec, touch: boolean): 'h' | 'v' | null {
+    const hTol = (touch ? 14 : 8) / this.view.scale;
+    if (Math.abs(w.y - from.y) < hTol && Math.abs(w.x - from.x) > hTol) return 'h';
+    if (Math.abs(w.x - from.x) < hTol && Math.abs(w.y - from.y) > hTol) return 'v';
+    return null;
+  }
+
+  /**
+   * The next point of a shape under way, placed so the size grows in steps: lengths, sides and
+   * diameters in whole millimeters (finer only when zoomed in past a 1 mm grid). Null = no shape
+   * under way (or a point whose size is not stepped, such as an arc's end angle) → the grid.
+   */
+  private sizeSnap(w: Vec, touch: boolean): Snap | null {
+    const P = this.placed;
+    if (!P.length) return null;
+    const step = Math.min(1, this.gridStep());
+    const steps = (v: number, st: number) => Math.max(st, Math.round(Math.abs(v) / st) * st);
+    const sign = (v: number) => (v < 0 ? -1 : 1);
+    // The point at a stepped distance from `from`, in the finger's direction.
+    const radial = (from: Vec, st: number): Snap | null => {
+      const d = dist(from, w);
+      if (d < 1e-9) return null;
+      const L = steps(d, st);
+      return { x: from.x + ((w.x - from.x) * L) / d, y: from.y + ((w.y - from.y) * L) / d, kind: 'grid' };
+    };
+    const a = P[0];
+    switch (this.tool) {
+      case 'line': {
+        const from = P[P.length - 1];
+        const hv = this.hvLock(from, w, touch);
+        if (hv === 'h') return { x: from.x + sign(w.x - from.x) * steps(w.x - from.x, step), y: from.y, kind: 'h' };
+        if (hv === 'v') return { x: from.x, y: from.y + sign(w.y - from.y) * steps(w.y - from.y, step), kind: 'v' };
+        return radial(from, step);
+      }
+      case 'rect':
+        return { x: a.x + sign(w.x - a.x) * steps(w.x - a.x, step), y: a.y + sign(w.y - a.y) * steps(w.y - a.y, step), kind: 'grid' };
+      case 'rectc': // the corner is half the width and height from the center
+        return { x: a.x + sign(w.x - a.x) * steps(w.x - a.x, step / 2), y: a.y + sign(w.y - a.y) * steps(w.y - a.y, step / 2), kind: 'grid' };
+      case 'circle':
+      case 'polygon': // the radius in half steps = the diameter in whole ones
+        return radial(a, step / 2);
+      case 'arcc':
+        return P.length === 1 ? radial(a, step / 2) : null;
+      case 'arc3':
+        return P.length === 1 ? radial(a, step) : null;
+      case 'slot': {
+        if (P.length === 1) return radial(a, step);
+        // The width: the distance from the center line, in half steps.
+        const b = P[1];
+        const L = dist(a, b);
+        if (L < 1e-9) return null;
+        const ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
+        const along = (w.x - a.x) * ux + (w.y - a.y) * uy;
+        const across = (w.y - a.y) * ux - (w.x - a.x) * uy;
+        const r = sign(across) * steps(across, step / 2);
+        return { x: a.x + ux * along - uy * r, y: a.y + uy * along + ux * r, kind: 'grid' };
+      }
+    }
+    return null;
   }
 
   // ---- Create geometry ------------------------------------------------------------
@@ -1837,6 +1901,8 @@ export class SketchEditor {
       } else if (this.tool === 'rect') text = `${fmtNum(Math.abs(cur.x - a.x))} × ${fmtNum(Math.abs(cur.y - a.y))}`;
       else if (this.tool === 'rectc') text = `${fmtNum(2 * Math.abs(cur.x - a.x))} × ${fmtNum(2 * Math.abs(cur.y - a.y))}`;
       else if (this.tool === 'circle') text = `R ${fmtNum(dist(a, cur))} · Ø ${fmtNum(2 * dist(a, cur))}`;
+      else if (this.tool === 'polygon') text = `Ø ${fmtNum(2 * dist(a, cur))}`;
+      else if (this.tool === 'slot' && P.length === 2) text = `${fmtNum(dist(a, P[1]))} × ${fmtNum(2 * slotRadius(a, P[1], cur))}`;
       else if (this.tool === 'arc3' && P.length === 2) {
         const arc = arcThrough(P[0], P[1], cur);
         text = arc ? `R ${fmtNum(arc.r)}` : '';

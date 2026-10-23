@@ -231,6 +231,9 @@ The sketch tool (phase 1)
   from the first to the second point in one swipe, or tap point by point.
   Two fingers pan/zoom. Snapping: existing points/the origin (become shared
   points = coincident), grid (step by zoom), horizontal/vertical (line).
+  Once a shape has its first point the size snaps instead of the position (sizeSnap, 2026-10-23):
+  diameters, lengths and sides in whole mm (finer only when zoomed in past a 1 mm grid); points,
+  curves and the model still win. Off with the grid button. Test: tools/browser/steps.mjs.
   A line chain ends on an existing point, with "Finish" or by tapping the last
   point again. Select: tap, drag points/lines/a circle edge, drop a point on
   another to merge them. Construction = dashed, does not count as a profile.
