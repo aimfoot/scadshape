@@ -157,6 +157,35 @@ main { display: flex; min-height: 0; }
 #log:empty { display: none; }
 #log .err { color: var(--err); }
 #log .warn { color: var(--warn); }
+#log .times { color: var(--muted); }
+/* The code's problems (src/ui/problems.ts): merged and explained; the raw log only on request. */
+#problems { max-height: 45%; overflow: auto; border-top: 1px solid var(--line); background: var(--sunken); }
+#problems[hidden] { display: none; }
+#codePanel.has-problems:not(.full-log) #log { display: none; }
+.problems-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; position: sticky; top: 0; background: var(--sunken); }
+.problems-head strong { flex: 1; font-size: 13px; }
+.problems-head button { min-height: 34px; min-width: 0; font-size: 13px; }
+#problemList { list-style: none; margin: 0; padding: 0 0 6px; }
+#problemList button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+}
+#problemList button:active { background: var(--accent-soft); }
+#problemList .where { grid-row: span 2; font-weight: 600; color: var(--warn); white-space: nowrap; }
+#problemList .error .where { color: var(--err); }
+#problemList .hint { line-height: 1.35; }
+#problemList .raw { grid-column: 2 / 4; font: 11px/1.4 ui-monospace, "Roboto Mono", monospace; color: var(--muted); overflow-wrap: anywhere; }
+#problemList .count { color: var(--muted); font-size: 12px; white-space: nowrap; }
+#problemList .follow button { color: var(--muted); }
 
 @media (orientation: portrait) {
   main { flex-direction: column-reverse; }

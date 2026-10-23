@@ -10,7 +10,8 @@ import { parseBinaryStl } from '../stl';
 import { Viewer } from '../viewer';
 import { bedOf, fitsBed, parseBedChoice } from '../bed';
 import { t, type Key } from '../i18n';
-import { $, fmtInt, fmtMs, store } from './dom';
+import { $, el, fmtInt, fmtMs, store } from './dom';
+import { clearProblems, showProblems } from './problems';
 import { app, on, vars } from './state';
 import cube from '../examples/cube.scad';
 import plate from '../examples/plate.scad';
@@ -37,7 +38,7 @@ const codePanel = $('#codePanel');
 export const renderOpts = { hideSketch: null as string | null, onRendered: [] as (() => void)[] };
 
 /** The status after a finished render, kept so a new build volume can redo the fit warning. */
-let doneStatus: { base: string; errs: number; size: [number, number, number]; shown: string } | null = null;
+let doneStatus: { base: string; errs: number; warn: boolean; size: [number, number, number]; shown: string } | null = null;
 
 export function setStatus(text: string, kind: '' | 'busy' | 'error' | 'warn' = '') {
   statusEl.textContent = text;
@@ -48,12 +49,12 @@ export function setStatus(text: string, kind: '' | 'busy' | 'error' | 'warn' = '
 /** The printer's build volume chosen in Settings. */
 export const currentBed = () => bedOf(parseBedChoice(store.get('bed')));
 
-function showDoneStatus(d: { base: string; errs: number; size: [number, number, number] }) {
+function showDoneStatus(d: { base: string; errs: number; warn: boolean; size: [number, number, number] }) {
   const bed = currentBed();
   const fits = fitsBed(d.size, bed);
   const mm = (v: number) => String(Math.round(v * 10) / 10);
   const text = fits ? d.base : `${d.base} · ${t('bed.tooBig', { w: mm(bed.w), d: mm(bed.d), h: mm(bed.h) })}`;
-  setStatus(text, d.errs ? 'error' : fits ? '' : 'warn');
+  setStatus(text, d.errs ? 'error' : fits && !d.warn ? '' : 'warn');
   doneStatus = { ...d, shown: text };
 }
 
@@ -97,15 +98,28 @@ export function setSource(s: string) {
 
 function showLog(log: string[]) {
   const problems = new Set(logProblems(log));
+  // A warning repeated by a loop (thousands of times, interleaved with others) once, where it first
+  // appears, with a count.
+  const runs: { line: string; n: number }[] = [];
+  const first = new Map<string, { line: string; n: number }>();
+  for (const l of log) {
+    if (/^Could not initialize localization/.test(l)) continue;
+    const seen = problems.has(l) ? first.get(l) : undefined;
+    if (seen) seen.n++;
+    else {
+      const r = { line: l, n: 1 };
+      runs.push(r);
+      if (problems.has(l)) first.set(l, r);
+    }
+  }
   logEl.replaceChildren(
-    ...log
-      .filter(l => !/^Could not initialize localization/.test(l))
-      .map(l => {
-        const div = document.createElement('div');
-        div.textContent = l;
-        if (problems.has(l)) div.className = /^WARNING/.test(l) ? 'warn' : 'err';
-        return div;
-      }),
+    ...runs.map(({ line, n }) => {
+      const div = document.createElement('div');
+      div.textContent = line;
+      if (n > 1) div.append(el('span', { className: 'times', textContent: ` ${t('dx.times', { n })}` }));
+      if (problems.has(line)) div.className = /^WARNING/.test(line) ? 'warn' : 'err';
+      return div;
+    }),
   );
 }
 
@@ -157,6 +171,7 @@ async function renderOnce() {
   if (app.source === 'model' && app.model.solids === 0) {
     viewer.setMesh(null);
     logEl.replaceChildren();
+    clearProblems();
     if (view.fitNext) viewer.setView('iso');
     view.fitNext = app.doc.features.length === 0;
     setStatus(app.doc.features.length ? t('status.noSolid') + errText : t('status.start'), errs ? 'error' : '');
@@ -176,8 +191,12 @@ async function renderOnce() {
   }
   if (renderWanted) return; // something newer is waiting – do not show old geometry
   showLog(r.log);
+  const problems = showProblems(r.log, src);
+  const probText = problems ? ` · ${problems === 1 ? t('status.problem1') : t('status.problems', { n: problems })}` : '';
   if (!r.ok || !r.data) {
-    setStatus(r.log.some(l => /Current top level object is empty/.test(l)) ? t('status.empty') + errText : t('status.seeLog'), 'error');
+    // Empty with no warning that explains it (e.g. if (false) …): just "nothing to show".
+    const empty = r.log.some(l => /Current top level object is empty/.test(l)) && !logProblems(r.log).length;
+    setStatus(empty ? t('status.empty') + errText : problems ? t('status.error') + probText : t('status.seeLog'), 'error');
     if (codePanel.hidden && app.source !== 'model') codePanel.hidden = false;
     if (app.source === 'model') remoteLog('model-error', { problems: logProblems(r.log).slice(0, 5) });
     return;
@@ -193,7 +212,8 @@ async function renderOnce() {
   if (!view.fitNext && app.source !== 'model' && (moved || resized)) viewer.fit();
   if (view.fitNext) viewer.setView('iso');
   view.fitNext = false;
-  showDoneStatus({ base: `${fmtMs(r.renderMs)} · ${t('status.triangles', { n: fmtInt(mesh.triangles) })}${errText}`, errs, size: meshSize(mesh.positions) });
+  // Rendered, but with problems (an unknown function leaves parts out without failing): say so.
+  showDoneStatus({ base: `${fmtMs(r.renderMs)} · ${t('status.triangles', { n: fmtInt(mesh.triangles) })}${errText}${probText}`, errs, warn: problems > 0, size: meshSize(mesh.positions) });
 }
 
 engine.onLoaded = ms => {

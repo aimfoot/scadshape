@@ -55,6 +55,14 @@
       <button type="button" id="btnConvert"><svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><path d="M14 20h6M17 17v6" transform="translate(0 -3)"/></svg><span data-i18n="convert.button">Convert to sketches</span></button>
     </div>
     <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" data-i18n-aria="ui.code"></textarea>
+    <div id="problems" hidden>
+      <div class="problems-head">
+        <strong id="problemsTitle"></strong>
+        <button type="button" id="btnCopyProblems" class="primary" data-i18n="dx.copy">Copy for AI</button>
+        <button type="button" id="btnFullLog" aria-pressed="false" data-i18n="dx.fullLog">Full log</button>
+      </div>
+      <ul id="problemList"></ul>
+    </div>
     <div id="log"></div>
   </aside>
   <section id="partArea">

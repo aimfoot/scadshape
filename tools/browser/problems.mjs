@@ -1,0 +1,94 @@
+// The code's problem list: AI-written code with radians() (OpenSCAD has none) renders without the
+// gears – the status bar says "1 problem", the list explains it on line 28 with its count, a tap goes
+// to the line, and "Copy for AI" puts the text for the chat on the clipboard. Then a syntax error.
+// node problems.mjs [url] [outdir]
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+const url = process.argv[2] ?? 'http://127.0.0.1:8799/';
+const out = process.argv[3] ?? '.';
+const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
+const errors = [];
+const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, locale: 'en-US' });
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(url).origin });
+const page = await ctx.newPage();
+page.on('pageerror', e => errors.push(e.message));
+page.on('console', m => m.type() === 'error' && errors.push(m.text()));
+await page.route('**/api/**', r => r.fulfill({ status: 204 }));
+const status = () => page.evaluate(() => ({ text: document.querySelector('#status').textContent, cls: document.querySelector('#status').className }));
+const waitRendered = async () => {
+  await page.waitForTimeout(1200); // the code renders 0.8 s after typing
+  await page.waitForFunction(() => !/Rendering|Loading/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
+  return status();
+};
+
+await page.goto(url);
+await page.evaluate(() => { localStorage.clear(); localStorage.setItem('scadshape.lang', 'en'); });
+await page.reload();
+await page.waitForFunction(() => /Start with Sketch/.test(document.querySelector('#status').textContent));
+
+// Gear code where one helper uses radians(): everything else renders, the gears are missing.
+const gears = `// Planet gear (shortened)
+m = 1.5;
+pa = 20;
+$fn = 48;
+function inv(a) = tan(a) - radians(a);
+function polar(R, a) = [R*cos(a), R*sin(a)];
+function half_ang(z, R) = 90/z + (inv(pa) - inv(acos(min(1, m*z/2*cos(pa)/R)))) * 180/PI;
+module gear2d(z) polygon([for (k = [0:z-1], s = [-1, 1]) polar(m*z/2, k*360/z + s*half_ang(z, m*z/2))]);
+cylinder(r = 30, h = 3);
+translate([0, 0, 3]) linear_extrude(8) gear2d(14);
+`;
+await page.selectOption('#source', 'custom');
+await page.waitForTimeout(300);
+if (await page.isHidden('#codePanel')) await page.click('#btnCode');
+await page.waitForSelector('#code', { state: 'visible' });
+await page.fill('#code', gears);
+let st = await waitRendered();
+assert.match(st.text, /triangles · 1 problem$/, st.text);
+assert.match(st.cls, /warn/);
+const rows = () => page.$$eval('#problemList li', ls => ls.map(l => ({ cls: l.className, text: l.textContent })));
+let list = await rows();
+assert.match(await page.textContent('#problemsTitle'), /^1 problem in the code$/);
+assert.match(list[0].text, /^Line 5OpenSCAD has no radians\(\)\. Write x \* PI \/ 180 instead\.× \d+Ignoring unknown function 'radians'$/, list[0].text);
+assert.match(list.at(-1).text, /^\+ \d+ follow-on warnings about undefined values$/);
+assert.ok(await page.isHidden('#log'), 'the raw log is hidden behind "Full log"');
+await page.screenshot({ path: `${out}/p-portrait.png` });
+
+// Tap the problem: line 5 is selected in the code
+await page.click('#problemList li:first-child button');
+const sel = await page.evaluate(() => { const c = document.querySelector('#code'); return c.value.slice(c.selectionStart, c.selectionEnd); });
+assert.equal(sel, 'function inv(a) = tan(a) - radians(a);');
+
+// Copy for AI
+await page.click('#btnCopyProblems');
+await page.waitForFunction(() => /Copied/.test(document.querySelector('#partToast')?.textContent ?? ''));
+const clip = await page.evaluate(() => navigator.clipboard.readText());
+assert.match(clip, /^My OpenSCAD code \(OpenSCAD 2026\.10\.15, Manifold backend; libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad\) gives these problems:\n\nLine 5: WARNING: Ignoring unknown function 'radians' \(\d+ times\)\n {4}function inv\(a\) = tan\(a\) - radians\(a\);\n\n\(plus \d+ follow-on warnings about undefined values\)\n\nPlease fix the code and send the whole corrected file\.$/, clip);
+console.log('copied for AI:\n' + clip.split('\n').map(l => '  | ' + l).join('\n'));
+
+// Full log: the raw lines, repeats merged
+await page.click('#btnFullLog');
+assert.ok(await page.isVisible('#log'));
+assert.match(await page.textContent('#log'), /Ignoring unknown function 'radians' in file \/in\.scad, line 5 × \d+/);
+
+// The fix: no problems, no list
+await page.fill('#code', gears.replace('radians(a)', 'a * PI / 180'));
+st = await waitRendered();
+assert.doesNotMatch(st.text, /problem/); assert.doesNotMatch(st.cls, /warn|error/);
+assert.ok(await page.isHidden('#problems'));
+
+// A syntax error (+=): fails, the list says why
+await page.fill('#code', 'x = 1;\nx += 1;\ncube(x);\n');
+st = await waitRendered();
+assert.match(st.cls, /error/);
+assert.equal(st.text, 'Error · 1 problem');
+list = await rows();
+assert.equal(list.length, 1);
+assert.match(list[0].text, /^Line 2OpenSCAD has no \+= or \+\+/);
+assert.equal(list[0].cls, 'error');
+await page.setViewportSize({ width: 915, height: 412 });
+await page.waitForTimeout(300);
+await page.screenshot({ path: `${out}/p-landscape.png` });
+
+await browser.close();
+console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');
