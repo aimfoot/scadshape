@@ -3,6 +3,7 @@ package io.github.aimfoot.scadshape;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -294,6 +295,24 @@ public class MainActivity extends Activity {
             pendingFile = "";
             return f;
         }
+
+        /** The WebView often has no navigator.clipboard: the page copies and pastes through here. */
+        @JavascriptInterface
+        public void copyText(String label, String text) {
+            runOnUiThread(() -> clipboard().setPrimaryClip(ClipData.newPlainText(label, text)));
+        }
+
+        @JavascriptInterface
+        public String readClipboard() {
+            ClipData c = clipboard().getPrimaryClip();
+            if (c == null || c.getItemCount() == 0) return "";
+            CharSequence s = c.getItemAt(0).coerceToText(MainActivity.this);
+            return s == null ? "" : s.toString();
+        }
+    }
+
+    ClipboardManager clipboard() {
+        return (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
     }
 
     // --- Files that other apps open or share to the app ---
@@ -303,6 +322,20 @@ public class MainActivity extends Activity {
         Uri uri = null;
         if (Intent.ACTION_VIEW.equals(i.getAction())) uri = i.getData();
         else if (Intent.ACTION_SEND.equals(i.getAction())) uri = streamExtra(i);
+        if (uri == null && Intent.ACTION_SEND.equals(i.getAction())) {
+            // Text shared from another app (an AI chat's answer): the page picks the code out of it.
+            CharSequence text = i.getCharSequenceExtra(Intent.EXTRA_TEXT);
+            if (text == null) return;
+            try {
+                JSONObject o = new JSONObject();
+                o.put("text", text.toString());
+                pendingFile = o.toString();
+                web.evaluateJavascript("window.scadshapeOpenPending && scadshapeOpenPending()", null);
+            } catch (JSONException e) {
+                Toast.makeText(this, R.string.cannot_open_file, Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
         if (uri == null) return;
         Uri u = uri;
         new Thread(() -> {

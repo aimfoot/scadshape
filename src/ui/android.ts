@@ -3,6 +3,7 @@
 
 import { android, fromBase64 } from '../android';
 import { onThemeChange, currentTheme, type Theme } from '../theme';
+import { receiveCode } from './aiflow';
 import { $ } from './dom';
 import { importFile } from './importer';
 import { openProjectFile } from './projects';
@@ -47,9 +48,15 @@ function setBars(th: Theme) {
 async function openPending() {
   const json = android!.takeFile();
   if (!json) return;
-  const { name, data } = JSON.parse(json) as { name: string; data: string };
-  const file = new File([fromBase64(data)], name);
+  const { name, data, text } = JSON.parse(json) as { name: string; data: string; text?: string };
   if (document.body.dataset.mode === 'sketch') $('#btnDone').click();
+  // Text shared from another app (an AI chat's answer): its code becomes Custom code.
+  if (text !== undefined) {
+    const ok = receiveCode(text);
+    showToast(ok ? t('ai.received') : t('ai.noCode'), ok ? 'info' : 'error');
+    return;
+  }
+  const file = new File([fromBase64(data)], name);
   try {
     if (/\.(stl|svg)$/i.test(name)) await importFile(file);
     else await openProjectFile(file);

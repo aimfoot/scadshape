@@ -53,6 +53,7 @@
   <aside id="codePanel" hidden>
     <div id="codeBar" class="codebar" hidden>
       <button type="button" id="btnConvert"><svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><path d="M14 20h6M17 17v6" transform="translate(0 -3)"/></svg><span data-i18n="convert.button">Convert to sketches</span></button>
+      <button type="button" id="btnPrompt" data-i18n-title="ai.promptTitle"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H10l-4 4v-4H5z"/><path d="M9 10h6"/></svg><span data-i18n="ai.copyPrompt">Copy prompt</span></button>
     </div>
     <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" data-i18n-aria="ui.code"></textarea>
     <div id="problems" hidden>
@@ -136,6 +137,15 @@
         </button>
         <h2 data-i18n="start.title">Welcome to scadshape</h2>
         <p data-i18n="start.intro"></p>
+        <div class="ai-start">
+          <h3 data-i18n="ai.title">From an AI chat</h3>
+          <p data-i18n="ai.intro"></p>
+          <div class="ai-buttons">
+            <button type="button" id="startPrompt"><b>1</b> <span data-i18n="ai.copyPrompt">Copy prompt</span></button>
+            <button type="button" id="startPaste" class="primary"><b>2</b> <span data-i18n="ai.paste">Paste code</span></button>
+          </div>
+        </div>
+        <h3 data-i18n="start.draw">Or draw it yourself</h3>
         <ol class="steps">
           <li data-i18n="start.step1"></li>
           <li data-i18n="start.step2"></li>

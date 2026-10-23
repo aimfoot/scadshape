@@ -8,6 +8,7 @@ import { setLang } from '../src/i18n';
 import { diagnose, problemsForAi } from '../src/diagnose';
 import { fontsFor } from '../src/fonts';
 import { lint } from '../src/lint';
+import { aiPrompt, codeFromChat, looksLikeScad } from '../src/aiprompt';
 import { buildModel } from '../src/model3d';
 import { EXAMPLES, buildExample } from '../src/examples/models';
 setLang('en');
@@ -65,6 +66,26 @@ await test('the checks raise no false alarms on correct code', () => {
     ...readdirSync(`${process.env.ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')).map(f => `${process.env.ROOT}/tests/fixtures/${f}`)];
   for (const f of files) assert.deepEqual(lint(readFileSync(f, 'utf8')).map(p => `${p.line}: ${p.hint}`), [], f);
   for (const ex of EXAMPLES) assert.deepEqual(lint(buildModel(buildExample(ex.id)).code).map(p => p.hint), [], ex.id);
+});
+
+await test('the code is picked out of an AI chat answer', () => {
+  const answer = 'Here is a box:\n\n```openscad\nwidth = 40;\ncube([width, 20, 10]);\n```\n\nAnd to print it:\n```bash\nopenscad -o box.stl box.scad\n```\nEnjoy!';
+  assert.equal(codeFromChat(answer), 'width = 40;\ncube([width, 20, 10]);\n');
+  // Without a language: the longest block; without fences: the text itself.
+  assert.equal(codeFromChat('```\na=1;\n```\ntext\n```\ncube(10);\nsphere(5);\n```'), 'cube(10);\nsphere(5);\n');
+  assert.equal(codeFromChat('  cube(10);\n'), 'cube(10);\n');
+  assert.ok(looksLikeScad('cube(10);') && !looksLikeScad('https://example.com/model') && !looksLikeScad('Sure! Here is your model.'));
+});
+
+await test('the prompt tells the AI what the app runs', () => {
+  const p = aiPrompt({ version: 'OpenSCAD 2026.10.15', bed: { w: 180, d: 180, h: 180 }, printer: 'Bambu Lab A1 mini' });
+  assert.match(p, /scadshape \(OpenSCAD 2026\.10\.15, Manifold backend\)/);
+  assert.match(p, /Libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad/);
+  assert.match(p, /Fonts for text\(\): Liberation Sans, Allerta Stencil, Bebas Neue, Pacifico, Orbitron\./);
+  assert.match(p, /print on Bambu Lab A1 mini \(180 × 180 × 180 mm\)/);
+  assert.match(p, /There is no radians\(\)/);
+  assert.match(p, /What I want: $/);
+  assert.match(aiPrompt({ version: 'OpenSCAD', bed: { w: 200, d: 150, h: 100 }, printer: null }), /print on 200 × 150 × 100 mm:/);
 });
 
 // ---- The corpus, through the real OpenSCAD ---------------------------------------------------

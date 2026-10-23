@@ -391,6 +391,13 @@ button.feature small { color: var(--muted); }
 .startcard p { margin: 4px 0; font-size: 14px; line-height: 1.4; }
 .startcard .steps { margin: 8px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.45; }
 .startcard .steps li { margin: 3px 0; }
+/* Code from an AI chat: the quickest way in, so first and set apart. */
+.startcard .ai-start { margin: 10px 0 4px; padding: 8px 10px 10px; border-radius: 10px; background: var(--accent-soft); }
+.startcard .ai-start h3 { margin: 0 0 2px; }
+.ai-buttons { display: flex; gap: 8px; margin-top: 8px; }
+.ai-buttons button { flex: 1; gap: 8px; }
+.ai-buttons b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; background: var(--accent-soft); color: var(--accent); }
+.ai-buttons .primary b { background: var(--on-accent); }
 .startclose { position: absolute; top: 8px; right: 8px; min-height: 36px; width: 36px; border-color: transparent; }
 .startcard .examples { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
 .startcard .example { flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; text-align: left; white-space: normal; }

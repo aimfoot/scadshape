@@ -5,6 +5,7 @@
 import { diagnose, problemsForAi, type Problem } from '../diagnose';
 import { t } from '../i18n';
 import { PARTS } from '../licenses';
+import { copyText } from './clipboard';
 import { $, el } from './dom';
 import { showToast } from './toast';
 
@@ -56,20 +57,8 @@ export const hasProblems = () => shown.problems.length > 0;
 
 async function copyForAi() {
   const v = PARTS.flatMap(g => g.parts).find(p => p.name === 'OpenSCAD')?.version?.replace(/\s*\(.*\)$/, '');
-  const text = problemsForAi(shown.problems, shown.src, v ? `OpenSCAD ${v}` : 'OpenSCAD');
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast(t('dx.copied'));
-  } catch {
-    // A WebView without clipboard access: the old way.
-    const ta = el('textarea', { value: text });
-    ta.style.cssText = 'position:fixed;opacity:0;top:0';
-    document.body.append(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    ta.remove();
-    showToast(ok ? t('dx.copied') : t('dx.copyFailed'), ok ? 'info' : 'error');
-  }
+  const ok = await copyText(problemsForAi(shown.problems, shown.src, v ? `OpenSCAD ${v}` : 'OpenSCAD'));
+  showToast(ok ? t('dx.copied') : t('dx.copyFailed'), ok ? 'info' : 'error');
 }
 
 export function initProblems() {

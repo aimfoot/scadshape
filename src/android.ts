@@ -8,8 +8,12 @@ type Bridge = {
   shareFile(name: string, mime: string, base64: string): string;
   /** The system bars' background and whether the icons should be light (dark theme). */
   setBars(color: string, dark: boolean): void;
-  /** A file that another app opened/shared to the app: JSON { name, data (base64) }, or "". */
+  /** A file that another app opened/shared to the app: JSON { name, data (base64) } or, for shared text, { text }; or "". */
   takeFile(): string;
+  /** Puts text on the clipboard. */
+  copyText(label: string, text: string): void;
+  /** The text on the clipboard ("" if none). */
+  readClipboard(): string;
 };
 
 export const android: Bridge | null = (globalThis as { ScadshapeAndroid?: Bridge }).ScadshapeAndroid ?? null;
