@@ -4,9 +4,9 @@
 // typical mistakes of AI-written code recognised (radians(), +=, Python loops, a forgotten BOSL2
 // include …). problemsForAi() writes them as text to paste back into the AI chat.
 
-import { FONTS } from './fonts';
+import { FAMILIES } from './fonts';
 import { t } from './i18n';
-import { BOSL2_NAMES } from './libnames.gen';
+import { BOSL2_NAMES, MCAD_NAMES } from './libnames.gen';
 import { LIBRARIES } from './libs';
 import { lint } from './lint';
 
@@ -43,7 +43,7 @@ const MISSING_FUNCTIONS: Record<string, string> = {
   atan2d: 'atan2(y, x)',
 };
 
-let bosl2: Map<string, string> | null = null;
+let bosl2: Map<string, string> | null = null, mcad: Map<string, string> | null = null;
 /** The BOSL2 file that defines a name ("std.scad", "gears.scad" …), or null. */
 function bosl2File(name: string): string | null {
   if (!bosl2) {
@@ -51,6 +51,22 @@ function bosl2File(name: string): string | null {
     for (const [file, names] of Object.entries(BOSL2_NAMES)) for (const n of names.split(' ')) bosl2.set(n, file);
   }
   return bosl2.get(name) ?? null;
+}
+/** The MCAD file that defines a name, or null. involute_gears first: its gear() is the one AI code means. */
+function mcadFile(name: string): string | null {
+  if (!mcad) {
+    mcad = new Map();
+    const files = Object.entries(MCAD_NAMES).sort(([a], [b]) => Number(b === 'involute_gears.scad') - Number(a === 'involute_gears.scad'));
+    for (const [file, names] of files) for (const n of names.split(' ')) if (!mcad.has(n)) mcad.set(n, file);
+  }
+  return mcad.get(name) ?? null;
+}
+/** "comes from BOSL2/MCAD, include it" for a library name, or null. */
+function libraryHint(name: string): string | null {
+  const b = bosl2File(name);
+  if (b) return t('dx.bosl2', { name, file: b });
+  const m = mcadFile(name);
+  return m ? t('dx.mcadName', { name, file: m }) : null;
 }
 
 /** Edit distance with swapped neighbours as one edit (widht → width), for "did you mean". */
@@ -94,8 +110,8 @@ function hintFor(msg: string, line: number | null, src: string, lines: string[])
   if ((m = /Ignoring unknown function '(\w+)'/.exec(msg))) {
     const n = m[1];
     if (MISSING_FUNCTIONS[n]) return t('dx.missingFunction', { name: n, instead: MISSING_FUNCTIONS[n] });
-    const f = bosl2File(n);
-    if (f) return t('dx.bosl2', { name: n, file: f });
+    const lib = libraryHint(n);
+    if (lib) return lib;
     const typo = closest(n, names(src, /\bfunction\s+([A-Za-z_]\w*)/g));
     return typo ? t('dx.didYouMean', { name: typo }) : t('dx.unknownFunction', { name: n });
   }
@@ -103,8 +119,8 @@ function hintFor(msg: string, line: number | null, src: string, lines: string[])
     const n = m[1];
     if (n === 'assign') return t('dx.assign');
     if (n === 'child') return t('dx.child');
-    const f = bosl2File(n);
-    if (f) return t('dx.bosl2', { name: n, file: f });
+    const lib = libraryHint(n);
+    if (lib) return lib;
     const typo = closest(n, names(src, /\bmodule\s+([A-Za-z_]\w*)/g));
     return typo ? t('dx.didYouMean', { name: typo }) : t('dx.unknownModule', { name: n });
   }
@@ -116,12 +132,10 @@ function hintFor(msg: string, line: number | null, src: string, lines: string[])
   if (/Non-ASCII identifiers/.test(msg)) return t('dx.nonAscii');
   if (/syntax error/.test(msg)) return syntaxHint(lines, line);
   if (/Mixing 2D and 3D/.test(msg)) return t('dx.mix2d3d');
-  if ((m = /Can't (?:open library|find include file) '([^']+)'/.exec(msg))) {
-    if (/^MCAD\//.test(m[1])) return t('dx.mcad');
+  if ((m = /Can't (?:open library|find include file) '([^']+)'/.exec(msg)))
     return t('dx.noLibrary', { name: m[1], libs: LIBRARIES.map(l => l.name).join(', ') });
-  }
   if (/Can't open import file/.test(msg)) return t('dx.importFile');
-  if ((m = /Can't get font (.+)/.exec(msg))) return t('dx.font', { font: m[1].trim(), fonts: [...new Set(FONTS.map(f => f.family.split(':')[0]))].join(', ') });
+  if ((m = /Can't get font (.+)/.exec(msg))) return t('dx.font', { font: m[1].trim(), fonts: FAMILIES.join(', ') });
   if ((m = /"(\w+)" was assigned on line (\d+) but was overwritten/.exec(msg))) return t('dx.overwritten', { name: m[1] });
   if (/^Assertion/.test(msg)) return t('dx.assertion');
   if (/top level object is empty/.test(msg)) return t('dx.empty');

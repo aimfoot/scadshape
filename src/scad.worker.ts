@@ -2,6 +2,7 @@
 // rendering gets a new, clean instance (OpenSCAD's main() is not made to run several times in the
 // same process).
 
+import { FONTS_CONF } from './fonts';
 import { EXT, type WorkerRequest, type WorkerMessage } from './scad';
 
 interface WorkerScope {
@@ -33,7 +34,6 @@ function load() {
 
 /** Fonts are fetched once per worker (dist/fonts/) and written to each instance. */
 const fontCache = new Map<string, Promise<Uint8Array>>();
-const FONTS_CONF = '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig><dir>/fonts</dir></fontconfig>\n';
 function fetchFont(file: string) {
   if (!fontCache.has(file)) {
     const p = fetch(new URL(`./fonts/${file}`, import.meta.url)).then(async r => {

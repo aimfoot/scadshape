@@ -3,7 +3,7 @@
 // the model), a font the app doesn't have (silently replaced), a huge $fn, an assembly of parts that
 // will be merged into one body. They join OpenSCAD's own problems in diagnose.ts.
 
-import { FONTS } from './fonts';
+import { FAMILIES, fontAlias } from './fonts';
 import { t } from './i18n';
 import type { Problem } from './diagnose';
 
@@ -22,7 +22,6 @@ function closing(code: string, open: number) {
   }
   return code.length - 1;
 }
-const families = () => [...new Set(FONTS.map(f => f.family.split(':')[0]))];
 
 export function lint(src: string): Problem[] {
   const code = blank(src);
@@ -38,11 +37,17 @@ export function lint(src: string): Problem[] {
   for (const c of calls('sin|cos|tan')) if (/\bPI\b/.test(c.arg) && !/180/.test(c.arg)) add(c.at, 'warn', c.text, t('lint.trigRadians', { fn: c.name }));
   for (const c of calls('rotate')) if (/\bPI\b/.test(c.arg) && !/180/.test(c.arg)) add(c.at, 'warn', c.text, t('lint.rotateRadians'));
 
-  // A font the app doesn't have: fontconfig falls back to Liberation Sans without a warning.
+  // A font the app doesn't have: fontconfig falls back to Liberation Sans without a warning. A name
+  // with an alias of the same letter widths (Arial → Liberation Sans) is fine; another alias is
+  // mentioned.
   for (const c of calls('text')) {
     const f = /\bfont\s*=\s*"([^"]*)"/.exec(src.slice(c.at, c.at + c.text.length));
     const family = f?.[1].split(':')[0].trim();
-    if (f && family && !families().includes(family)) add(c.at + f.index, 'warn', `font = "${f[1]}"`, t('lint.font', { font: family, fonts: families().join(', ') }));
+    if (!f || !family || FAMILIES.includes(family)) continue;
+    const alias = fontAlias(family);
+    if (alias?.same) continue;
+    if (alias) add(c.at + f.index, 'note', `font = "${f[1]}"`, t('lint.fontAlias', { font: family, used: alias.family }));
+    else add(c.at + f.index, 'warn', `font = "${f[1]}"`, t('lint.font', { font: family, fonts: FAMILIES.join(', ') }));
   }
 
   // $fn far above what a print needs: slow, above all on a phone.

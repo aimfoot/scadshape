@@ -2,7 +2,7 @@
 // avoid the mistakes diagnose.ts/lint.ts look for), and the code picked out of a chat answer.
 
 import type { Bed } from './bed';
-import { FONTS } from './fonts';
+import { FAMILIES } from './fonts';
 import { t } from './i18n';
 import { LIBRARIES } from './libs';
 
@@ -12,7 +12,7 @@ export function aiPrompt(o: { version: string; bed: Bed; printer: string | null 
   return t('ai.prompt', {
     version: o.version,
     libs: LIBRARIES.map(l => l.name).join(', '),
-    fonts: [...new Set(FONTS.map(f => f.family.split(':')[0]))].join(', '),
+    fonts: FAMILIES.join(', '),
     printer: o.printer ? `${o.printer} (${size})` : size,
   });
 }

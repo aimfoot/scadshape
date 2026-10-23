@@ -1,0 +1,1 @@
+MCAD from https://github.com/openscad/MCAD, commit bd0a7ba3f042bfbced5ca1894b236cea08904e26 (2021-10-25), copied 2026-10-24: the *.scad files and bitmap/*.scad (without the test file), no Python tools or tests.

@@ -18,6 +18,8 @@ export const LIBRARIES: Library[] = [
   // Gridfinity's main files include relatively (include <src/core/standard.scad>) – also when
   // pasted.
   { name: 'gridfinity-rebuilt-openscad', detect: /<\s*src\/(core|helpers|external)\//, paths: ['gridfinity-rebuilt-openscad'] },
+  // The library AI-written code reaches for most (gears, nuts and bolts): use <MCAD/involute_gears.scad>.
+  { name: 'MCAD' },
 ];
 
 const uses = (src: string, lib: Library) =>

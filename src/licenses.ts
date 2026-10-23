@@ -66,6 +66,8 @@ export const PARTS: { group: Key; parts: Part[] }[] = [
       { name: 'Round-Anything', license: 'MIT', url: 'https://github.com/Irev-Dev/Round-Anything', files: [L('lib-Round-Anything')] },
       { name: 'dotSCAD', version: '3.3', license: 'LGPL-3.0', url: 'https://github.com/JustinSDK/dotSCAD', files: [L('lib-dotSCAD'), GPL3] },
       { name: 'gridfinity-rebuilt-openscad', license: 'MIT', url: 'https://github.com/kennetek/gridfinity-rebuilt-openscad', files: [L('lib-gridfinity-rebuilt-openscad')] },
+      // Licence per file (LGPL 2.1 for most; the list and the LGPL text are in its LICENSE).
+      { name: 'MCAD', version: 'bd0a7ba', license: 'LGPL-2.1 and others per file', url: 'https://github.com/openscad/MCAD', files: [L('lib-MCAD'), GPL3] },
     ],
   },
   {

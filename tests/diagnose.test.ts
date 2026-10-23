@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { setLang } from '../src/i18n';
 import { diagnose, problemsForAi } from '../src/diagnose';
-import { fontsFor } from '../src/fonts';
+import { FONTS_CONF, fontsFor } from '../src/fonts';
 import { lint } from '../src/lint';
 import { aiPrompt, codeFromChat, looksLikeScad } from '../src/aiprompt';
 import { buildModel } from '../src/model3d';
@@ -80,8 +80,8 @@ await test('the code is picked out of an AI chat answer', () => {
 await test('the prompt tells the AI what the app runs', () => {
   const p = aiPrompt({ version: 'OpenSCAD 2026.10.15', bed: { w: 180, d: 180, h: 180 }, printer: 'Bambu Lab A1 mini' });
   assert.match(p, /scadshape \(OpenSCAD 2026\.10\.15, Manifold backend\)/);
-  assert.match(p, /Libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad/);
-  assert.match(p, /Fonts for text\(\): Liberation Sans, Allerta Stencil, Bebas Neue, Pacifico, Orbitron\./);
+  assert.match(p, /Libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad, MCAD \(/);
+  assert.match(p, /Fonts for text\(\): Liberation Sans, Liberation Serif, Liberation Mono, Allerta Stencil, Bebas Neue, Pacifico, Orbitron\./);
   assert.match(p, /print on Bambu Lab A1 mini \(180 × 180 × 180 mm\)/);
   assert.match(p, /There is no radians\(\)/);
   assert.match(p, /What I want: $/);
@@ -100,17 +100,50 @@ walk(ROOT + '/vendor/libraries');
 
 /** OpenSCAD's log for the code, set up like the app's worker (/in.scad, libraries, fonts on demand). */
 async function log(src: string) {
+  return (await run(src)).log;
+}
+async function run(src: string) {
   const out: string[] = [];
   const inst = await OpenSCAD({ noInitialRun: true, wasmBinary, print: (s: string) => out.push(s), printErr: (s: string) => out.push(s),
     preRun: [(m: { ENV: Record<string, string> }) => { m.ENV.OPENSCADPATH = '/libraries'; m.ENV.FONTCONFIG_FILE = '/fonts/fonts.conf'; }] });
   for (const [p, b] of libFiles) { inst.FS.mkdirTree('/libraries/' + p.slice(0, p.lastIndexOf('/'))); inst.FS.writeFile('/libraries/' + p, b); }
   inst.FS.mkdirTree('/fonts');
   for (const f of fontsFor(src)) inst.FS.writeFile(`/fonts/${f}`, readFileSync(ROOT + '/public/fonts/' + f));
-  inst.FS.writeFile('/fonts/fonts.conf', '<?xml version="1.0"?>\n<fontconfig><dir>/fonts</dir></fontconfig>\n');
+  inst.FS.writeFile('/fonts/fonts.conf', FONTS_CONF);
   inst.FS.writeFile('/in.scad', src);
   try { inst.callMain(['/in.scad', '-o', '/out.stl', '--export-format=binstl', '--backend=manifold']); } catch (e) { out.push(String(e)); }
-  return out;
+  let stl: Uint8Array | null = null;
+  try { stl = inst.FS.readFile('/out.stl') as Uint8Array; } catch { /* nothing rendered */ }
+  return { log: out, stl };
 }
+/** Triangles and size of a binary STL (or null). */
+function shape(stl: Uint8Array | null) {
+  if (!stl || stl.length < 84) return null;
+  const v = new DataView(stl.buffer, stl.byteOffset, stl.byteLength), n = v.getUint32(80, true);
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < n; i++) for (let k = 0; k < 9; k++) { const x = v.getFloat32(84 + 50 * i + 12 + 4 * k, true); min[k % 3] = Math.min(min[k % 3], x); max[k % 3] = Math.max(max[k % 3], x); }
+  return { n, size: [0, 1, 2].map(i => Math.round((max[i] - min[i]) * 1000) / 1000) };
+}
+
+await test('font names with an alias render as the app\'s font (Arial Bold is Liberation Sans Bold)', async () => {
+  const text = (font: string) => `linear_extrude(2) text("Hej 123", size = 10, font = "${font}");`;
+  for (const [asked, real] of [['Arial:style=Bold', 'Liberation Sans:style=Bold'], ['Helvetica', 'Liberation Sans'], ['Times New Roman', 'Liberation Serif'], ['Courier New', 'Liberation Mono']]) {
+    const a = shape((await run(text(asked))).stl), b = shape((await run(text(real))).stl);
+    assert.ok(a && b, asked);
+    assert.deepEqual(a, b, `${asked} vs ${real}`);
+  }
+  // …and differ from each other, so the alias is not just the default font.
+  assert.notDeepEqual(shape((await run(text('Times New Roman'))).stl), shape((await run(text('Arial'))).stl));
+  assert.notDeepEqual(shape((await run(text('Arial:style=Bold'))).stl), shape((await run(text('Arial'))).stl));
+});
+
+await test('MCAD is in the app: its involute gear renders without problems', async () => {
+  const src = 'use <MCAD/involute_gears.scad>\ngear(number_of_teeth = 20, circular_pitch = 200, gear_thickness = 5, rim_thickness = 5, hub_thickness = 8, bore_diameter = 5);\n';
+  const r = await run(src);
+  const s = shape(r.stl);
+  assert.ok(s && s.n > 500, JSON.stringify(s));
+  assert.deepEqual(diagnose(r.log, src).filter(p => p.severity !== 'note').map(p => p.message), []);
+});
 
 const dir = `${ROOT}/tests/ai-mistakes`;
 for (const f of readdirSync(dir).filter(x => x.endsWith('.scad')).sort()) {

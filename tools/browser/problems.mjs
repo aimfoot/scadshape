@@ -63,7 +63,7 @@ assert.equal(sel, 'function inv(a) = tan(a) - radians(a);');
 await page.click('#btnCopyProblems');
 await page.waitForFunction(() => /Copied/.test(document.querySelector('#partToast')?.textContent ?? ''));
 const clip = await page.evaluate(() => navigator.clipboard.readText());
-assert.match(clip, /^My OpenSCAD code \(OpenSCAD 2026\.10\.15, Manifold backend; libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad\) gives these problems:\n\nLine 5: WARNING: Ignoring unknown function 'radians' \(\d+ times\)\n {4}function inv\(a\) = tan\(a\) - radians\(a\);\n\n\(plus \d+ follow-on warnings about undefined values\)\n\nPlease fix the code and send the whole corrected file\.$/, clip);
+assert.match(clip, /^My OpenSCAD code \(OpenSCAD 2026\.10\.15, Manifold backend; libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad, MCAD\) gives these problems:\n\nLine 5: WARNING: Ignoring unknown function 'radians' \(\d+ times\)\n {4}function inv\(a\) = tan\(a\) - radians\(a\);\n\n\(plus \d+ follow-on warnings about undefined values\)\n\nPlease fix the code and send the whole corrected file\.$/, clip);
 console.log('copied for AI:\n' + clip.split('\n').map(l => '  | ' + l).join('\n'));
 
 // Full log: the raw lines, repeats merged

@@ -2,7 +2,8 @@ Fonts in scadshape
 
 All fonts here are licensed under the SIL Open Font License 1.1 (full text below).
 
-  LiberationSans-Regular.ttf, LiberationSans-Bold.ttf
+  LiberationSans-Regular.ttf, LiberationSans-Bold.ttf, LiberationSerif-Regular.ttf,
+  LiberationSerif-Bold.ttf, LiberationMono-Regular.ttf (Liberation 2.1.5)
       Digitized data copyright (c) 2010 Google Corporation with Reserved Font Arimo, Tinos and Cousine.
       Copyright (c) 2012 Red Hat, Inc. with Reserved Font Name Liberation.
   AllertaStencil-Regular.ttf   Copyright (c) 2010 Matt McInerney
