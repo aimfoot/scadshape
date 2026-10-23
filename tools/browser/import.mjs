@@ -112,11 +112,11 @@ await page.screenshot({ path: `${out}/im-3d.png` });
 console.log('svg:', st.status, JSON.stringify(b));
 
 // 5. A large SVG (star with 400 corners) is locked automatically; 2000 corners cannot be unlocked.
-await pick(page, 'stjarna.svg', 'image/svg+xml', Buffer.from(star(400)));
+await pick(page, 'star.svg', 'image/svg+xml', Buffer.from(star(400)));
 await page.waitForSelector('#svgDlg[open]');
 assert.equal(await page.isChecked('#svgLock'), true); assert.equal(await page.isDisabled('#svgLock'), false);
 await page.click('#svgDlg form button');
-await pick(page, 'stjarna.svg', 'image/svg+xml', Buffer.from(star(2000)));
+await pick(page, 'star.svg', 'image/svg+xml', Buffer.from(star(2000)));
 await page.waitForSelector('#svgDlg[open]');
 assert.equal(await page.isChecked('#svgLock'), true); assert.equal(await page.isDisabled('#svgLock'), true);
 await page.click('#svgOk');

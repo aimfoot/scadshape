@@ -203,6 +203,7 @@ main { display: flex; min-height: 0; }
   animation: spin .8s linear infinite;
 }
 .status.error { color: var(--err); border-color: var(--err-line); }
+.status.warn { color: var(--warn); border-color: var(--warn); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /*
@@ -534,12 +535,18 @@ body { grid-template-columns: minmax(0, 1fr); }
 #fpHole { display: flex; flex-direction: column; gap: 6px; }
 #fpFields { display: flex; flex-direction: column; gap: 6px; }
 .drawer > * { flex-shrink: 0; } /* scroll rather than squeeze the language picker at the bottom */
-.drawer .field select { min-height: 40px; font: inherit; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; }
+.drawer .field select, #settingsDlg .field select { min-height: 40px; font: inherit; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; }
 
 /* Export */
 .exname input { width: auto; }
 #exInfo.error { color: var(--err); }
 .exbuttons { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Settings: scrolls on a short landscape screen instead of squeezing; the custom build volume in one row */
+#settingsDlg { overflow: auto; }
+#settingsDlg > * { flex-shrink: 0; }
+.bedcustom { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bedcustom input { width: 100%; min-width: 0; }
 
 /* Models */
 .projbtn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 52px; padding: 6px 12px; text-align: left; }

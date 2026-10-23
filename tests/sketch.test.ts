@@ -76,7 +76,7 @@ test('hand-drawn: strut (arc + chord + quadrilateral + triangle)', () => {
   const { loops } = findLoops(sk);
   assert.equal(loops.length, 3, 'three adjacent faces');
   assert.ok(loops.every(l => l.depth === 0));
-  writeFileSync(process.env.OUT + '/telefon_skiss2.scad', `linear_extrude(5) {\n${codegenSketch(sk)}\n}\n`);
+  writeFileSync(process.env.OUT + '/phone_sketch2.scad', `linear_extrude(5) {\n${codegenSketch(sk)}\n}\n`);
 });
 test('hand-drawn: strut without chord', () => {
   const { loops } = findLoops(phoneSketch('strut-open'));
@@ -89,7 +89,7 @@ test('hand-drawn: rectangle + circle around the corner', () => {
   // The union must be the circle (r 22) plus the part of the 15×24 rectangle that sticks out.
   const total = loops.reduce((a, l) => a + l.area, 0);
   assert.ok(total > Math.PI * 484 - 1 && total < Math.PI * 484 + 100, `area ${total}`);
-  writeFileSync(process.env.OUT + '/telefon_skiss1.scad', `linear_extrude(5) {\n${codegenSketch(sk)}\n}\n`);
+  writeFileSync(process.env.OUT + '/phone_sketch1.scad', `linear_extrude(5) {\n${codegenSketch(sk)}\n}\n`);
 });
 test('construction lines do not count', () => {
   const sk = emptySketch(); const ids = rect(sk, 0, 0, 10, 10);
@@ -136,7 +136,7 @@ test('document code on three planes', () => {
     const f = newSketch(doc, plane); rect(f, 0, 0, 20, 10); insertFeature(doc, f);
     insertFeature(doc, newExtrude(doc, f.id));
   }
-  insertFeature(doc, newSketch(doc, 'XY')); // tom skiss
+  insertFeature(doc, newSketch(doc, 'XY')); // an empty sketch
   const { code, solids, errors } = buildModel(doc);
   assert.equal(solids, 3); assert.equal(errors.size, 0);
   assert.match(code, /module extrude_1\(\)/); assert.match(code, /rotate\(\[90, 0, 0\]\) linear_extrude/);

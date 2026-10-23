@@ -12,10 +12,12 @@ import type { ViewName } from './viewer';
 import { runBench } from './ui/bench';
 import { $, $$, store } from './ui/dom';
 import { closePanel, currentPanel, initPanel, openPanel, startFeature } from './ui/panel';
+import { selectedFace } from './ui/faceselect';
 import { initExport } from './ui/export';
 import { initPwa } from './ui/pwa';
 import { initAndroid } from './ui/android';
 import { initAbout } from './ui/about';
+import { initSettings, refreshSettingsTexts } from './ui/settings';
 import { openStorage, storageForTests, storageHooks } from './kv';
 import { initHistory, recordDoc } from './ui/history';
 import { initConvert } from './ui/convert';
@@ -112,6 +114,7 @@ function initLanguage() {
     fillSources();
     renderTree();
     refreshSketchTexts();
+    refreshSettingsTexts();
     if (currentPanel()) {
       const p = currentPanel()!;
       closePanel();
@@ -139,6 +142,7 @@ initImport();
 projectHooks.renamed = fillSources;
 initPwa();
 initAbout();
+initSettings();
 initStart();
 initScrollHints();
 initParams();
@@ -182,6 +186,7 @@ Object.assign(window, {
     get source() { return app.source; },
     get model() { return app.model; },
     get panel() { return currentPanel(); },
+    get face() { return selectedFace(); },
     storage: storageForTests,
   },
 });

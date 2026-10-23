@@ -91,7 +91,7 @@ await test('region choice: ring or disc', async () => {
   rect(s, -20, -20, 20, 20); circle(s, 0, 0, 10);
   const { loops } = findLoops(s); const regs = regionsOf(loops);
   assert.equal(regs.length, 2);
-  assert.deepEqual(selectRegions(regs, loops, null).length, 1, 'standard = ringen');
+  assert.deepEqual(selectRegions(regs, loops, null).length, 1, 'default = the ring');
   const e = newExtrude(doc, s.id); e.depth = '1'; insertFeature(doc, e);
   near((await render(buildModel(doc).code)).vol, 1600 - Math.PI * 100, 0.5);
   e.regions = [{ x: 1, y: 1 }]; // tap in the disc

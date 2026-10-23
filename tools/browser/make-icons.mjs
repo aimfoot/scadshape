@@ -10,4 +10,4 @@ for (const [svg, size, out] of [['icon.svg', 192, 'icon-192.png'], ['icon.svg', 
   await page.close();
 }
 await browser.close();
-console.log('ikoner klara');
+console.log('icons done');

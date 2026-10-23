@@ -11,9 +11,15 @@ const page = await ctx.newPage();
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errors.push(m.text()));
 await page.route('**/api/**', r => r.fulfill({ status: 204 }));
+const openSettings = async () => {
+  if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
+  if (await page.isHidden('#tree')) await page.click('#btnTree');
+  await page.click('#btnSettings');
+};
+const closeSettings = () => page.evaluate(() => document.querySelector('#settingsDlg').close());
 await page.goto(url);
 
-if (await page.isHidden('#tree')) await page.click('#btnTree');
+await openSettings();
 await page.click('#btnAbout');
 assert.ok(await page.evaluate(() => document.querySelector('#aboutDlg').open));
 console.log('version:', await page.textContent('#aboutVersion'));

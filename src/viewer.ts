@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { Bed } from './bed';
 import type { Mesh } from './stl';
 import type { Vec } from './sketch/geom';
 import type { Plane } from './sketch/model';
@@ -50,19 +51,24 @@ export class Viewer {
   private sketches = new THREE.Group();
   private overlay = new THREE.Group();
   private marks = new THREE.Group();
+  private highlight = new THREE.Group();
+  private bedLines = new THREE.Group();
+  private bed: Bed | null = null;
   private overlayAxes: { a: THREE.Vector3; b: THREE.Vector3 }[] = [];
   private overlayPoints: THREE.Vector3[] = [];
   /** Tap (without the view having rotated) – screen coordinates in the canvas. */
   onTap?: (p: { x: number; y: number }) => void;
   /** Temporary tap handler (e.g. pick a face for a new sketch) that takes precedence over onTap. */
   tapOverride: ((p: { x: number; y: number }) => void) | null = null;
+  /** Long press (or right click) without the view having rotated. Not while tapOverride is set. */
+  onLongPress?: (p: { x: number; y: number }) => void;
   /** The shown model's triangles (9 numbers per triangle), or null. */
   meshPositions: Float32Array | null = null;
   /** The model's CAD edges (6 numbers per segment), for the measure tool. */
   edgePositions: Float32Array | null = null;
   private cornerPositions: Float32Array | null = null;
-  /** A new mesh is shown (the measure tool drops its picks). */
-  onMeshChanged?: () => void;
+  /** A new mesh is shown: listeners drop what pointed into the old one (measure picks, a selected face). */
+  readonly meshChanged: (() => void)[] = [];
   private grid = new THREE.Group();
   private running = false;
   private dirty = true;
@@ -87,7 +93,7 @@ export class Viewer {
     key.position.set(-0.5, 1, 2);
     this.camera.add(key);
 
-    this.scene.add(this.grid, this.part, this.sketches, this.overlay, this.marks);
+    this.scene.add(this.grid, this.bedLines, this.part, this.highlight, this.sketches, this.overlay, this.marks);
     this.buildGrid(100);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -97,31 +103,54 @@ export class Viewer {
     this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
     this.controls.addEventListener('change', () => this.requestRender());
 
-    // Tap = short touch without movement with one finger.
+    // Tap = short touch without movement with one finger; held still for 500 ms = long press.
     let down: { x: number; y: number; t: number; id: number } | null = null;
     let fingers = 0;
+    let pressTimer = 0;
+    let mouse = false;
     const el = this.renderer.domElement;
-    const local = (e: PointerEvent) => {
+    const local = (e: MouseEvent) => {
       const r = el.getBoundingClientRect();
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
+    const longPress = (p: { x: number; y: number }) => {
+      if (!this.tapOverride) this.onLongPress?.(p);
+    };
     el.addEventListener('pointerdown', e => {
       fingers++;
+      mouse = e.pointerType === 'mouse';
       down = fingers === 1 ? { ...local(e), t: performance.now(), id: e.pointerId } : null;
+      clearTimeout(pressTimer);
+      if (down && !mouse) {
+        const at = { x: down.x, y: down.y };
+        pressTimer = window.setTimeout(() => {
+          down = null; // no tap when the finger is lifted
+          longPress(at);
+        }, 500);
+      }
     });
     el.addEventListener('pointermove', e => {
       if (down && e.pointerId === down.id) {
         const p = local(e);
-        if (Math.hypot(p.x - down.x, p.y - down.y) > 8) down = null;
+        if (Math.hypot(p.x - down.x, p.y - down.y) > 8) {
+          down = null;
+          clearTimeout(pressTimer);
+        }
       }
     });
     const up = (e: PointerEvent) => {
       fingers = Math.max(0, fingers - 1);
+      clearTimeout(pressTimer);
       if (down && e.pointerId === down.id && e.type === 'pointerup' && performance.now() - down.t < 600) (this.tapOverride ?? this.onTap)?.(local(e));
       down = null;
     };
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
+    // The browser's own long-press menu has no use here; a right click is the mouse's long press.
+    el.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (mouse) longPress(local(e));
+    });
 
     new ResizeObserver(() => this.resize()).observe(host);
     this.resize();
@@ -158,6 +187,27 @@ export class Viewer {
   setTheme(th: Theme = currentTheme()) {
     this.buildGrid(this.gridHalf);
     for (const o of this.sketches.children) ((o as THREE.LineSegments).material as THREE.LineBasicMaterial).color.setHex(PALETTE[th].sketch);
+    this.drawBed();
+    this.requestRender();
+  }
+
+  /** The printer's plate (w × d): an outline at Z = 0, centered under the model as a slicer places it. */
+  setBed(bed: Bed | null) {
+    this.bed = bed;
+    this.drawBed();
+  }
+
+  private drawBed() {
+    Viewer.disposeGroup(this.bedLines);
+    if (this.bed) {
+      const box = new THREE.Box3().setFromObject(this.part);
+      const cx = box.isEmpty() ? 0 : (box.min.x + box.max.x) / 2, cy = box.isEmpty() ? 0 : (box.min.y + box.max.y) / 2;
+      const x0 = cx - this.bed.w / 2, x1 = cx + this.bed.w / 2, y0 = cy - this.bed.d / 2, y1 = cy + this.bed.d / 2;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute([x0, y0, 0, x1, y0, 0, x1, y0, 0, x1, y1, 0, x1, y1, 0, x0, y1, 0, x0, y1, 0, x0, y0, 0], 3));
+      const pal = PALETTE[currentTheme()];
+      this.bedLines.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: pal.major, transparent: true, opacity: Math.min(1, pal.majorA * 2.2), depthWrite: false })));
+    }
     this.requestRender();
   }
 
@@ -202,6 +252,7 @@ export class Viewer {
     else box.getBoundingSphere(this.bounds);
     const ext = box.isEmpty() ? 0 : Math.max(Math.abs(box.min.x), Math.abs(box.max.x), Math.abs(box.min.y), Math.abs(box.max.y));
     this.buildGrid(Math.max(100, ext) + 10);
+    this.drawBed();
     this.requestRender();
   }
 
@@ -378,6 +429,30 @@ export class Viewer {
     this.requestRender();
   }
 
+  /** A picked face (triangles in the world, 9 numbers each), tinted over the model; null removes it. */
+  setHighlight(tris: number[] | null) {
+    Viewer.disposeGroup(this.highlight);
+    if (tris?.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(tris, 3));
+      const m = new THREE.Mesh(
+        g,
+        new THREE.MeshBasicMaterial({
+          color: 0x1a6fc4, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false,
+          polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+        }),
+      );
+      m.renderOrder = 5;
+      this.highlight.add(m);
+    }
+    this.requestRender();
+  }
+
+  /** Is a face highlighted? – for tests. */
+  get highlighted() {
+    return this.highlight.children.length > 0;
+  }
+
   /** Screen position for a world point – for tests. */
   screenOfWorld(x: number, y: number, z: number): { x: number; y: number } {
     const el = this.renderer.domElement;
@@ -471,7 +546,8 @@ export class Viewer {
     Viewer.disposeGroup(this.part);
     this.meshPositions = mesh && mesh.triangles ? mesh.positions : null;
     this.edgePositions = this.cornerPositions = null;
-    this.onMeshChanged?.();
+    this.setHighlight(null);
+    for (const f of this.meshChanged) f();
     if (!mesh || mesh.triangles === 0) return this.updateBounds();
 
     const geo = new THREE.BufferGeometry();

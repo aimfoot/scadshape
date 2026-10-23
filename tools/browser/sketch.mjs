@@ -122,7 +122,7 @@ await touch('touchEnd', []);
 const scale1 = await page.evaluate(() => window.__scadshape.editor.view.scale);
 assert.ok(scale1 / scale0 > 1.9 && scale1 / scale0 < 2.1, `zoom ${scale1 / scale0}`);
 s = await state(); assert.equal(s.ents, 11, 'pinching must not draw anything');
-console.log('nyp-zoom ×' + (scale1 / scale0).toFixed(2));
+console.log('pinch zoom ×' + (scale1 / scale0).toFixed(2));
 await page.click('#btnSketchFit');
 
 // Select and delete the open arc

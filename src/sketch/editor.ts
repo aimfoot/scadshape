@@ -210,7 +210,7 @@ export class SketchEditor {
     this.resize();
   }
 
-  // ---- Publikt API --------------------------------------------------------------
+  // ---- Public API ---------------------------------------------------------------
 
   setSolver(s: SketchSolver) {
     this.solver = s;
@@ -1278,7 +1278,7 @@ export class SketchEditor {
     return best;
   }
 
-  // ---- Pekare --------------------------------------------------------------------------
+  // ---- Pointer -------------------------------------------------------------------------
 
   private bindInput() {
     const c = this.canvas;

@@ -21,6 +21,12 @@ const waitRendered = async () => {
   return S();
 };
 /** Open ☰ if it is closed (the state is saved between reloads). */
+const openSettings = async () => {
+  if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
+  if (await page.isHidden('#tree')) await page.click('#btnTree');
+  await page.click('#btnSettings');
+};
+const closeSettings = () => page.evaluate(() => document.querySelector('#settingsDlg').close());
 const openTree = async () => { if (await page.isHidden('#tree')) await page.click('#btnTree'); };
 const C = p => page.evaluate(p => window.__scadshape.editor.clientPoint(p), p);
 const tap = async p => { const c = await C(p); await touch('touchStart', [c]); await touch('touchEnd', []); };
@@ -82,8 +88,9 @@ assert.equal(await page.isVisible('#fp-chamfer'), false);
 await page.click('#fpCancel');
 
 // 4. Switch language to Swedish and back
-await openTree();
+await openSettings();
 await page.selectOption('#lang', 'sv');
+await closeSettings();
 await page.waitForTimeout(300);
 assert.equal(await page.textContent('#btnExtrude span'), 'Extrudera');
 assert.equal(await page.textContent('#btnRender'), 'Rendera');
@@ -100,7 +107,7 @@ await page.click('#fpCancel');
 await page.reload();
 await page.waitForFunction(() => /trianglar/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
 assert.equal(await page.evaluate(() => document.documentElement.lang), 'sv', 'the language is saved');
-await openTree(); await page.selectOption('#lang', 'en'); await page.waitForTimeout(300);
+await openSettings(); await page.selectOption('#lang', 'en'); await closeSettings(); await page.waitForTimeout(300);
 assert.equal(await page.textContent('#btnExtrude span'), 'Extrude');
 console.log('language switch en → sv → en ok');
 

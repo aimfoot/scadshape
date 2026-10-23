@@ -79,7 +79,7 @@ function recorder(page) {
   };
 }
 
-// ---- GIF 1: skiss → del ---------------------------------------------------------------------------
+// ---- GIF 1: sketch → part --------------------------------------------------------------------------
 {
   const { ctx, page, touch } = await session(1);
   const rec = recorder(page);

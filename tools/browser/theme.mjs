@@ -20,6 +20,11 @@ async function open(colorScheme) {
 const theme = page => page.evaluate(() => document.documentElement.dataset.theme);
 const bodyBg = page => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 const lum = rgb => { const [r, g, b] = rgb.match(/\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+const openSettings = async page => {
+  if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
+  if (await page.isHidden('#tree')) await page.click('#btnTree');
+  await page.click('#btnSettings');
+};
 const openTree = async page => { if (await page.isHidden('#tree')) await page.click('#btnTree'); };
 const closeTree = async page => { if (!(await page.isHidden('#tree'))) await page.click('#btnTree'); };
 
@@ -78,6 +83,7 @@ await openTree(page);
 await page.screenshot({ path: `${out}/th-tree-dark.png` });
 
 // 2. Choose Light: everything changes at once (the 3D view's grid too), and the choice is saved.
+await openSettings(page);
 const gridBefore = await page.evaluate(() => window.__scadshape.viewer.scene.children.find(o => o.type === 'Group').children[0].material.color.getHex());
 await page.selectOption('#theme', 'light');
 assert.equal(await theme(page), 'light');
@@ -95,11 +101,12 @@ await ctx.close();
 ({ ctx, page } = await open('light'));
 await page.goto(url);
 assert.equal(await theme(page), 'light');
-await openTree(page);
+await openSettings(page);
 await page.selectOption('#theme', 'dark');
 assert.equal(await theme(page), 'dark');
 await page.reload();
 assert.equal(await theme(page), 'dark');
+await openSettings(page);
 await page.selectOption('#theme', 'auto');
 assert.equal(await theme(page), 'light');
 // Swedish texts exist.

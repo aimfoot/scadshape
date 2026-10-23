@@ -14,7 +14,7 @@ for (const [name, vp] of [['landscape', { width: 915, height: 412 }], ['portrait
   const logged = [];
   await page.route('**/api/bench', r => r.fulfill({ status: 204 }));
   await page.route('**/api/log', r => (logged.push(JSON.parse(r.request().postData() ?? '{}').kind), r.fulfill({ status: 204 })));
-  page.on('close', () => console.log(name, 'loggat:', logged.join(' ')));
+  page.on('close', () => console.log(name, 'logged:', logged.join(' ')));
   const t0 = Date.now();
   await page.goto(url);
   await page.selectOption('#source', 'plate');
@@ -23,16 +23,15 @@ for (const [name, vp] of [['landscape', { width: 915, height: 412 }], ['portrait
   await page.screenshot({ path: `${out}/${name}.png` });
   if (name === 'landscape') {
     await page.click('#btnCode');
-    await page.fill('#code', 'cube(10);\nsphere(;'); // syntaxfel
-    await page.click('#btnRender');
+    await page.fill('#code', 'cube(10);\nsphere(;'); // a syntax error; renders by itself
     await page.waitForFunction(() => /Error/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
-    console.log('syntaxfel →', await page.textContent('#status'), '|', (await page.textContent('#log')).split('\n').find(l => /ERROR/.test(l)));
+    console.log('syntax error →', await page.textContent('#status'), '|', (await page.textContent('#log')).split('\n').find(l => /ERROR/.test(l)));
     await page.screenshot({ path: `${out}/error.png` });
     await page.selectOption('#source', 'cup');
     await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
     console.log('cup →', await page.textContent('#status'));
     await page.click('[data-view="top"]');
-    await page.screenshot({ path: `${out}/kopp-top.png` });
+    await page.screenshot({ path: `${out}/cup-top.png` });
     if (bench) {
       if (await page.isHidden('#tree')) await page.click('#btnTree'); // the button is in ☰
       await page.click('#btnBench');

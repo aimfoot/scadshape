@@ -20,7 +20,7 @@ cpSync(join(root, 'public'), dist, { recursive: true });
 cpSync(join(root, 'vendor/openscad'), join(dist, 'openscad'), { recursive: true });
 cpSync(join(root, 'node_modules/@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm'), join(dist, 'planegcs.wasm'));
 
-// Licenstexter ("Om scadshape", src/licenses.ts): vendor/licenses (tools/licenses.sh) + beroendenas LICENSE.
+// Licence texts ("About scadshape", src/licenses.ts): vendor/licenses (tools/licenses.sh) + the dependencies' LICENSE.
 cpSync(join(root, 'vendor/licenses'), join(dist, 'licenses'), { recursive: true });
 cpSync(join(root, 'node_modules/three/LICENSE'), join(dist, 'licenses/three.txt'));
 cpSync(join(root, 'node_modules/@salusoft89/planegcs/LICENSE'), join(dist, 'licenses/planegcs.txt'));

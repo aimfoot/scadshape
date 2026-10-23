@@ -8,7 +8,7 @@ import { arcGeom, type SketchData } from './model';
 
 export interface Loop {
   pts: Vec[]; // closed polygon (the last point is not repeated), counterclockwise
-  area: number; // absolut area, mm²
+  area: number; // absolute area, mm²
   entityIds: string[]; // curves that form the edge
   circle?: { c: Vec; r: number }; // a separate full circle
   component: number; // connected group of curves
@@ -86,8 +86,8 @@ function intersect(p: Curve, q: Curve): { tp: number; tq: number; at: Vec }[] {
 }
 
 interface SubEdge {
-  u: number; // startvertex
-  v: number; // slutvertex
+  u: number; // start vertex
+  v: number; // end vertex
   pts: Vec[]; // polyline from u to v
   entity: string;
 }

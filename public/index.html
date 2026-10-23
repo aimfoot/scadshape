@@ -31,7 +31,7 @@
     <svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
   </button>
   <button id="btnCode" class="part-only" aria-pressed="false" data-i18n="ui.code">Code</button>
-  <button id="btnRender" class="primary part-only" data-i18n="ui.render">Render</button>
+  <button id="btnRender" class="primary part-only" data-i18n="ui.render" hidden>Render</button>
   <button id="btnUndo" class="icon sketch-only" data-i18n-aria="ui.undo" hidden>
     <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
   </button>
@@ -47,20 +47,8 @@
     <p id="treeEmpty" class="muted" data-i18n="tree.empty"></p>
     <span class="spacer"></span>
     <button id="btnStart" data-i18n="ui.start">Getting started</button>
-    <label class="field">
-      <span data-i18n="ui.language">Language</span>
-      <select id="lang"></select>
-    </label>
-    <label class="field">
-      <span data-i18n="ui.theme">Theme</span>
-      <select id="theme">
-        <option value="auto" data-i18n="theme.auto">Same as the phone</option>
-        <option value="light" data-i18n="theme.light">Light</option>
-        <option value="dark" data-i18n="theme.dark">Dark</option>
-      </select>
-    </label>
+    <button id="btnSettings" data-i18n="ui.settings">Settings</button>
     <button id="btnBench" data-i18n="ui.bench">Benchmark</button>
-    <button id="btnAbout" data-i18n="about.title">About scadshape</button>
   </aside>
   <aside id="codePanel" hidden>
     <div id="codeBar" class="codebar" hidden>
@@ -285,6 +273,16 @@
   <form method="dialog"><button data-i18n="ui.close">Close</button></form>
 </dialog>
 
+<dialog id="faceMenu">
+  <h2 data-i18n="faceSel.title">Face</h2>
+  <div class="menu">
+    <button type="button" data-face="extrude" data-i18n="faceSel.extrude">Extrude</button>
+    <button type="button" data-face="cut" data-i18n="faceSel.cut">Cut into the model</button>
+    <button type="button" data-face="sketch" data-i18n="faceSel.sketch">Sketch on this face</button>
+  </div>
+  <form method="dialog"><button data-i18n="ui.close">Close</button></form>
+</dialog>
+
 <dialog id="paramsDlg">
   <h2 data-i18n="ui.variables">Variables</h2>
   <p class="muted small" data-i18n="params.hint"></p>
@@ -352,6 +350,36 @@
     <button type="button" id="exDownload" class="primary" data-i18n="export.download">Download</button>
   </form>
 </dialog>
+<dialog id="settingsDlg">
+  <h2 data-i18n="ui.settings">Settings</h2>
+  <label class="field">
+    <span data-i18n="ui.language">Language</span>
+    <select id="lang"></select>
+  </label>
+  <label class="field">
+    <span data-i18n="ui.theme">Theme</span>
+    <select id="theme">
+      <option value="auto" data-i18n="theme.auto">Same as the phone</option>
+      <option value="light" data-i18n="theme.light">Light</option>
+      <option value="dark" data-i18n="theme.dark">Dark</option>
+    </select>
+  </label>
+  <label class="field">
+    <span data-i18n="bed.title">Printer (build volume)</span>
+    <select id="bedPreset"></select>
+  </label>
+  <div id="bedCustom" class="bedcustom" hidden>
+    <label class="field"><span data-i18n="bed.width">Width (X)</span><input id="bedW" inputmode="decimal" autocomplete="off"></label>
+    <label class="field"><span data-i18n="bed.depth">Depth (Y)</span><input id="bedD" inputmode="decimal" autocomplete="off"></label>
+    <label class="field"><span data-i18n="bed.height">Height (Z)</span><input id="bedH" inputmode="decimal" autocomplete="off"></label>
+  </div>
+  <p class="muted small" data-i18n="bed.hint"></p>
+  <div class="menu">
+    <button type="button" id="btnAbout" data-i18n="about.title">About scadshape</button>
+  </div>
+  <form method="dialog"><button data-i18n="ui.close">Close</button></form>
+</dialog>
+
 <dialog id="aboutDlg">
   <div id="aboutMain" class="about">
     <h2 data-i18n="about.title">About scadshape</h2>

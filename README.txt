@@ -320,11 +320,30 @@ Import (src/ui/importer.ts, Import in the part toolbar)
   points are locked by default, over 600 always, over 6000 refused.
   Tests: tests/svg.test.ts, tools/browser/import.mjs (pwa.mjs runs with ?sw in the address).
 
-Theme (src/theme.ts, ☰ → Theme: Same as the phone / Light / Dark)
+Theme (src/theme.ts, ☰ → Settings → Theme: Same as the phone / Light / Dark)
   The choice is saved (scadshape.theme); the resolved theme becomes data-theme on <html>. All colors in
   style.css are variables with dark values (+ a media query before the script has run, color-scheme for
   forms). The sketch canvas has two palettes (editor.ts LIGHT/DARK; fully defined = light in
   dark), the 3D view changes its grid and sketch lines (viewer.setTheme). Test: tools/browser/theme.mjs.
+
+Settings (src/ui/settings.ts, src/bed.ts, ☰ → Settings, 2026-10-23)
+  Language, theme, the printer's build volume and About scadshape in one dialog (the drawer keeps the
+  room for the features). Build volume: presets (Bambu Lab A1 mini 180³ by default, A1/P1S/X1 256³,
+  Prusa MK4, Prusa MINI, Ender-3) or a custom size, saved as scadshape.bed. The 3D view draws the plate's
+  outline at Z = 0, centered under the model as a slicer places it (viewer.setBed); the status bar warns
+  (class warn) when the model does not fit, also turned 90° on the plate (fitsBed). Changing it
+  redoes the warning without a new render (applyBed). Test: tools/browser/settings.mjs.
+  Everything renders by itself: the model on every change, Custom code 0.8 s after the typing pauses.
+  The Render button is only Cancel, shown once a render has run for 0.4 s.
+
+Faces picked in the 3D view (src/ui/faceselect.ts, 2026-10-23)
+  In part mode with no panel open, a tap on the model selects a face (tinted, viewer.setHighlight with
+  faceTriangles: the connected flat face, or the smooth curved one), a tap beside clears it. With a face
+  selected, Extrude in the toolbar extrudes it (as "Pick a face" does) and Sketch sketches on it. A long
+  press (500 ms still, or a right click) selects the face and opens a menu: Extrude, Cut into the model
+  (extrude with op remove, inward), Sketch on this face. The click the browser sends when the finger is
+  lifted is swallowed so it does not hit the menu. A new mesh, a panel, the measure tool or sketch
+  mode clears the selection. Test: tools/browser/faceselect.mjs.
 
 Snap fits
   Snap hook (features/snap.ts) at points in a sketch (none picked = standalone points, otherwise

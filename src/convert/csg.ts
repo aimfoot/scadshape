@@ -6,9 +6,9 @@ export type CsgValue = number | string | boolean | null | CsgValue[];
 
 export interface CsgNode {
   name: string;
-  /** Positionella argument (t.ex. multmatrix(M)). */
+  /** Positional arguments (e.g. multmatrix(M)). */
   pos: CsgValue[];
-  /** Namngivna argument (h = 8.4). */
+  /** Named arguments (h = 8.4). */
   args: Record<string, CsgValue>;
   children: CsgNode[];
 }

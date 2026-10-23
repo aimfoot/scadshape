@@ -53,7 +53,7 @@ console.log('waiting .scad →', await page.textContent('#status'));
 // 2. The system bars get the toolbar's color (light theme).
 const bars = await calls('bars');
 assert.ok(bars.length >= 1 && bars.at(-1).dark === false, JSON.stringify(bars));
-console.log('systemrader:', bars.at(-1));
+console.log('system bars:', bars.at(-1));
 
 // 3. Export: Download saves via the app (3MF = zip, "PK"), Share is shown and goes via the app.
 await page.click('#btnExport');
@@ -78,8 +78,14 @@ let n = 0;
 while (await page.evaluate(() => window.scadshapeBack())) assert.ok(++n < 10, 'back should run out');
 console.log(`back: the dialog + ${n} more, then false`);
 
+const openSettings = async () => {
+  if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
+  if (await page.isHidden('#tree')) await page.click('#btnTree');
+  await page.click('#btnSettings');
+};
+const closeSettings = () => page.evaluate(() => document.querySelector('#settingsDlg').close());
 // 4b. Back in a licence text in "About" → the list; once more → the dialog closes.
-if (await page.isHidden('#tree')) await page.click('#btnTree');
+await openSettings();
 await page.click('#btnAbout');
 await page.click('#aboutLicense');
 await page.waitForFunction(() => /GNU GENERAL PUBLIC LICENSE/.test(document.querySelector('#aboutTextBody').textContent));

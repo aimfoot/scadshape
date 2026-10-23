@@ -14,6 +14,7 @@ import { chipRow, refreshChips } from './params';
 import { view, viewer } from './render';
 import { app, emit, on, saveDoc, vars } from './state';
 import { hideToasts, showToast } from './toast';
+import { clearFace, takeFace, type FaceHit } from './faceselect';
 import { planeLabel, renderTree } from './tree';
 
 let editor: SketchEditor | null = null;
@@ -172,6 +173,7 @@ export const sketchHooks = { beforeEnter: () => {} };
 
 export function enterSketch(f: SketchFeature) {
   sketchHooks.beforeEnter();
+  clearFace();
   editing = f;
   setMode('sketch');
   $('#sketchTitle').textContent = `${f.name} · ${planeLabel(f)}`;
@@ -242,7 +244,7 @@ export function exitSketch() {
   }
 }
 
-// ---- Planval ------------------------------------------------------------------------------------
+// ---- Plane picker -------------------------------------------------------------------------------
 
 /** Open the plane choice for a new sketch; content is put into the sketch once the plane is chosen. */
 export let openPlaneDialog: (content?: ((f: SketchFeature) => void) | null, title?: string) => void = () => {};
@@ -271,8 +273,6 @@ function stopFacePick() {
   viewer.tapOverride = null;
   $('#faceBar').hidden = true;
 }
-
-type FaceHit = { point: [number, number, number]; normal: [number, number, number] };
 
 /**
  * New sketch (not inserted) in the tapped face's plane: a base plane with offset, or a slanted face
@@ -308,6 +308,7 @@ export function pickFaceThen(onHit: (hit: FaceHit) => void): boolean {
     showToast(t('plane.noModel'), 'info');
     return false;
   }
+  clearFace();
   $('#faceBar').hidden = false;
   remoteLog('face-pick-start', {});
   viewer.tapOverride = p => {
@@ -320,15 +321,25 @@ export function pickFaceThen(onHit: (hit: FaceHit) => void): boolean {
   return true;
 }
 
+/** A new sketch on the face hit in the 3D view, entered at once. */
+export function sketchOnFace(hit: FaceHit) {
+  addSketchAndEnter(sketchForHit(hit));
+}
+
 function startFacePick() {
-  pickFaceThen(hit => addSketchAndEnter(sketchForHit(hit)));
+  pickFaceThen(sketchOnFace);
 }
 
 function initPlaneDialog() {
   const dlg = $<HTMLDialogElement>('#planeDlg');
   const offset = $<HTMLInputElement>('#planeOffset');
   $('#planeChips').replaceWith(Object.assign(chipRow(() => offset), { id: 'planeChips' }));
-  $('#btnNewSketch').addEventListener('click', () => openPlaneDialog());
+  $('#btnNewSketch').addEventListener('click', () => {
+    // A face selected in the 3D view: sketch on it.
+    const face = takeFace();
+    if (face) sketchOnFace(face);
+    else openPlaneDialog();
+  });
   openPlaneDialog = (content = null, title = t('plane.title')) => {
     stopFacePick();
     pendingContent = content;

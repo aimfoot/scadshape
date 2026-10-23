@@ -58,9 +58,16 @@ for (const [i, name] of Object.keys(want).entries()) {
   if (i === 1) await page.screenshot({ path: `${out}/welcome-plate.png` });
 }
 
+const openSettings = async () => {
+  if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
+  if (await page.isHidden('#tree')) await page.click('#btnTree');
+  await page.click('#btnSettings');
+};
+const closeSettings = () => page.evaluate(() => document.querySelector('#settingsDlg').close());
 // 5. Swedish: the examples' names and variables follow the language.
-await page.click('#btnTree');
+await openSettings();
 await page.selectOption('#lang', 'sv');
+await closeSettings();
 await page.click('#btnStart');
 assert.deepEqual(await page.$$eval('#startExamples b', bs => bs.map(b => b.textContent)), ['Låda med lock', 'Monteringsplatta', 'Skylt', 'Kopp']);
 const before = await doc();

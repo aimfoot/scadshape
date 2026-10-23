@@ -16,9 +16,8 @@ const libRequests = [];
 page.on('request', r => r.url().includes('/libs/') && libRequests.push(r.url().split('/').pop()));
 const status = () => page.textContent('#status');
 const renderCode = async code => {
-  await page.fill('#code', code);
-  await page.click('#btnRender');
-  await page.waitForTimeout(300);
+  await page.fill('#code', code); // renders by itself when the typing pauses (0.8 s)
+  await page.waitForTimeout(1200);
   await page.waitForFunction(() => !/Rendering|Loading/.test(document.querySelector('#status').textContent) && !/Cancel/.test(document.querySelector('#btnRender').textContent), null, { timeout: 90000 });
   return status();
 };
@@ -51,7 +50,7 @@ await page.screenshot({ path: `${out}/l-gridfinity.png` });
 assert.deepEqual([...libRequests].sort(), ['BOSL2.json', 'Round-Anything.json', 'dotSCAD.json', 'gridfinity-rebuilt-openscad.json']);
 
 // A library that does not exist gives OpenSCAD's warning in the log, not a crash
-st = await renderCode('include <Finnsinte/std.scad>\ncube(5);');
+st = await renderCode('include <DoesNotExist/std.scad>\ncube(5);');
 assert.match(await page.textContent('#log'), /Can't find include file/);
 
 // Open a .scad file from ☰ → the model → Open file: becomes Custom code and renders

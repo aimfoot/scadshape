@@ -8,6 +8,7 @@ import { t } from '../i18n';
 import { $, $$ } from './dom';
 import { viewer } from './render';
 import { showToast } from './toast';
+import { clearFace } from './faceselect';
 
 let refs: Ref[] = [];
 let active = false;
@@ -38,6 +39,7 @@ export function stopMeasure() {
 
 function startMeasure() {
   if (!viewer.meshPositions) return showToast(t('measure.noModel'), 'info');
+  clearFace();
   active = true;
   refs = [];
   $('#measureBar').hidden = false;
@@ -69,9 +71,9 @@ export function initMeasure() {
     if (e.key === 'Escape' && active) stopMeasure();
   });
   // The model has been re-rendered: old picks point to a different mesh.
-  viewer.onMeshChanged = () => {
+  viewer.meshChanged.push(() => {
     if (!active) return;
     refs = [];
     show();
-  };
+  });
 }

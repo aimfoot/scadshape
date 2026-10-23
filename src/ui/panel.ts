@@ -16,14 +16,15 @@ import { renderOpts, setSource, viewer } from './render';
 import { app, emit, vars } from './state';
 import { showToast } from './toast';
 import { chipRow } from './params';
-import { pickFaceThen, sketchForHit } from './sketchmode';
+import { pickFaceThen, sketchForHit, sketchOnFace } from './sketchmode';
+import { clearFace, initFaceSelect, longPressFace, takeFace, tapFace, type FaceHit } from './faceselect';
 import { addFaceLoops, faceLoops, smoothFace } from '../faceoutline';
 import { findCurveRef } from '../faceref';
 import { sketchFrame } from '../frame';
-import { outwardOf } from '../features/common';
+import { inwardOf, outwardOf } from '../features/common';
 
 interface PanelState {
-  f: SolidFeature; // arbetskopia
+  f: SolidFeature; // working copy
   existing: SolidFeature | null;
   mode: PickMode;
   /** The feature's place in the tree: sketches before it can be used (e.g. as a pattern axis). */
@@ -177,6 +178,7 @@ function syncFields() {
 
 export function openPanel(f: SolidFeature, existing: boolean) {
   if (document.body.dataset.mode !== 'part') return;
+  clearFace();
   const before = existing ? app.doc.features.indexOf(f) : activeCount(app.doc);
   panel = { f: JSON.parse(JSON.stringify(f)), existing: existing ? f : null, mode: 'regions', before };
   const kind = kindOf(f);
@@ -291,57 +293,69 @@ function defaultSketch(type: SolidFeature['type']): SketchFeature | null {
  * switches sketch.
  */
 export function extrudeFace() {
-  pickFaceThen(hit => {
-    // Round face: thicken/cut along the surface (its own feature) instead of a sketch.
-    const tris = smoothFace(viewer.meshPositions!, hit.point, hit.normal);
-    if (tris) {
-      if (panel && !panel.existing) {
-        const tpl = panel.template;
-        closePanel();
-        if (tpl && !dependents(app.doc, tpl.id).length) removeFeature(app.doc, tpl);
-      }
-      const f = newFeature(app.doc, 'surface', WORLD_SKETCH);
-      f.tris = tris;
-      // The side of an extruded circle/arc: follow it (otherwise a fixed copy of the surface).
-      f.ref = findCurveRef(app.doc, vars(), hit.normal, hit.point) ?? undefined;
-      remoteLog('extrude-face', { curved: true, triangles: tris.length / 9, ref: f.ref });
-      emit('docChanged');
-      openPanel(f, false);
-      return;
-    }
-    const sk = sketchForHit(hit);
-    const loops = faceLoops(viewer.meshPositions!, sketchFrame(sk, vars(), app.doc), hit.point);
-    if (!loops.length) return showToast(t('face.noOutline'), 'info');
-    addFaceLoops(sk, loops);
-    sk.name = t('face.sketchName', { name: sk.name });
-    remoteLog('extrude-face', { plane: sk.plane, face: !!sk.face, loops: loops.map(l => (l.kind === 'circle' ? 'c' : l.pts.length)) });
-    const old = panel?.template;
-    insertFeature(app.doc, sk);
+  pickFaceThen(hit => extrudeHit(hit, 'add'));
+}
+
+/** Extrude (or, with 'remove', cut into) the face hit in the 3D view – see extrudeFace. */
+function extrudeHit(hit: FaceHit, op: 'add' | 'remove') {
+  // Round face: thicken/cut along the surface (its own feature) instead of a sketch.
+  const tris = smoothFace(viewer.meshPositions!, hit.point, hit.normal);
+  if (tris) {
     if (panel && !panel.existing) {
-      panel.before++;
-      if (old && !dependents(app.doc, old.id).length) {
-        removeFeature(app.doc, old);
-        panel.before--;
-      }
-      panel.template = sk;
-      panel.f.sketch = sk.id;
-      renderOpts.hideSketch = sk.id;
-      (panel.f as { regions?: unknown }).regions = null;
-      if (panel.f.type === 'extrude') panel.f.direction = panel.f.op === 'remove' ? (outwardOf(sk) === 'normal' ? 'reverse' : 'normal') : outwardOf(sk);
-      emit('docChanged');
-      refreshSketchOptions();
-      syncFields();
-      updatePreview();
-      return;
+      const tpl = panel.template;
+      closePanel();
+      if (tpl && !dependents(app.doc, tpl.id).length) removeFeature(app.doc, tpl);
     }
+    const f = newFeature(app.doc, 'surface', WORLD_SKETCH);
+    f.tris = tris;
+    // The side of an extruded circle/arc: follow it (otherwise a fixed copy of the surface).
+    f.ref = findCurveRef(app.doc, vars(), hit.normal, hit.point) ?? undefined;
+    f.op = op;
+    remoteLog('extrude-face', { curved: true, triangles: tris.length / 9, ref: f.ref });
     emit('docChanged');
-    openPanel(newFeature(app.doc, 'extrude', sk), false);
-    panel!.template = sk;
-  });
+    openPanel(f, false);
+    return;
+  }
+  const sk = sketchForHit(hit);
+  const loops = faceLoops(viewer.meshPositions!, sketchFrame(sk, vars(), app.doc), hit.point);
+  if (!loops.length) return showToast(t('face.noOutline'), 'info');
+  addFaceLoops(sk, loops);
+  sk.name = t('face.sketchName', { name: sk.name });
+  remoteLog('extrude-face', { plane: sk.plane, face: !!sk.face, loops: loops.map(l => (l.kind === 'circle' ? 'c' : l.pts.length)) });
+  const old = panel?.template;
+  insertFeature(app.doc, sk);
+  if (panel && !panel.existing) {
+    panel.before++;
+    if (old && !dependents(app.doc, old.id).length) {
+      removeFeature(app.doc, old);
+      panel.before--;
+    }
+    panel.template = sk;
+    panel.f.sketch = sk.id;
+    renderOpts.hideSketch = sk.id;
+    (panel.f as { regions?: unknown }).regions = null;
+    if (panel.f.type === 'extrude') panel.f.direction = panel.f.op === 'remove' ? (outwardOf(sk) === 'normal' ? 'reverse' : 'normal') : outwardOf(sk);
+    emit('docChanged');
+    refreshSketchOptions();
+    syncFields();
+    updatePreview();
+    return;
+  }
+  emit('docChanged');
+  const f = newFeature(app.doc, 'extrude', sk);
+  if (op === 'remove') {
+    f.op = 'remove';
+    f.direction = inwardOf(sk);
+  }
+  openPanel(f, false);
+  panel!.template = sk;
 }
 
 /** New feature of the type (from the toolbar). */
 export function startFeature(type: SolidFeature['type']) {
+  // A face selected in the 3D view: Extrude extrudes it.
+  const face = type === 'extrude' ? takeFace() : null;
+  if (face) return extrudeHit(face, 'add');
   if (KINDS[type].pick.kind === 'none') return openPanel(newFeature(app.doc, type, WORLD_SKETCH), false);
   const sk = defaultSketch(type);
   // Extrude without a closed sketch but with a model: pick a face to extrude.
@@ -404,13 +418,26 @@ export function initPanel() {
       syncFields();
       updatePreview();
     });
-  // Tap in the 3D view: pick regions, axis, points or circles.
+  // Tap in the 3D view: pick regions, axis, points or circles – or, with no panel open, a face.
   viewer.onTap = p => {
+    if (!panel) {
+      if (partMode()) tapFace(p);
+      return;
+    }
     const sk = panelSketch();
-    if (!panel || !sk) return;
+    if (!sk) return;
     const key = pickerFor(panel.f).tap(panel.f, sk, p, viewer, panel.mode);
     if (!key) return;
     if (key === 'axis') panel.mode = 'regions';
     changed(key);
+  };  viewer.onLongPress = p => {
+    if (!panel && partMode()) longPressFace(p);
   };
+  initFaceSelect((action, hit) => {
+    if (action === 'sketch') return sketchOnFace(hit);
+    extrudeHit(hit, action === 'cut' ? 'remove' : 'add');
+  });
 }
+
+/** Part mode with nothing else using taps in the 3D view (the measure tool sets tapOverride). */
+const partMode = () => document.body.dataset.mode === 'part';

@@ -41,7 +41,7 @@ await page.waitForFunction(() => /Start with Sketch/.test(document.querySelector
 await page.click('#btnNewSketch'); await page.click('[data-plane="XY"]');
 await page.waitForFunction(() => window.__scadshape.editor?.solverReady, null, { timeout: 15000 });
 await page.click('[data-tool="rect"]'); await tapSk({ x: 0, y: 0 }); await tapSk({ x: 40, y: 20 });
-await page.click('[data-tool="circle"]'); await tapSk({ x: 28, y: 10 }); await tapSk({ x: 28, y: 14 });
+await page.click('[data-tool="circle"]'); await tapSk({ x: 30, y: 10 }); await tapSk({ x: 30, y: 14 });
 await page.click('#btnDone');
 await page.click('#btnExtrude'); await page.waitForSelector('#featPanel:not([hidden])');
 await page.fill('#fp-depth', '10'); await page.click('#fpOk');
@@ -62,7 +62,7 @@ assert.equal(sk.plane, 'XY');
 await page.fill('#fp-depth', '5'); await page.click('#fpOk');
 assert.deepEqual(await waitRendered(), []);
 assert.deepEqual(await bbox(), [0, 0, 0, 40, 20, 15]);
-const holeThrough = await page.evaluate(() => { const p = window.__scadshape.viewer.meshPositions; for (let i = 0; i < p.length; i += 3) if (Math.abs(Math.hypot(p[i] - 28, p[i + 1] - 10) - 4) < 0.05 && Math.abs(p[i + 2] - 15) < 1e-3) return true; return false; });
+const holeThrough = await page.evaluate(() => { const p = window.__scadshape.viewer.meshPositions; for (let i = 0; i < p.length; i += 3) if (Math.abs(Math.hypot(p[i] - 30, p[i + 1] - 10) - 4) < 0.01 && Math.abs(p[i + 2] - 15) < 1e-3) return true; return false; });
 assert.ok(holeThrough, 'the hole goes up through the extruded part');
 console.log('top extruded 5 mm, the hole follows:', sk.name);
 await page.screenshot({ path: `${out}/faceextrude-top.png` });
@@ -76,7 +76,7 @@ await page.click('#fp-op [data-value="remove"]');
 await page.fill('#fp-depth', '3'); await page.click('#fpOk');
 assert.deepEqual(await waitRendered(), []);
 assert.deepEqual(await bbox(), [0, 3, 0, 40, 20, 15]);
-console.log('framsidan bortskuren 3 mm');
+console.log('the front cut away 3 mm');
 await page.screenshot({ path: `${out}/faceextrude-front.png` });
 
 // 3. Cancel removes the face sketch

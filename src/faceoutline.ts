@@ -150,6 +150,22 @@ export function addFaceLoops(sk: SketchData, loops: FaceLoop[]) {
  * flat.
  */
 export function smoothFace(positions: Float32Array, at: V3, normal: V3): number[] | null {
+  return growFace(positions, at, normal, Math.cos((30 * Math.PI) / 180), true);
+}
+
+/**
+ * The whole face around the tapped point, flat or curved, as triangles in the world (9 numbers per
+ * triangle) – what a picked face is highlighted with. Null if no facet has the normal.
+ */
+export function faceTriangles(positions: Float32Array, at: V3, normal: V3): number[] | null {
+  return smoothFace(positions, at, normal) ?? growFace(positions, at, normal, 0.9999, false);
+}
+
+/**
+ * Facets connected to the one under `at` across edges whose normals differ by less than `minDot`
+ * (cosine). With `curvedOnly` the result is null unless the face is curved.
+ */
+function growFace(positions: Float32Array, at: V3, normal: V3, minDot: number, curvedOnly: boolean): number[] | null {
   const nTri = positions.length / 9;
   const P = (t: number, k: number): V3 => [positions[t * 9 + k * 3], positions[t * 9 + k * 3 + 1], positions[t * 9 + k * 3 + 2]];
   const nrm = (t: number): V3 => {
@@ -186,7 +202,6 @@ export function smoothFace(positions: Float32Array, at: V3, normal: V3): number[
       if (l) l.push(t);
       else byEdge.set(id, [t]);
     }
-  const smooth = Math.cos((30 * Math.PI) / 180);
   const face = new Set([seed]);
   const queue = [seed];
   let curved = false;
@@ -194,13 +209,13 @@ export function smoothFace(positions: Float32Array, at: V3, normal: V3): number[
     const t = queue.pop()!;
     for (let k = 0; k < 3; k++)
       for (const u of byEdge.get(ek(t, k)) ?? []) {
-        if (face.has(u) || dot(normals[t], normals[u]) < smooth) continue;
+        if (face.has(u) || dot(normals[t], normals[u]) < minDot) continue;
         face.add(u);
         queue.push(u);
         if (dot(normals[u], n0) < 0.9999) curved = true;
       }
   }
-  if (!curved) return null;
+  if (curvedOnly && !curved) return null;
   const out: number[] = [];
   for (const t of face) for (let k = 0; k < 3; k++) out.push(...P(t, k).map(v => Math.round(v * 1e4) / 1e4));
   return out;
