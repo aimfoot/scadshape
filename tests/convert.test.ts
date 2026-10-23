@@ -196,6 +196,18 @@ translate([0, 0, thickness]) cube([10, depth, 7]);
   assert.ok(dv < 0.005 && db < 1e-3, `volume ${dv}, size ${db}`);
 });
 
+await test('products of variables: the code\'s own expression is kept, a built one is not', async () => {
+  // The width is written in the code (m * z + 2 * wall): exact. The position is m*z + wall from two
+  // translates, which one variable at a time looks like 20*m + 1,5*z + wall - 30: wrong as soon as
+  // m and z both change, so it stays a number.
+  const r = await scadToDoc('m = 1.5; z = 20; wall = 3;\ntranslate([m * z, 0, 0]) translate([wall, 0, 0]) cube([m * z + 2 * wall, 10, wall]);', engine);
+  const sk = r.doc.features[0] as SketchFeature;
+  const dims = sk.constraints.filter(c => c.type === 'distance') as { p1: string; dir: string; value: number; expr?: string }[];
+  assert.deepEqual(dims.map(c => [c.p1 === 'O' ? 'at' : 'size', c.dir, c.value, c.expr]),
+    [['size', 'h', 36, 'm * z + 2 * wall'], ['size', 'v', 10, undefined], ['at', 'h', 33, undefined]]);
+  assert.equal(r.doc.features.find(f => f.type === 'extrude')!.depth, 'wall');
+});
+
 // tests/fixtures: public test models. tests/private (only exists locally, not published): own
 // files.
 const fixtureDirs = ['fixtures', 'private'].filter(d => existsSync(`${ROOT}/tests/${d}`));

@@ -91,9 +91,13 @@ interface Analysis {
   params: Param[];
   vars: Map<string, number>; // only those in params
   refs: (e: string) => string;
-  /** Variables set to a plain number: code that sets one to value + d (appended, so it wins). */
-  free: Map<string, (d: number) => string>;
+  /**
+   * Variables set to a plain number: code that sets one to its value + its change in `d` (appended,
+   * so it wins). The elements of a vector write the whole vector with all their changes.
+   */
+  free: Map<string, Override>;
 }
+type Override = (d: ReadonlyMap<string, number>) => string;
 
 /** The source's numeric top-level variables as document variables (vectors become name_x/_y/_z). */
 export const scadParams = (src: string): Param[] => analyse(src).params;
@@ -113,8 +117,9 @@ function analyse(src: string): Analysis {
       const k = idx !== undefined ? Number(idx) : AXES.indexOf(axis!);
       return els?.[k] ?? m;
     });
-  const free = new Map<string, (d: number) => string>();
-  const add = (name: string, expr: string, hidden: boolean, override: (d: number) => string) => {
+  const free = new Map<string, Override>();
+  const plus = (e: string, d = 0) => (d ? `(${e}) + ${d}` : e);
+  const add = (name: string, expr: string, hidden: boolean, override: Override) => {
     if (validateParamName(name, found)) return false;
     const e = elementRefs(expr);
     const r = parseExpr(e, vars);
@@ -129,11 +134,11 @@ function analyse(src: string): Analysis {
     const els = vectorElements(a.expr);
     if (els) {
       const names = els.map((_, k) => `${a.name}_${els.length <= 3 ? AXES[k] : k}`);
-      const ok = els.map((e, k) => add(names[k], e, a.hidden, d => `${a.name} = [${els.map((x, j) => (j === k ? `(${x}) + ${d}` : x)).join(', ')}];`));
+      const ok = els.map((e, k) => add(names[k], e, a.hidden, d => `${a.name} = [${els.map((x, j) => plus(x, d.get(names[j]))).join(', ')}];`));
       if (ok.every(Boolean)) vectors.set(a.name, names);
       continue;
     }
-    add(a.name, a.expr, a.hidden, d => `${a.name} = (${a.expr}) + ${d};`);
+    add(a.name, a.expr, a.hidden, d => `${a.name} = ${plus(a.expr, d.get(a.name))};`);
   }
   // Hidden variables only come along when a visible one uses them.
   const keep = new Set(found.filter(p => !p.hidden).map(p => p.name));
@@ -187,6 +192,11 @@ function negate(e: string) {
   return m ? `${m[2]} - ${m[1]}` : `-(${e})`;
 }
 const numOf = (s: string | undefined) => (s === undefined ? null : parseExpr(s).value);
+
+interface Probe {
+  deps: number[][]; // per slot, per free variable
+  joint: { values: number[]; vars: Map<string, number> } | null;
+}
 
 /** A value in the converted document that can get an expression. */
 interface Slot {
@@ -242,7 +252,7 @@ function linear(terms: [string, [number, number]][], c: number): string {
 export class ParamLinker {
   readonly params: Param[];
   private vars: Map<string, number>;
-  private free: Map<string, (d: number) => string>;
+  private free: Map<string, Override>;
   private code: Candidate[] = [];
   private lv: Candidate[][] = [];
   constructor(private src: string) {
@@ -264,17 +274,17 @@ export class ParamLinker {
     if (!this.params.length) return 0;
     doc.params = this.params.map(p => ({ ...p }));
     const base = slots(doc);
-    let deps: number[][] | null;
+    let probe: Probe | null;
     try {
-      deps = await this.probe(base, reconvert, Date.now() + budgetMs);
+      probe = await this.probe(base, reconvert, Date.now() + budgetMs);
     } catch {
-      deps = null;
+      probe = null;
     }
     let linked = 0;
     base.forEach((s, i) => {
       if (!Number.isFinite(s.v)) return;
-      const e = deps ? this.fromDeps(s, deps[i]) : this.find(s.v, { signed: true, radial: s.radial });
-      if (e) {
+      const e = probe ? this.fromDeps(s, probe.deps[i]) : this.find(s.v, { signed: true, radial: s.radial });
+      if (e && (!probe || this.holds(e, probe, i))) {
         s.set(e);
         linked++;
       }
@@ -285,26 +295,52 @@ export class ParamLinker {
   /** Nudge size for a variable: large enough for the SVG export's 6 digits. */
   private step = (name: string) => 0.1 * Math.max(1, Math.abs(this.vars.get(name)!));
 
-  /** Per slot, the change per unit of each free variable (0 for one that changes the structure). */
-  private async probe(base: Slot[], reconvert: (src: string) => Promise<Doc>, deadline: number): Promise<number[][]> {
+  /** The code with the variables changed by `d`. */
+  private nudged(d: ReadonlyMap<string, number>) {
+    const lines = new Set([...d.keys()].filter(n => d.get(n)).map(n => this.free.get(n)!(d)));
+    return `${this.src}\n${[...lines].join('\n')}\n`;
+  }
+
+  /**
+   * Per slot, the change per unit of each free variable (0 for one that changes the structure),
+   * and the values with all of them changed at once (null if that changes the structure).
+   */
+  private async probe(base: Slot[], reconvert: (src: string) => Promise<Doc>, deadline: number): Promise<Probe> {
     const names = [...this.free.keys()];
     const deps = base.map(() => names.map(() => 0));
+    const steps = new Map<string, number>();
+    const run = async (d: ReadonlyMap<string, number>) => {
+      if (Date.now() > deadline) throw new Error('timeout');
+      let s: Slot[];
+      try {
+        s = slots(await reconvert(this.nudged(d)));
+      } catch {
+        return null;
+      }
+      return s.length === base.length && s.every((x, i) => x.key === base[i].key) ? s : null;
+    };
     for (const [k, name] of names.entries()) {
       // Up first, down if that changes the structure (a loop count, a shape becoming another).
       for (const d of [this.step(name), -this.step(name)]) {
-        if (Date.now() > deadline) throw new Error('timeout');
-        let s: Slot[];
-        try {
-          s = slots(await reconvert(`${this.src}\n${this.free.get(name)!(d)}\n`));
-        } catch {
-          continue;
-        }
-        if (s.length !== base.length || s.some((x, i) => x.key !== base[i].key)) continue;
+        const s = await run(new Map([[name, d]]));
+        if (!s) continue;
         s.forEach((x, i) => (deps[i][k] = (x.v - base[i].v) / d));
+        steps.set(name, d);
         break;
       }
     }
-    return deps;
+    const all = await run(steps);
+    return { deps, joint: all && { values: all.map(x => x.v), vars: evalParams(this.params.map(p => (steps.has(p.name) ? { ...p, expr: String(this.vars.get(p.name)! + steps.get(p.name)!) } : p))).vars } };
+  }
+
+  /**
+   * Does the expression also hold with all variables changed at once? One variable at a time only
+   * shows the slope along each: m*z looks like a sum of m and z terms until both change.
+   */
+  private holds(e: string, probe: Probe, i: number) {
+    if (!probe.joint) return probe.deps[i].filter(x => Math.abs(x) > 0.02).length <= 1;
+    const want = probe.joint.values[i], got = parseExpr(e, probe.joint.vars).value;
+    return got !== null && Math.abs(got - want) < 2e-3 * Math.max(1, Math.abs(want));
   }
 
   /** The variables' and code expressions' values and dependences (computed, so exact). */
