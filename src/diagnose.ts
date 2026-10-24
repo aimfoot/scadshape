@@ -5,6 +5,7 @@
 // include …). problemsForAi() writes them as text to paste back into the AI chat.
 
 import { convertFix, includeFix, renameFix, type Fix } from './fixes';
+import { floatingParts } from './floating';
 import { FAMILIES } from './fonts';
 import { t } from './i18n';
 import { BOSL2_NAMES, MCAD_NAMES } from './libnames.gen';
@@ -27,6 +28,8 @@ export interface Problem {
   check?: true;
   /** A one-tap fix, where the right change is clear (fixes.ts). */
   fix?: Fix;
+  /** Found in the rendered model (meshProblems), not in a line of the code. */
+  mesh?: true;
 }
 
 const USER_FILE = '/in.scad';
@@ -211,6 +214,18 @@ export function diagnose(log: string[], src: string): Problem[] {
   });
   // With the app's own checks (what OpenSCAD renders without a word), in the order of the code.
   return [...found, ...lint(src)].sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));
+}
+
+/** Problems in the rendered model itself: parts that start in mid-air (floating.ts). */
+export function meshProblems(positions: Float32Array): Problem[] {
+  const mm = (v: number) => String(Math.round(v * 10) / 10 || 0);
+  return floatingParts(positions).slice(0, 5).map(p => {
+    const [x, y] = [0, 1].map(k => `${mm(p.min[k])}…${mm(p.max[k])}`);
+    return {
+      severity: 'warn', message: `x ${x}, y ${y}, z ${mm(p.min[2])}…${mm(p.max[2])}`, line: null, count: 1, followUp: false, check: true, mesh: true,
+      hint: t('mesh.floating', { x, y, z: mm(p.min[2]), h: mm(p.above) }),
+    };
+  });
 }
 
 /** The problems as text for an AI chat: OpenSCAD's messages with their lines of code. */

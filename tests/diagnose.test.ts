@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { setLang } from '../src/i18n';
-import { diagnose, problemsForAi } from '../src/diagnose';
+import { diagnose, meshProblems, problemsForAi } from '../src/diagnose';
+import { floatingParts } from '../src/floating';
+import { parseBinaryStl } from '../src/stl';
 import { FONTS_CONF, fontsFor } from '../src/fonts';
 import { lint } from '../src/lint';
 import { applyFix } from '../src/fixes';
@@ -176,27 +178,62 @@ await test('MCAD is in the app: its involute gear renders without problems', asy
   assert.deepEqual(diagnose(r.log, src).filter(p => p.severity !== 'note').map(p => p.message), []);
 });
 
+/** All problems the app shows: OpenSCAD's log, the checks of the code, and of the rendered model. */
+async function problems(src: string) {
+  const r = await run(src);
+  return [...diagnose(r.log, src), ...(r.stl ? meshProblems(parseBinaryStl(r.stl.slice().buffer).positions) : [])];
+}
+const floating = async (src: string) => {
+  const stl = (await run(src)).stl;
+  assert.ok(stl, src);
+  return floatingParts(parseBinaryStl(stl.slice().buffer).positions).map(p => `z ${Math.round(p.min[2] * 100) / 100}`);
+};
+
+await test('parts in mid-air are found; parts on the bed or on another part are not', async () => {
+  assert.deepEqual(await floating('cube(10); translate([20, 0, 5]) cube(4);'), ['z 5']);
+  assert.deepEqual(await floating('cube(10, center = true); translate([20, 0, 0]) cube(4, center = true);'), ['z -2']);
+  const fine = [
+    'cube(10); translate([20, 0, 0]) cylinder(r = 3, h = 8);', // side by side
+    'cube([60, 20, 2]); translate([5, 5, 2]) linear_extrude(1) text("Hi i!", size = 8);', // letters standing on a plate
+    'cube([20, 20, 10]); translate([0, 0, 10]) cube([20, 20, 2]);', // a lid lying exactly on a box
+    'translate([0, 0, -5]) cube(10); translate([30, 0, 0]) sphere(5);', // below z = 0: the bottom of the model counts
+    'difference() { cube(20, center = true); sphere(12); }', // one body with holes
+    'difference() { cube(20); translate([10, 10, 10]) sphere(4); }', // a closed void inside: its own shell, facing inwards
+  ];
+  for (const src of fine) assert.deepEqual(await floating(src), [], src);
+  for (const ex of EXAMPLES) assert.deepEqual(await floating(buildModel(buildExample(ex.id)).code), [], ex.id);
+  // Runs after every render: fast also on a heavy model (here ~300k triangles in two bodies).
+  const heavy = parseBinaryStl((await run('$fn = 360; sphere(20); translate([60, 0, 0]) sphere(20);')).stl!.slice().buffer);
+  const t0 = performance.now();
+  assert.deepEqual(floatingParts(heavy.positions), []);
+  console.log(`  floating check: ${heavy.triangles} triangles in ${Math.round(performance.now() - t0)} ms`);
+  // snap_box's dome button pokes 1 mm out under its lid, so the lid's bottom is z = -1 and the box,
+  // from z = 0, really starts 1 mm up in the air.
+  const expected: Record<string, string[]> = { 'snap_box.scad': ['z 0'] };
+  for (const f of readdirSync(`${ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')))
+    assert.deepEqual(await floating(readFileSync(`${ROOT}/tests/fixtures/${f}`, 'utf8')), expected[f] ?? [], f);
+});
+
 const dir = `${ROOT}/tests/ai-mistakes`;
 for (const f of readdirSync(dir).filter(x => x.endsWith('.scad')).sort()) {
   await test(`ai-mistakes/${f}`, async () => {
     const src = readFileSync(`${dir}/${f}`, 'utf8');
     const expect = /^\/\/ expect: (.+)$/m.exec(src)![1];
-    const ps = diagnose(await log(src), src);
-    const main = ps.filter(p => !p.followUp);
+    const ps = await problems(src);    const main = ps.filter(p => !p.followUp);
     assert.ok(main.length, 'no problem found');
     const hit = main.find(p => p.hint?.includes(expect));
     assert.ok(hit, `${main.map(p => `${p.line}: ${p.message} → ${p.hint}`).join(' | ')}`);
-    assert.ok(hit.line !== null, `no line: ${hit.message}`);
+    // A problem of the rendered model (meshProblems) has no line of code.
+    assert.ok(hit.line !== null || hit.mesh, `no line: ${hit.message}`);
     // // fix: the fixed line(s) must contain this, and after the fix the problem is gone and it renders.
     // Without it there must be no fix: a guess is left to the user.
     const fix = /^\/\/ fix: (.+)$/m.exec(src)?.[1];
     if (!fix) return assert.equal(hit.fix?.preview, undefined);
     assert.ok(hit.fix?.preview.includes(fix), `fix: ${hit.fix?.preview}`);
     const fixed = applyFix(src, hit.fix!);
-    const r = await run(fixed);
     const same = (ps: typeof main) => ps.filter(p => !p.followUp && p.hint?.includes(expect)).length;
-    assert.ok(same(diagnose(r.log, fixed)) < same(main), `still there after the fix:\n${fixed}`);
-    assert.ok(shape(r.stl), `nothing rendered after the fix:\n${fixed}`);
+    assert.ok(same(await problems(fixed)) < same(main), `still there after the fix:\n${fixed}`);
+    assert.ok(shape((await run(fixed)).stl), `nothing rendered after the fix:\n${fixed}`);
   });
 }
 console.log(`${n} diagnose tests ok`);

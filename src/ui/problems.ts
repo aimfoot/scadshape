@@ -51,7 +51,7 @@ function applyFixToCode(p: Problem) {
 
 function row(p: Problem) {
   const b = el('button', { type: 'button', className: 'row' },
-    el('span', { className: 'where', textContent: p.line ? t('dx.line', { n: p.line }) : '–' }),
+    el('span', { className: 'where', textContent: p.line ? t('dx.line', { n: p.line }) : p.mesh ? t('dx.model') : '–' }),
     el('span', { className: 'hint', textContent: p.hint ?? p.message }),
     el('span', { className: 'count', textContent: p.count > 1 ? t('dx.times', { n: p.count }) : '' }),
   );
@@ -70,9 +70,9 @@ function row(p: Problem) {
   return li;
 }
 
-/** Show the problems in a render's log. Returns how many there are (follow-ups and notes not counted). */
-export function showProblems(log: string[], src: string): number {
-  const problems = diagnose(log, src);
+/** Show the problems in a render's log (plus `extra`: the model's own, meshProblems). Returns how many there are (follow-ups and notes not counted). */
+export function showProblems(log: string[], src: string, extra: Problem[] = []): number {
+  const problems = [...diagnose(log, src), ...extra];
   shown = { problems, src };
   const main = problems.filter(p => !p.followUp), follow = problems.filter(p => p.followUp);
   $('#problems').hidden = !problems.length;

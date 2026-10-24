@@ -1,10 +1,12 @@
 // The code's problem list: AI-written code with radians() (OpenSCAD has none) renders without the
 // gears – the status bar says "1 problem", the list explains it on line 28 with its count, a tap goes
 // to the line, and "Copy for AI" puts the text for the chat on the clipboard. Fix changes the code
-// (undo works; after typing it refuses). Then a silent rotate(PI/4) and its fix, and a syntax error.
+// (undo works; after typing it refuses). Then a silent rotate(PI/4) and its fix, a part in mid-air,
+// and a syntax error.
 // node problems.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 const url = process.argv[2] ?? 'http://127.0.0.1:8799/';
 const out = process.argv[3] ?? '.';
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
@@ -110,6 +112,19 @@ await page.tap('#problemList .fix');
 st = await waitRendered();
 assert.equal(await page.inputValue('#code'), 'cube([30, 4, 4]);\nrotate([0, 0, 45]) cube([30, 4, 4]);\n');
 assert.doesNotMatch(st.text, /problem/);
+
+// A part in mid-air (an AI's screw-top jar: the cavity cut takes away the top the neck stands on).
+// Found in the rendered model, so no line; the lid beside it is fine.
+await page.fill('#code', readFileSync(new URL('../../tests/ai-mistakes/screw-jar.scad', import.meta.url), 'utf8'));
+st = await waitRendered();
+assert.match(st.text, /triangles · 1 problem$/, st.text);
+list = await rows();
+assert.equal(list.length, 1);
+assert.match(list[0].text, /^ModelA part \(x -12\.8…12\.8, y -12\.8…12\.8 mm\) starts in mid-air at z = 35 mm, 35 mm above the bottom of the model/, list[0].text);
+await page.click('#btnCopyProblems');
+await page.waitForTimeout(300);
+assert.match(await page.evaluate(() => navigator.clipboard.readText()), /\nCHECK: A part \(x -12\.8…12\.8, y -12\.8…12\.8 mm\) starts in mid-air at z = 35 mm/);
+await page.screenshot({ path: `${out}/p-floating.png` });
 
 // A syntax error (+=): fails, the list says why
 await page.fill('#code', 'x = 1;\nx += 1;\ncube(x);\n');

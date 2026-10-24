@@ -6,6 +6,7 @@ import { sketchFrame } from '../frame';
 import { remoteLog } from '../remote';
 import { ScadEngine, RenderCancelled, logProblems, type RenderResult } from '../scad';
 import { sketchPolylines } from '../sketch3d';
+import { meshProblems } from '../diagnose';
 import { parseBinaryStl } from '../stl';
 import { Viewer } from '../viewer';
 import { bedOf, fitsBed, parseBedChoice } from '../bed';
@@ -191,9 +192,10 @@ async function renderOnce() {
   }
   if (renderWanted) return; // something newer is waiting – do not show old geometry
   showLog(r.log);
-  const problems = showProblems(r.log, src);
+  const mesh = r.ok && r.data ? parseBinaryStl(r.data) : null;
+  const problems = showProblems(r.log, src, mesh ? meshProblems(mesh.positions) : []);
   const probText = problems ? ` · ${problems === 1 ? t('status.problem1') : t('status.problems', { n: problems })}` : '';
-  if (!r.ok || !r.data) {
+  if (!mesh) {
     // Empty with no warning that explains it (e.g. if (false) …): just "nothing to show".
     const empty = r.log.some(l => /Current top level object is empty/.test(l)) && !logProblems(r.log).length;
     setStatus(empty ? t('status.empty') + errText : problems ? t('status.error') + probText : t('status.seeLog'), 'error');
@@ -201,7 +203,6 @@ async function renderOnce() {
     if (app.source === 'model') remoteLog('model-error', { problems: logProblems(r.log).slice(0, 5) });
     return;
   }
-  const mesh = parseBinaryStl(r.data);
   const before = { center: viewer.bounds.center.clone(), radius: viewer.bounds.radius };
   viewer.setMesh(mesh);
   // Example/custom code: an entirely different model (size × 2 or moved more than its size) → fit
