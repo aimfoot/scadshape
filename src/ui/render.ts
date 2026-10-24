@@ -38,8 +38,9 @@ const codePanel = $('#codePanel');
 /** The sketch that should not be drawn as lines (the one the feature panel shows regions for). */
 export const renderOpts = { hideSketch: null as string | null, onRendered: [] as (() => void)[] };
 
-/** The status after a finished render, kept so a new build volume can redo the fit warning. */
-let doneStatus: { base: string; errs: number; warn: boolean; size: [number, number, number]; shown: string } | null = null;
+/** A finished render, kept so a new build volume can redo the problem list and the fit warning. */
+type Done = { head: string; errs: number; log: string[]; src: string; positions: Float32Array };
+let doneStatus: (Done & { shown: string }) | null = null;
 
 export function setStatus(text: string, kind: '' | 'busy' | 'error' | 'warn' = '') {
   statusEl.textContent = text;
@@ -50,23 +51,22 @@ export function setStatus(text: string, kind: '' | 'busy' | 'error' | 'warn' = '
 /** The printer's build volume chosen in Settings. */
 export const currentBed = () => bedOf(parseBedChoice(store.get('bed')));
 
-function showDoneStatus(d: { base: string; errs: number; warn: boolean; size: [number, number, number] }) {
+/** The problem list (with the model's own: too big for the printer, mid-air …) and the status bar for a render with a model. */
+function showDone(d: Done) {
   const bed = currentBed();
-  const fits = fitsBed(d.size, bed);
+  const problems = showProblems(d.log, d.src, meshProblems(d.positions, bed));
+  const probText = problems ? ` · ${problems === 1 ? t('status.problem1') : t('status.problems', { n: problems })}` : '';
+  const fits = fitsBed(meshSize(d.positions), bed);
   const mm = (v: number) => String(Math.round(v * 10) / 10);
-  const text = fits ? d.base : `${d.base} · ${t('bed.tooBig', { w: mm(bed.w), d: mm(bed.d), h: mm(bed.h) })}`;
-  setStatus(text, d.errs ? 'error' : fits && !d.warn ? '' : 'warn');
+  const text = `${d.head}${probText}${fits ? '' : ` · ${t('bed.tooBig', { w: mm(bed.w), d: mm(bed.d), h: mm(bed.h) })}`}`;
+  setStatus(text, d.errs ? 'error' : problems ? 'warn' : '');
   doneStatus = { ...d, shown: text };
 }
 
-/** A new build volume: redraw the plate and the fit warning, and render again so the problem list
- * (and "Copy for AI") says whether it fits. */
+/** A new build volume: redraw the plate, the problem list and the fit warning. */
 export function applyBed() {
   viewer.setBed(currentBed());
-  if (doneStatus) {
-    showDoneStatus(doneStatus);
-    requestRender();
-  }
+  if (doneStatus) showDone(doneStatus);
 }
 
 export function currentCode(): string {
@@ -187,9 +187,9 @@ async function renderOnce() {
   if (renderWanted) return; // something newer is waiting – do not show old geometry
   showLog(r.log);
   const mesh = r.ok && r.data ? parseBinaryStl(r.data) : null;
-  const problems = showProblems(r.log, src, mesh ? meshProblems(mesh.positions, currentBed()) : []);
-  const probText = problems ? ` · ${problems === 1 ? t('status.problem1') : t('status.problems', { n: problems })}` : '';
   if (!mesh) {
+    const problems = showProblems(r.log, src);
+    const probText = problems ? ` · ${problems === 1 ? t('status.problem1') : t('status.problems', { n: problems })}` : '';
     // Empty with no warning that explains it (e.g. if (false) …): just "nothing to show".
     const empty = r.log.some(l => /Current top level object is empty/.test(l)) && !logProblems(r.log).length;
     setStatus(empty ? t('status.empty') + errText : problems ? t('status.error') + probText : t('status.seeLog'), 'error');
@@ -208,7 +208,7 @@ async function renderOnce() {
   if (view.fitNext) viewer.setView('iso');
   view.fitNext = false;
   // Rendered, but with problems (an unknown function leaves parts out without failing): say so.
-  showDoneStatus({ base: `${fmtMs(r.renderMs)} · ${t('status.triangles', { n: fmtInt(mesh.triangles) })}${errText}${probText}`, errs, warn: problems > 0, size: meshSize(mesh.positions) });
+  showDone({ head: `${fmtMs(r.renderMs)} · ${t('status.triangles', { n: fmtInt(mesh.triangles) })}${errText}`, errs, log: r.log, src, positions: mesh.positions });
 }
 
 engine.onLoaded = ms => {

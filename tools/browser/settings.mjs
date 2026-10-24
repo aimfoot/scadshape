@@ -55,6 +55,9 @@ let st = await waitRendered();
 assert.match(st.text, /larger than the printer \(180 × 180 × 180 mm\)/, st.text);
 assert.match(st.cls, /warn/);
 assert.ok(await page.isHidden('#btnRender'), 'no Render button when nothing is rendering');
+// Also a row in the problem list, so "Copy for AI" says it.
+const rows = () => page.$$eval('#problemList li .hint', els => els.map(e => e.textContent));
+assert.ok((await rows()).some(r => /200 × 20 × 10 mm, larger than the printer \(180 × 180 × 180 mm/.test(r)), (await rows()).join(' | '));
 console.log('A1 mini:', st.text);
 
 // 3. Bambu Lab A1 (256): it fits – the warning goes without a new render.
@@ -63,6 +66,7 @@ await page.selectOption('#bedPreset', 'a1');
 st = await status();
 assert.doesNotMatch(st.text, /larger/, st.text);
 assert.doesNotMatch(st.cls, /warn/);
+assert.deepEqual(await rows(), []);
 console.log('A1:', st.text);
 
 // 4. Custom 150 × 150 × 150: too small again; saved after a reload.
