@@ -16,7 +16,8 @@ The last five requests in `requests.json` are in Swedish on purpose: users write
 Per request: the prompt from "Copy prompt" (A1 mini build volume) plus the request goes to the
 `claude` CLI (`--model`, default haiku) as a plain chat without tools. The code is picked out of the
 answer, rendered in the app's WASM build (a worker thread, 90 s limit), and checked like in the app:
-OpenSCAD's messages, lint, mid-air starts and flat ceilings. While there are problems, the "Copy for
+OpenSCAD's messages, lint, and the model checks (too big for the bed, mid-air starts, flat ceilings,
+overhangs). While there are problems, the "Copy for
 AI" text goes back into the same chat (ROUNDS, default 3). The last code goes through "Convert to
 sketches" and is drawn to a PNG. When a `scadcheck` command is installed, it judges every rendered
 round independently (slicing-based), to show what the app's own checks miss.
