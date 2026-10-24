@@ -32,6 +32,8 @@ export interface Overlay {
   points?: { p: Vec; selected: boolean }[];
   /** The points' distance from the plane along the normal (e.g. the hole's start point). */
   pointsOffset?: number;
+  /** Where the points are in the world, if not on the plane (e.g. text around a round side). */
+  pointsAt?: (p: Vec) => V3;
 }
 
 export type ViewName = 'iso' | 'top' | 'front' | 'right';
@@ -63,6 +65,11 @@ export class Viewer {
   tapOverride: ((p: { x: number; y: number }) => void) | null = null;
   /** Long press (or right click) without the view having rotated. Not while tapOverride is set. */
   onLongPress?: (p: { x: number; y: number }) => void;
+  /**
+   * One-finger drag of something in the view (e.g. text along a face): start says whether the
+   * point grabs it; if so the view does not rotate, move follows the finger and end comes on release.
+   */
+  drag: { start(p: { x: number; y: number }): boolean; move(p: { x: number; y: number }): void; end(): void } | null = null;
   /** The shown model's triangles (9 numbers per triangle), or null. */
   meshPositions: Float32Array | null = null;
   /** Their normals (one per corner, the same for a triangle's three), or null. */
@@ -119,6 +126,33 @@ export class Viewer {
     const longPress = (p: { x: number; y: number }) => {
       if (!this.tapOverride) this.onLongPress?.(p);
     };
+    // A drag grabs the pointer before OrbitControls sees it (capture listeners on the target run
+    // first). A grab without movement is still a tap.
+    let dragging: { id: number; x: number; y: number; moved: boolean; t: number } | null = null;
+    el.addEventListener('pointerdown', e => {
+      if (dragging || fingers > 0 || e.button > 0 || this.tapOverride || !this.drag?.start(local(e))) return;
+      e.stopImmediatePropagation();
+      el.setPointerCapture(e.pointerId);
+      dragging = { id: e.pointerId, ...local(e), moved: false, t: performance.now() };
+    }, { capture: true });
+    el.addEventListener('pointermove', e => {
+      if (!dragging || e.pointerId !== dragging.id) return;
+      e.stopImmediatePropagation();
+      const p = local(e);
+      if (!dragging.moved && Math.hypot(p.x - dragging.x, p.y - dragging.y) <= 8) return;
+      dragging.moved = true;
+      this.drag?.move(p);
+    }, { capture: true });
+    const dragUp = (e: PointerEvent) => {
+      if (!dragging || e.pointerId !== dragging.id) return;
+      e.stopImmediatePropagation();
+      const d = dragging;
+      dragging = null;
+      this.drag?.end();
+      if (!d.moved && e.type === 'pointerup' && performance.now() - d.t < 600) this.onTap?.(local(e));
+    };
+    el.addEventListener('pointerup', dragUp, { capture: true });
+    el.addEventListener('pointercancel', dragUp, { capture: true });
     el.addEventListener('pointerdown', e => {
       fingers++;
       mouse = e.pointerType === 'mouse';
@@ -305,8 +339,9 @@ export class Viewer {
         l.renderOrder = 12;
         this.overlay.add(l);
       }
+      const at = (p: Vec) => (o.pointsAt ? V(o.pointsAt(p)) : to3(p, o.pointsOffset ?? 0));
       for (const sel of [false, true]) {
-        const pts = (o.points ?? []).filter(p => p.selected === sel).map(p => to3(p.p, o.pointsOffset ?? 0));
+        const pts = (o.points ?? []).filter(p => p.selected === sel).map(p => at(p.p));
         if (!pts.length) continue;
         const g = new THREE.BufferGeometry().setFromPoints(pts);
         const m = new THREE.Points(
@@ -316,7 +351,7 @@ export class Viewer {
         m.renderOrder = 13;
         this.overlay.add(m);
       }
-      this.overlayPoints = (o.points ?? []).map(p => to3(p.p, o.pointsOffset ?? 0));
+      this.overlayPoints = (o.points ?? []).map(p => at(p.p));
     }
     this.updateBounds();
   }
@@ -330,6 +365,15 @@ export class Viewer {
     const pl = new THREE.Plane().setFromNormalAndCoplanarPoint(V(frame.n), V(frame.o));
     const hit = ray.ray.intersectPlane(pl, new THREE.Vector3());
     return hit ? toPlane(frame, [hit.x, hit.y, hit.z]) : null;
+  }
+
+  /** The ray from the eye through a screen point: origin and unit direction in the world. */
+  rayAt(p: { x: number; y: number }): { o: V3; d: V3 } {
+    const el = this.renderer.domElement;
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2((p.x / el.clientWidth) * 2 - 1, -(p.y / el.clientHeight) * 2 + 1), this.camera);
+    const { origin: o, direction: d } = ray.ray;
+    return { o: [o.x, o.y, o.z], d: [d.x, d.y, d.z] };
   }
 
   /** The model surface under a screen point: hit point and the surface's normal (in the world), or null. */

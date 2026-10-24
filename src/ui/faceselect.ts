@@ -11,7 +11,7 @@ import { app } from './state';
 import { showToast } from './toast';
 
 export type FaceHit = { point: V3; normal: V3 };
-export type FaceAction = 'extrude' | 'cut' | 'sketch';
+export type FaceAction = 'extrude' | 'cut' | 'sketch' | 'text';
 
 let selected: FaceHit | null = null;
 let onAction: ((a: FaceAction, hit: FaceHit) => void) | null = null;

@@ -20,7 +20,11 @@ import { pickFaceThen, sketchForHit, sketchOnFace } from './sketchmode';
 import { clearFace, initFaceSelect, longPressFace, takeFace, tapFace, type FaceHit } from './faceselect';
 import { addFaceLoops, faceLoops, smoothFace } from '../faceoutline';
 import { findCurveRef } from '../faceref';
-import { sketchFrame } from '../frame';
+import { dot, sketchFrame, sub, toPlane } from '../frame';
+import { parseExpr } from '../expr';
+import { newId } from '../sketch/model';
+import type { Vec } from '../sketch/geom';
+import { textSurface, type TextFeature, type TextSurface } from '../features/text';
 import { inwardOf, outwardOf } from '../features/common';
 
 interface PanelState {
@@ -31,6 +35,8 @@ interface PanelState {
   before: number;
   /** Template sketch created for the feature (removed if you cancel). */
   template?: SketchFeature;
+  /** The sketch as it was before the text was moved (an existing feature: restored on Cancel). */
+  sketchBackup?: string;
 }
 
 let panel: PanelState | null = null;
@@ -206,6 +212,7 @@ export function openPanel(f: SolidFeature, existing: boolean) {
   $('#tree').hidden = true;
   $('#btnTree').setAttribute('aria-pressed', 'false');
   renderOpts.hideSketch = panel.f.sketch;
+  viewer.drag = f.type === 'text' ? dragText : null;
   syncFields();
   updatePreview();
   viewer.fit(); // make sure the sketch being worked on is visible
@@ -272,6 +279,8 @@ renderOpts.onRendered.push(() => {
 
 export function closePanel() {
   panel = null;
+  viewer.drag = null;
+  textDrag = null;
   app.previewDoc = null;
   clearTimeout(previewTimer);
   panelEl().hidden = true;
@@ -280,6 +289,111 @@ export function closePanel() {
   viewer.setRightInset(0);
   viewer.setBottomInset(0);
 }
+
+// ---- Text on a face: placed where the face is tapped, dragged along it ----------------------------
+
+/**
+ * A sketch that only holds the text's place: at most one point, nothing drawn, used by no other
+ * feature. Such a sketch moves with the text (to another face too).
+ */
+function placeSketch(f: SolidFeature, sk: SketchFeature): boolean {
+  if (f.type !== 'text') return false;
+  return !Object.keys(sk.entities).length && Object.keys(sk.points).length <= 1 && !sk.constraints.length && dependents(app.doc, sk.id).every(g => g.id === f.id);
+}
+
+/** Before the first move of an existing feature's sketch: a copy to restore if the panel is cancelled. */
+function keepSketch(sk: SketchFeature) {
+  if (panel?.existing && !panel.sketchBackup) panel.sketchBackup = JSON.stringify(sk);
+}
+
+/** The text's place (its sketch point; the origin if it has none). */
+const anchorOf = (sk: SketchFeature): Vec => Object.values(sk.points)[0] ?? { x: 0, y: 0 };
+
+function setAnchor(f: TextFeature, sk: SketchFeature, p: Vec) {
+  const id = Object.keys(sk.points)[0] ?? newId(sk, 'p');
+  sk.points[id] = { x: p.x, y: p.y, standalone: true };
+  f.points = null;
+}
+
+/** New text on the face hit in the 3D view, at the tapped point. */
+function textOnFace(hit: FaceHit) {
+  const sk = sketchForHit(hit);
+  const at = toPlane(sketchFrame(sk, vars(), app.doc), hit.point);
+  insertFeature(app.doc, sk);
+  emit('docChanged');
+  const f = newFeature(app.doc, 'text', sk);
+  setAnchor(f, sk, at);
+  remoteLog('text-on-face', { plane: sk.plane, face: !!sk.face });
+  openPanel(f, false);
+  panel!.template = sk;
+}
+
+/** A tap with a text panel open: the text moves there, onto another face if need be. */
+function moveTextTo(p: { x: number; y: number }): boolean {
+  const sk = panelSketch();
+  const f = panel?.f;
+  if (!sk || f?.type !== 'text' || !placeSketch(f, sk) || app.source !== 'model') return false;
+  const hit = viewer.pickFace(p);
+  if (!hit) return false;
+  keepSketch(sk);
+  const fr = sketchFrame(sk, vars(), app.doc);
+  const next = sketchForHit(hit);
+  const nf = sketchFrame(next, vars(), app.doc);
+  if (Math.abs(dot(fr.n, nf.n)) < 0.9999 || Math.abs(dot(sub(nf.o, fr.o), fr.n)) > 0.02) {
+    // Another face: the sketch takes its plane, and the text keeps raised/engraved.
+    for (const key of ['plane', 'offset', 'face', 'faceRef', 'outward', 'seat'] as const) {
+      if (next[key] === undefined) delete sk[key];
+      else (sk as unknown as Record<string, unknown>)[key] = next[key];
+    }
+    f.direction = f.op === 'remove' ? inwardOf(sk) : outwardOf(sk);
+  }
+  setAnchor(f, sk, toPlane(sketchFrame(sk, vars(), app.doc), hit.point));
+  // On a round side the point is measured along it.
+  const ray = viewer.rayAt(p);
+  const along = textSurface(f, sk, app.doc, vars()).fromRay(ray.o, ray.d);
+  if (along) setAnchor(f, sk, along);
+  changed('points');
+  return true;
+}
+
+/** Dragging the text along its face (the view rotates if the finger is not on the text). */
+let textDrag: { surface: TextSurface; off: Vec } | null = null;
+const dragText: NonNullable<typeof viewer.drag> = {
+  start(p) {
+    const sk = panelSketch();
+    const f = panel?.f;
+    if (!sk || f?.type !== 'text' || !placeSketch(f, sk) || app.source !== 'model') return false;
+    const surface = textSurface(f, sk, app.doc, vars());
+    const ray = viewer.rayAt(p);
+    const at = surface.fromRay(ray.o, ray.d);
+    if (!at) return false;
+    // On the text: inside a generous box around it.
+    const a = anchorOf(sk);
+    const size = parseExpr(f.size, vars()).value ?? 8;
+    const ang = ((parseExpr(f.angle || '0', vars()).value ?? 0) * Math.PI) / 180;
+    const dx = at.x - a.x, dy = at.y - a.y;
+    const x = dx * Math.cos(ang) + dy * Math.sin(ang), y = -dx * Math.sin(ang) + dy * Math.cos(ang);
+    const len = [...f.text].length * size * 0.7, pad = size * 0.6;
+    const x0 = f.halign === 'left' ? 0 : f.halign === 'right' ? -len : -len / 2;
+    if (x < x0 - pad || x > x0 + len + pad || Math.abs(y) > size * 0.6 + pad) return false;
+    keepSketch(sk);
+    textDrag = { surface, off: { x: a.x - at.x, y: a.y - at.y } };
+    return true;
+  },
+  move(p) {
+    const sk = panelSketch();
+    if (!textDrag || !sk || panel?.f.type !== 'text') return;
+    const ray = viewer.rayAt(p);
+    const at = textDrag.surface.fromRay(ray.o, ray.d);
+    if (!at) return;
+    setAnchor(panel.f, sk, { x: at.x + textDrag.off.x, y: at.y + textDrag.off.y });
+    changed('points');
+  },
+  end() {
+    if (textDrag) remoteLog('text-drag', { at: panelSketch() && anchorOf(panelSketch()!) });
+    textDrag = null;
+  },
+};
 
 /** Default sketch for a new feature: the latest usable sketch, preferably one not already used. */
 function defaultSketch(type: SolidFeature['type']): SketchFeature | null {
@@ -354,14 +468,21 @@ function extrudeHit(hit: FaceHit, op: 'add' | 'remove') {
 /** New feature of the type (from the toolbar). */
 export function startFeature(type: SolidFeature['type']) {
   // A face selected in the 3D view: Extrude extrudes it.
-  const face = type === 'extrude' ? takeFace() : null;
-  if (face) return extrudeHit(face, 'add');
+  const face = type === 'extrude' || type === 'text' ? takeFace() : null;
+  if (face) return type === 'text' ? textOnFace(face) : extrudeHit(face, 'add');
   if (KINDS[type].pick.kind === 'none') return openPanel(newFeature(app.doc, type, WORLD_SKETCH), false);
   const sk = defaultSketch(type);
   // Extrude without a closed sketch but with a model: pick a face to extrude.
   if (!sk && type === 'extrude' && app.source === 'model' && viewer.meshPositions) {
     showToast(t('face.pickHint'), 'info');
     return extrudeFace();
+  }
+  // Text with a model and no points sketched for it: tap the face to put it on.
+  const prepared = !!sk && !dependents(app.doc, sk.id).length && Object.values(sk.points).some(p => p.standalone);
+  if (type === 'text' && !prepared && app.source === 'model' && viewer.meshPositions) {
+    showToast(t('text.pickFace'), 'info');
+    pickFaceThen(textOnFace);
+    return;
   }
   if (!sk && (type === 'container' || type === 'text' || type === 'snap')) {
     // No sketch yet: the container starts with a rectangle with dimensions, text/snap hook at the
@@ -383,8 +504,14 @@ export function initPanel() {
   $('#fpFace').addEventListener('click', extrudeFace);
   $('#fpCancel').addEventListener('click', () => {
     const tpl = panel?.template;
+    const backup = panel?.sketchBackup;
     closePanel();
-    if (tpl) {
+    if (backup) {
+      const sk: SketchFeature = JSON.parse(backup);
+      const i = app.doc.features.findIndex(g => g.id === sk.id);
+      if (i >= 0) app.doc.features[i] = sk;
+      emit('docChanged');
+    } else if (tpl) {
       removeFeature(app.doc, tpl);
       emit('docChanged');
     } else emit('render');
@@ -424,6 +551,7 @@ export function initPanel() {
       if (partMode()) tapFace(p);
       return;
     }
+    if (moveTextTo(p)) return;
     const sk = panelSketch();
     if (!sk) return;
     const key = pickerFor(panel.f).tap(panel.f, sk, p, viewer, panel.mode);
@@ -435,6 +563,7 @@ export function initPanel() {
   };
   initFaceSelect((action, hit) => {
     if (action === 'sketch') return sketchOnFace(hit);
+    if (action === 'text') return textOnFace(hit);
     extrudeHit(hit, action === 'cut' ? 'remove' : 'add');
   });
 }

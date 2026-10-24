@@ -12,7 +12,7 @@ import { add, cross, dot, extrudeSpan, extrudeFace, scale, sketchFrame, sub, toP
 import type { FaceRef } from './features/common';
 import type { ExtrudeFeature } from './features/extrude';
 import { arcGeom } from './sketch/model';
-import { ccwSweep } from './sketch/geom';
+import { ccwSweep, segmentsFor } from './sketch/geom';
 
 /** The plane's offset direction in the world (XY: +Z, XZ: −Y, YZ: +X; the same as model3d). */
 const AXIS: Record<Plane, { i: 0 | 1 | 2; sign: 1 | -1; u: 0 | 1 | 2; v: 0 | 1 | 2 }> = {
@@ -477,7 +477,9 @@ export function tangentSide(doc: Doc, fr: Frame, at: Vec[], vars: Vars | undefin
       if (!side) continue;
       const a = toWorld(fs, side.c);
       const dist = dot(sub(fr.o, a), fr.n);
-      if (Math.abs(Math.abs(dist) - side.r) > 0.01 + side.r * 1e-4) continue;
+      // Tapping the wall gives the plane of a facet, which lies a little inside the circle.
+      const inner = side.r * Math.cos(Math.PI / (side.fn ?? segmentsFor(side.r, 2 * Math.PI)));
+      if (Math.abs(dist) < inner - 0.01 || Math.abs(dist) > side.r + 0.01) continue;
       // The line of contact, as an angle in the circle's sketch, must be on the arc.
       const touch = toPlane(fs, add(a, scale(fr.n, dist)));
       if (side.sweep < 2 * Math.PI - 1e-9 && ccwSweep(side.a0, Math.atan2(touch.y - side.c.y, touch.x - side.c.x)) > side.sweep + 0.02) continue;

@@ -1,5 +1,5 @@
-// Text: the button without a sketch creates a sketch; fonts are loaded into the engine; engraved
-// flips the direction.
+// Text: with a model the button asks for a face and puts the text where it is tapped; fonts are
+// loaded into the engine; engraved flips the direction.
 // node text.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
@@ -26,11 +26,13 @@ await page.reload();
 await page.waitForFunction(() => /Start with Sketch/.test(document.querySelector('#status').textContent));
 assert.deepEqual(fontRequests, [], 'no fonts before text is used');
 
-// Box first, then text (without its own sketch the box's sketch is used – the text at the origin)
+// Box first, then text on the face tapped in the middle of the view
 await page.click('#btnContainer'); await page.waitForSelector('#featPanel:not([hidden])');
 await page.click('#fp-lid [data-value="none"]'); await page.fill('#fp-height', '20'); await page.click('#fpOk'); await waitRendered();
-await page.click('#btnText'); await page.waitForSelector('#featPanel:not([hidden])');
-assert.match(await page.textContent('#fpRegions'), /origin/);
+await page.click('#btnText'); await page.waitForSelector('#faceBar:not([hidden])');
+const mid = await page.evaluate(() => { const r = document.querySelector('#viewport canvas').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+await page.touchscreen.tap(mid.x, mid.y); await page.waitForSelector('#featPanel:not([hidden])');
+assert.equal(await page.evaluate(() => { const s = window.__scadshape; return Object.keys(s.doc.features.find(g => g.id === s.panel.f.sketch).points).length; }), 1, 'the text at the tapped point');
 assert.equal(await page.inputValue('#fp-rep'), 'none', 'the pattern list shows None');
 await page.fill('#fp-text', 'Screws M3'); await page.selectOption('#fp-font', 'stencil');
 let st = await waitRendered();
@@ -44,10 +46,10 @@ assert.equal(st.errors.length, 0, st.errors.join());
 for (const f of ['Orbitron-Medium.ttf', 'Orbitron-Bold.ttf', 'Orbitron-Black.ttf']) assert.ok(fontRequests.includes(f), `${f}: ${fontRequests.join()}`);
 assert.deepEqual(await page.$$eval('#fp-font option', os => os.map(o => o.textContent).filter(t => t.startsWith('Orbitron'))), ['Orbitron', 'Orbitron Bold', 'Orbitron Black']);
 await page.screenshot({ path: `${out}/x-text-orbitron.png` });
-await page.click('#fp-op [data-value="remove"]'); await page.fill('#fp-start', '2'); // into the box's bottom
+await page.click('#fp-op [data-value="remove"]');
 assert.equal(await page.getAttribute('#fp-direction [data-value="reverse"]', 'aria-pressed'), 'true');
 await page.click('#fpOk'); st = await waitRendered();
-assert.deepEqual(st.features, ['sketch', 'container', 'text']); assert.equal(st.errors.length, 0, st.errors.join());
+assert.deepEqual(st.features, ['sketch', 'container', 'sketch', 'text']); assert.equal(st.errors.length, 0, st.errors.join());
 if (await page.isHidden('#tree')) await page.click('#btnTree');
 assert.match(await page.textContent('#featureList'), /”Screws M3” · 8 mm · engraved/);
 await browser.close();

@@ -3,9 +3,11 @@
 
 import { tangentSide, type TangentSide } from '../faceref';
 import { fontById, FONTS } from '../fonts';
-import { add, cross, dot, scale, sketchFrame, sub, type Frame } from '../frame';
+import type { Doc } from '../doc';
+import type { Vars } from '../expr';
+import { add, cross, dot, scale, sketchFrame, sub, toPlane, toWorld, type Frame, type V3 } from '../frame';
 import { t } from '../i18n';
-import { segmentsFor } from '../sketch/geom';
+import { segmentsFor, type Vec } from '../sketch/geom';
 import { FieldReader, inwardOf, num, outwardOf, type BuildCtx, type Built, type FeatureBase, type FeatureKind, type Op, type SketchFeature } from './common';
 import { holeCandidates } from './hole';
 
@@ -127,6 +129,70 @@ export const text: FeatureKind<TextFeature> = {
 type Field = { v: number; code: string };
 
 /**
+ * A sketch plane touching a round side, as a frame around the axis: o0 on the axis level with the
+ * sketch origin, e1 from the axis to the line of contact, e2 along the circle (e2 × axis = the
+ * sketch normal, so the text is not mirrored). m: the sketch's (x, y) → (s along the circle at
+ * radius r, t along the axis) = m · (x, y, 1). sgn: 1 if the sketch normal points away from the axis.
+ */
+function cylinderMap(fr: Frame, side: TangentSide) {
+  const ax = side.axis;
+  const toAxis = sub(fr.o, side.a);
+  const sgn = dot(toAxis, fr.n) >= 0 ? 1 : -1;
+  const o0 = add(side.a, scale(ax, dot(toAxis, ax)));
+  const e1 = scale(fr.n, sgn);
+  const e2 = cross(ax, fr.n);
+  const m = [[dot(fr.u, e2), dot(fr.v, e2), dot(sub(fr.o, o0), e2)], [dot(fr.u, ax), dot(fr.v, ax), 0]];
+  return { ax, sgn, o0, e1, e2, m };
+}
+
+/** Where a text's sketch points are on the model: on the sketch plane, or around the round side it touches. */
+export interface TextSurface {
+  /** Sketch (x, y) → the world, on the surface. */
+  toWorld(p: Vec): V3;
+  /** Where a ray (from o along d) meets the surface, in sketch (x, y); null if it misses. */
+  fromRay(o: V3, d: V3): Vec | null;
+}
+
+export function textSurface(f: TextFeature, sk: SketchFeature, doc: Doc, vars: Vars): TextSurface {
+  const fr = sketchFrame(sk, vars, doc);
+  const ids = textAnchors(f, sk);
+  const side = tangentSide(doc, fr, ids.length ? ids.map(id => sk.points[id]) : [{ x: 0, y: 0 }], vars, f.id);
+  if (!side) {
+    return {
+      toWorld: p => toWorld(fr, p),
+      fromRay(o, d) {
+        const dn = dot(d, fr.n);
+        if (Math.abs(dn) < 1e-9) return null;
+        const k = dot(sub(fr.o, o), fr.n) / dn;
+        return k > 0 ? toPlane(fr, add(o, scale(d, k))) : null;
+      },
+    };
+  }
+  const r = side.r;
+  const { ax, sgn, o0, e1, e2, m } = cylinderMap(fr, side);
+  return {
+    toWorld(p) {
+      const s = m[0][0] * p.x + m[0][1] * p.y + m[0][2], tt = m[1][0] * p.x + m[1][1] * p.y;
+      return add(o0, scale(ax, tt), scale(e1, r * Math.cos(s / r)), scale(e2, r * Math.sin(s / r)));
+    },
+    fromRay(o, d) {
+      // |q − axis| = r for q = o + k·d, in the plane across the axis. Outside a post: the near
+      // crossing; inside a hole (the sketch normal points at the axis): the far one.
+      const q0 = sub(o, o0), dq = sub(d, scale(ax, dot(d, ax))), pq = sub(q0, scale(ax, dot(q0, ax)));
+      const a = dot(dq, dq), b = 2 * dot(pq, dq), c = dot(pq, pq) - r * r;
+      const disc = b * b - 4 * a * c;
+      if (a < 1e-12 || disc < 0) return null;
+      const k = (-b + (sgn > 0 ? -1 : 1) * Math.sqrt(disc)) / (2 * a);
+      if (k <= 0) return null;
+      const q = sub(add(o, scale(d, k)), o0);
+      const s = r * Math.atan2(dot(q, e2), dot(q, e1)) - m[0][2], tt = dot(q, ax);
+      // m's 2×2 part is a rotation: its inverse is the transpose.
+      return { x: m[0][0] * s + m[1][0] * tt, y: m[0][1] * s + m[1][1] * tt };
+    },
+  };
+}
+
+/**
  * Text on the round side of an extruded circle/arc that the sketch plane touches. The flat text is
  * laid along the circle (its x as arc length at the radius) in thin strips, each one a wedge
  * around the axis. A strip widens with the distance from the axis (linear_extrude's scale), so the
@@ -137,14 +203,7 @@ function wrapped(
   o: { at: { x: number; y: number }[]; rot: string; glyphs: string; size: number; angle: number; depth: Field; start: Field },
 ): Built {
   const r = side.r;
-  const ax = side.axis;
-  const toAxis = sub(fr.o, side.a);
-  const sgn = dot(toAxis, fr.n) >= 0 ? 1 : -1; // the sketch normal points away from the axis
-  const o0 = add(side.a, scale(ax, dot(toAxis, ax))); // on the axis, level with the sketch origin
-  const e1 = scale(fr.n, sgn); // from the axis to the line of contact
-  const e2 = cross(ax, fr.n); // along the circle; e2 × axis = normal, so the text is not mirrored
-  // The sketch's (x, y) → (s along the circle at radius r, t along the axis).
-  const m = [[dot(fr.u, e2), dot(fr.v, e2), dot(sub(fr.o, o0), e2)], [dot(fr.u, ax), dot(fr.v, ax), 0]];
+  const { ax, sgn, o0, e1, e2, m } = cylinderMap(fr, side);
   const fn = side.fn ?? segmentsFor(r, 2 * Math.PI);
   const step = Math.min(Math.PI / 18, 2 * Math.acos(1 - 0.01 / r)); // a strip is at most 0.01 mm off the circle
   // Raised text goes this far into the body, engraved text starts this far out of it: past the

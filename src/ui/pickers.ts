@@ -4,7 +4,7 @@
 import type { SketchFeature, SolidFeature } from '../doc';
 import { holeCandidates, holePoints } from '../features/hole';
 import { axisCandidates } from '../features/revolve';
-import { textAnchors } from '../features/text';
+import { textAnchors, textSurface } from '../features/text';
 import { threadCandidates, threadCircles } from '../features/thread';
 import { t } from '../i18n';
 import { sketchRegions } from '../model3d';
@@ -102,6 +102,7 @@ const pointPicker: Picker = {
       axes: [],
       points: holeCandidates(sk).map(id => ({ p: sk.points[id], selected: chosen.has(id) })),
       pointsOffset: f.type === 'hole' ? (parseExpr(f.start, vars()).value ?? 0) : 0, // where the drilling starts
+      pointsAt: f.type === 'text' ? textSurface(f, sk, app.doc, vars()).toWorld : undefined,
     };
   },
   tap(f, sk, p, viewer) {
