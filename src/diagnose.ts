@@ -8,6 +8,7 @@ import { fitsBed, meshSize, type Bed } from './bed';
 import { convertFix, includeFix, renameFix, type Fix } from './fixes';
 import { flatCeilings } from './ceilings';
 import { midAirStarts } from './floating';
+import { overhangs } from './overhangs';
 import { FAMILIES } from './fonts';
 import { t } from './i18n';
 import { BOSL2_NAMES, MCAD_NAMES } from './libnames.gen';
@@ -224,7 +225,8 @@ export function diagnose(log: string[], src: string): Problem[] {
 }
 
 /** Problems in the rendered model itself: too big for the printer (when `bed` is given), places that
- * start in mid-air (floating.ts), one row per height, and long flat ceilings (ceilings.ts). */
+ * start in mid-air (floating.ts), one row per height, long flat ceilings (ceilings.ts) and overhangs
+ * steeper than 45° (overhangs.ts). */
 export function meshProblems(positions: Float32Array, bed?: Bed): Problem[] {
   const mm = (v: number) => String(Math.round(v * 10) / 10 || 0);
   const row = (where: string, hint: string): Problem =>
@@ -239,12 +241,16 @@ export function meshProblems(positions: Float32Array, bed?: Bed): Problem[] {
     const text = t('mesh.ceiling', { x, y, z: mm(c.z), span: String(Math.round(c.span)) });
     return row(`x ${x}, y ${y}, z ${mm(c.z)}`, c.openBelow ? `${text} ${t('mesh.ceilingOpen')}` : text);
   });
+  const over = overhangs(positions).slice(0, 3).map(o => {
+    const [x, y, z] = [0, 1, 2].map(k => `${mm(o.min[k])}…${mm(o.max[k])}`);
+    return row(`x ${x}, y ${y}, z ${z}`, t('mesh.overhang', { x, y, z, angle: String(Math.round(o.angle)) }));
+  });
   // Said in the status bar too, but the AI only hears of it from this list.
   const size = meshSize(positions), dims = (v: number[]) => v.map(mm).join(' × ');
   const big = bed && positions.length && !fitsBed(size, bed)
     ? [row(`${dims(size)} mm`, t('mesh.tooBig', { size: dims(size), bed: dims([bed.w, bed.d, bed.h]) }))]
     : [];
-  return [...big, ...mid, ...ceilings];
+  return [...big, ...mid, ...ceilings, ...over];
 }
 
 /** The problems as text for an AI chat: OpenSCAD's messages with their lines of code. */

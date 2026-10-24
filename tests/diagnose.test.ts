@@ -8,6 +8,7 @@ import { setLang } from '../src/i18n';
 import { diagnose, meshProblems, problemsForAi } from '../src/diagnose';
 import { midAirStarts } from '../src/floating';
 import { flatCeilings } from '../src/ceilings';
+import { overhangs } from '../src/overhangs';
 import { parseBinaryStl } from '../src/stl';
 import { FONTS_CONF, fontsFor } from '../src/fonts';
 import { lint } from '../src/lint';
@@ -119,7 +120,7 @@ await test('the prompt tells the AI what the app runs', () => {
   assert.match(p, /print on Bambu Lab A1 mini \(180 × 180 × 180 mm\)/);
   assert.match(p, /There is no radians\(\)/);
   assert.match(p, /What I want: $/);
-  assert.match(aiPrompt({ version: 'OpenSCAD', bed: { w: 200, d: 150, h: 100 }, printer: null }), /print on 200 × 150 × 100 mm:/);
+  assert.match(aiPrompt({ version: 'OpenSCAD', bed: { w: 200, d: 150, h: 100 }, printer: null }), /print on 200 × 150 × 100 mm without support:/);
 });
 
 // ---- The corpus, through the real OpenSCAD ---------------------------------------------------
@@ -257,6 +258,23 @@ await test('long flat ceilings are found, the short way across; a walled hollow 
   const expected: Record<string, string[]> = { 'snap_box.scad': ['z 0 span ~65'], 'wall_hook.scad': ['z 0 span ~60'] };
   for (const f of readdirSync(`${ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')))
     assert.deepEqual(await ceilings(readFileSync(`${ROOT}/tests/fixtures/${f}`, 'utf8')), expected[f] ?? [], f);
+});
+
+await test('overhangs steeper than 45° are found; a 45° chamfer, a narrow ledge and the bed are not', async () => {
+  const found = async (src: string) => overhangs(parseBinaryStl((await run(src)).stl!.slice().buffer).positions)
+    .map(o => `z ${Math.round(o.min[2])}…${Math.round(o.max[2])} ${Math.round(o.angle)}° reach ${Math.round(o.reach)}`);
+  const side = (pts: number[][]) => `rotate([90, 0, 0]) linear_extrude(20) polygon(${JSON.stringify(pts)});`;
+  // An underside rising 10 mm over 20: 63° from upright.
+  assert.deepEqual(await found(side([[0, 0], [10, 0], [10, 5], [30, 15], [30, 20], [0, 20]])), ['z 5…15 63° reach 10']);
+  assert.deepEqual(await found(side([[0, 0], [10, 0], [10, 5], [25, 20], [0, 20]])), []); // 45°
+  assert.deepEqual(await found(side([[0, 0], [10, 0], [10, 5], [11.5, 6], [11.5, 20], [0, 20]])), []); // 1.5 mm ledge
+  // A block standing on an edge: both faces under it at 45° print; tipped further, the far one does not.
+  assert.deepEqual(await found('rotate([0, 45, 0]) cube([10, 20, 10]);'), []);
+  assert.deepEqual(await found('rotate([0, 60, 0]) cube([10, 20, 10]);'), ['z -9…-4 60° reach 6']);
+  for (const ex of EXAMPLES) assert.deepEqual(await found(buildModel(buildExample(ex.id)).code), [], ex.id);
+  const expected: Record<string, string[]> = {};
+  for (const f of readdirSync(`${ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')))
+    assert.deepEqual(await found(readFileSync(`${ROOT}/tests/fixtures/${f}`, 'utf8')), expected[f] ?? [], f);
 });
 
 await test('a model larger than the printer is a problem row (so "Copy for AI" says it), turned 90° if that fits', async () => {
