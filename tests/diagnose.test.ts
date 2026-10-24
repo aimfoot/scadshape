@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { setLang } from '../src/i18n';
 import { diagnose, meshProblems, problemsForAi } from '../src/diagnose';
-import { floatingParts } from '../src/floating';
+import { midAirStarts } from '../src/floating';
 import { parseBinaryStl } from '../src/stl';
 import { FONTS_CONF, fontsFor } from '../src/fonts';
 import { lint } from '../src/lint';
@@ -186,13 +186,20 @@ async function problems(src: string) {
 const floating = async (src: string) => {
   const stl = (await run(src)).stl;
   assert.ok(stl, src);
-  return floatingParts(parseBinaryStl(stl.slice().buffer).positions).map(p => `z ${Math.round(p.min[2] * 100) / 100}`);
+  return midAirStarts(parseBinaryStl(stl.slice().buffer).positions).map(p => `z ${Math.round(p.min[2] * 100) / 100}${p.count > 1 ? ` ×${p.count}` : ''}`);
 };
 
-await test('parts in mid-air are found; parts on the bed or on another part are not', async () => {
+await test('places that start in mid-air are found; on the bed, on another part, overhangs and bridges are not', async () => {
   assert.deepEqual(await floating('cube(10); translate([20, 0, 5]) cube(4);'), ['z 5']);
   assert.deepEqual(await floating('cube(10, center = true); translate([20, 0, 0]) cube(4, center = true);'), ['z -2']);
+  assert.deepEqual(await floating('cube(10); translate([30, 0, 10]) sphere(5, $fn = 48);'), ['z 5.01']); // a round bottom (OpenSCAD's lowest ring, not the pole)
+  // Inside one body: ridges hanging from the ceiling of a cavity open at the bottom (an AI's "box").
+  assert.deepEqual(await floating('difference() { cube(40); translate([5, 5, -1]) cube([30, 30, 36]); } for (i = [0:3]) translate([10 + i * 6, 18, 28]) cube([2, 2, 8]);'), ['z 28 ×4']);
   const fine = [
+    'cube([10, 10, 20]); translate([-10, 0, 20]) cube([30, 10, 3]);', // a T: the arms overhang, joined to the stem
+    'difference() { cube([60, 20, 20]); translate([5, -1, 0]) cube([50, 22, 15]); }', // a bridge over a gap
+    'difference() { cube(20); translate([-1, 10, 10]) rotate([0, 90, 0]) cylinder(d = 6, h = 22); }', // a hole lying down
+    'difference() { cube(20); translate([10, 10, -1]) cylinder(d = 6, h = 8); }', // a blind hole from below
     'cube(10); translate([20, 0, 0]) cylinder(r = 3, h = 8);', // side by side
     'cube([60, 20, 2]); translate([5, 5, 2]) linear_extrude(1) text("Hi i!", size = 8);', // letters standing on a plate
     'cube([20, 20, 10]); translate([0, 0, 10]) cube([20, 20, 2]);', // a lid lying exactly on a box
@@ -205,7 +212,7 @@ await test('parts in mid-air are found; parts on the bed or on another part are 
   // Runs after every render: fast also on a heavy model (here ~300k triangles in two bodies).
   const heavy = parseBinaryStl((await run('$fn = 360; sphere(20); translate([60, 0, 0]) sphere(20);')).stl!.slice().buffer);
   const t0 = performance.now();
-  assert.deepEqual(floatingParts(heavy.positions), []);
+  assert.deepEqual(midAirStarts(heavy.positions), []);
   console.log(`  floating check: ${heavy.triangles} triangles in ${Math.round(performance.now() - t0)} ms`);
   // snap_box's dome button pokes 1 mm out under its lid, so the lid's bottom is z = -1 and the box,
   // from z = 0, really starts 1 mm up in the air.

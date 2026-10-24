@@ -67,7 +67,7 @@ assert.equal(sel, 'function inv(a) = tan(a) - radians(a);');
 await page.click('#btnCopyProblems');
 await page.waitForFunction(() => /Copied/.test(document.querySelector('#partToast')?.textContent ?? ''));
 const clip = await page.evaluate(() => navigator.clipboard.readText());
-assert.match(clip, /^My OpenSCAD code \(OpenSCAD 2026\.10\.15, Manifold backend; libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad, MCAD\) gives these problems:\n\nLine 5: WARNING: Ignoring unknown function 'radians' \(\d+ times\)\n {4}function inv\(a\) = tan\(a\) - radians\(a\);\n\n\(plus \d+ follow-on warnings about undefined values\)\n\nPlease fix the code and send the whole corrected file\.$/, clip);
+assert.match(clip, /^My OpenSCAD code \(OpenSCAD 2026\.10\.15, Manifold backend; libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad, MCAD\) gives these problems:\n\nLine 5: WARNING: Ignoring unknown function 'radians' \(\d+ times\)\n {4}function inv\(a\) = tan\(a\) - radians\(a\);\n {4}Hint: OpenSCAD has no radians\(\)\. Write x \* PI \/ 180 instead\.\n\n\(plus \d+ follow-on warnings about undefined values\)\n\nPlease fix the code and send the whole corrected file\.$/, clip);
 console.log('copied for AI:\n' + clip.split('\n').map(l => '  | ' + l).join('\n'));
 
 // Full log: the raw lines, repeats merged
@@ -120,10 +120,10 @@ st = await waitRendered();
 assert.match(st.text, /triangles · 1 problem$/, st.text);
 list = await rows();
 assert.equal(list.length, 1);
-assert.match(list[0].text, /^ModelA part \(x -12\.8…12\.8, y -12\.8…12\.8 mm\) starts in mid-air at z = 35 mm, 35 mm above the bottom of the model/, list[0].text);
+assert.match(list[0].text, /^ModelSomething starts in mid-air at z = 35 mm \(x -12…12, y -12…12 mm\), 35 mm above the bottom of the model/, list[0].text);
 await page.click('#btnCopyProblems');
 await page.waitForTimeout(300);
-assert.match(await page.evaluate(() => navigator.clipboard.readText()), /\nCHECK: A part \(x -12\.8…12\.8, y -12\.8…12\.8 mm\) starts in mid-air at z = 35 mm/);
+assert.match(await page.evaluate(() => navigator.clipboard.readText()), /\nCHECK: Something starts in mid-air at z = 35 mm \(x -12…12, y -12…12 mm\)/);
 await page.screenshot({ path: `${out}/p-floating.png` });
 
 // A syntax error (+=): fails, the list says why

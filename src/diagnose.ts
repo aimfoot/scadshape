@@ -5,7 +5,7 @@
 // include …). problemsForAi() writes them as text to paste back into the AI chat.
 
 import { convertFix, includeFix, renameFix, type Fix } from './fixes';
-import { floatingParts } from './floating';
+import { midAirStarts } from './floating';
 import { FAMILIES } from './fonts';
 import { t } from './i18n';
 import { BOSL2_NAMES, MCAD_NAMES } from './libnames.gen';
@@ -48,6 +48,9 @@ const MISSING_FUNCTIONS: Record<string, string> = {
   mod: 'x % y',
   atan2d: 'atan2(y, x)',
 };
+
+/** Thread modules of libraries the app doesn't have (Thingiverse threads.scad and the like), which AI code reaches for. */
+const THREAD_NAMES = /^(screw_thread|metric_thread|english_thread|thread|threads|thread_for_screw|thread_for_nut|trapezoidal_thread|ScrewThread|ScrewHole|AugerThread|RodStart|RodEnd)$/;
 
 let bosl2: Map<string, string> | null = null, mcad: Map<string, string> | null = null;
 /** The BOSL2 file that defines a name ("std.scad", "gears.scad" …), or null. */
@@ -118,6 +121,7 @@ function hintFor(msg: string, line: number | null, src: string, lines: string[])
     if (MISSING_FUNCTIONS[n]) return t('dx.missingFunction', { name: n, instead: MISSING_FUNCTIONS[n] });
     const lib = libraryHint(n);
     if (lib) return lib;
+    if (THREAD_NAMES.test(n)) return t('dx.threads', { name: n });
     const typo = closest(n, names(src, /\bfunction\s+([A-Za-z_]\w*)/g));
     return typo ? t('dx.didYouMean', { name: typo }) : t('dx.unknownFunction', { name: n });
   }
@@ -127,6 +131,7 @@ function hintFor(msg: string, line: number | null, src: string, lines: string[])
     if (n === 'child') return t('dx.child');
     const lib = libraryHint(n);
     if (lib) return lib;
+    if (THREAD_NAMES.test(n)) return t('dx.threads', { name: n });
     const typo = closest(n, names(src, /\bmodule\s+([A-Za-z_]\w*)/g));
     return typo ? t('dx.didYouMean', { name: typo }) : t('dx.unknownModule', { name: n });
   }
@@ -216,14 +221,15 @@ export function diagnose(log: string[], src: string): Problem[] {
   return [...found, ...lint(src)].sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));
 }
 
-/** Problems in the rendered model itself: parts that start in mid-air (floating.ts). */
+/** Problems in the rendered model itself: places that start in mid-air (floating.ts), one row per height. */
 export function meshProblems(positions: Float32Array): Problem[] {
   const mm = (v: number) => String(Math.round(v * 10) / 10 || 0);
-  return floatingParts(positions).slice(0, 5).map(p => {
+  return midAirStarts(positions).slice(0, 5).map(p => {
     const [x, y] = [0, 1].map(k => `${mm(p.min[k])}…${mm(p.max[k])}`);
+    const args = { x, y, z: mm(p.min[2]), h: mm(p.above), n: p.count };
     return {
-      severity: 'warn', message: `x ${x}, y ${y}, z ${mm(p.min[2])}…${mm(p.max[2])}`, line: null, count: 1, followUp: false, check: true, mesh: true,
-      hint: t('mesh.floating', { x, y, z: mm(p.min[2]), h: mm(p.above) }),
+      severity: 'warn', message: `x ${x}, y ${y}, z ${mm(p.min[2])}`, line: null, count: 1, followUp: false, check: true, mesh: true,
+      hint: p.count > 1 ? t('mesh.floatingN', args) : t('mesh.floating', args),
     };
   });
 }
@@ -241,6 +247,8 @@ export function problemsForAi(problems: Problem[], src: string, version: string)
     out.push(`${p.line ? `${t('dx.ai.line', { n: p.line })}: ` : ''}${what}`);
     const code = p.line ? lines[p.line - 1]?.trim() : '';
     if (code) out.push(`    ${code}`);
+    // The app's explanation steers the AI (without it, an unknown thread module gets "fixed" by dropping the thread).
+    if (!p.check && p.hint) out.push(`    ${t('dx.ai.hint')}: ${p.hint}`);
   }
   if (follow) out.push('', t('dx.ai.followUps', { n: follow }));
   out.push('', t('dx.ai.ask'));
