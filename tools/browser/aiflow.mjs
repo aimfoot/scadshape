@@ -32,16 +32,26 @@ assert.match(prompt, /print on Bambu Lab A1 mini \(180 × 180 × 180 mm\)/);
 assert.match(prompt, /\n\nWhat I want: $/);
 
 // 2. The AI's answer, copied whole (text around the code) → Paste code
-const answer = 'Sure! Here is a parametric box:\n\n```openscad\n// Box\nwidth = 40; // outer width\ndepth = 30;\nheight = 12;\nwall = 2;\ndifference() {\n  cube([width, depth, height]);\n  translate([wall, wall, wall]) cube([width - 2*wall, depth - 2*wall, height]);\n}\n```\n\nChange `width` to make it bigger.';
+const answer = 'Sure! Here is a parametric box:\n\n```openscad\n// Parametric box\n// Box: open on top, 2 mm walls all round.\nwidth = 40; // outer width\ndepth = 30;\nheight = 12;\nwall = 2;\ndifference() {\n  cube([width, depth, height]);\n  translate([wall, wall, wall]) cube([width - 2*wall, depth - 2*wall, height]);\n}\n```\n\nChange `width` to make it bigger.';
 await page.evaluate(t => navigator.clipboard.writeText(t), answer);
 await page.click('#startPaste');
 await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 assert.equal(await toast(), 'Code pasted');
 const st = await page.evaluate(() => ({ source: document.querySelector('#source').value, code: document.querySelector('#code').value, card: document.querySelector('#startCard').hidden, panel: document.querySelector('#codePanel').hidden }));
 assert.deepEqual([st.source, st.card, st.panel], ['custom', true, false]);
-assert.match(st.code, /^\/\/ Box\nwidth = 40;/); assert.doesNotMatch(st.code, /Sure!|```|Change `width`/);
+assert.match(st.code, /^\/\/ Parametric box\n\/\/ Box: open on top, 2 mm walls all round.\nwidth = 40;/); assert.doesNotMatch(st.code, /Sure!|```|Change `width`/);
 assert.match(await page.textContent('#status'), /triangles$/, 'no problems');
 await page.screenshot({ path: `${out}/a-pasted.png` });
+
+// What the code says it is (its top comment) above the status: the title, a tap opens the parts, × hides it.
+assert.ok(await page.isVisible('#modelNote'));
+assert.equal(await page.textContent('#modelNoteTitle'), 'Parametric box');
+assert.ok(await page.isHidden('#modelNoteBody'));
+await page.click('#modelNoteToggle');
+assert.equal(await page.textContent('#modelNoteBody'), 'Box: open on top, 2 mm walls all round.');
+await page.screenshot({ path: `${out}/a-note.png` });
+await page.click('#modelNoteClose');
+assert.ok(await page.isHidden('#modelNote'));
 
 // The code bar has the prompt too
 assert.ok(await page.isVisible('#btnPrompt'));

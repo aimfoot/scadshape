@@ -13,7 +13,7 @@ import { parseBinaryStl } from '../src/stl';
 import { FONTS_CONF, fontsFor } from '../src/fonts';
 import { lint } from '../src/lint';
 import { applyFix } from '../src/fixes';
-import { aiPrompt, codeFromChat, looksLikeScad } from '../src/aiprompt';
+import { aiPrompt, codeDescription, codeFromChat, looksLikeScad } from '../src/aiprompt';
 import { buildModel } from '../src/model3d';
 import { EXAMPLES, buildExample } from '../src/examples/models';
 setLang('en');
@@ -112,8 +112,18 @@ await test('the code is picked out of an AI chat answer', () => {
   assert.ok(looksLikeScad('cube(10);') && !looksLikeScad('https://example.com/model') && !looksLikeScad('Sure! Here is your model.'));
 });
 
+await test('the comment at the top of the code says what it is: a title and the parts', () => {
+  const src = '\n// Screw-top jar, 60 mm\n// ====================\n// Jar: the body, thread on its neck.\n// Lid: screws onto the neck.\n//\n\njar_d = 60; // outer diameter\n// not part of it\ncube(1);\n';
+  assert.deepEqual(codeDescription(src), { title: 'Screw-top jar, 60 mm', body: 'Jar: the body, thread on its neck.\nLid: screws onto the neck.' });
+  assert.deepEqual(codeDescription('/* Hook\n * Arm: 45° brace under it.\n */\ncube(1);'), { title: 'Hook', body: 'Arm: 45° brace under it.' });
+  assert.equal(codeDescription('width = 40; // outer width\ncube(width);'), null);
+  assert.equal(codeDescription('// ok\ncube(1);'), null); // too short to say anything
+});
+
 await test('the prompt tells the AI what the app runs', () => {
   const p = aiPrompt({ version: 'OpenSCAD 2026.10.15', bed: { w: 180, d: 180, h: 180 }, printer: 'Bambu Lab A1 mini' });
+  assert.match(p, /Start the file with a comment: first line what it is, then a line per part/);
+  assert.match(p, /0\.4 mm in print-in-place joints/);
   assert.match(p, /scadshape \(OpenSCAD 2026\.10\.15, Manifold backend\)/);
   assert.match(p, /Libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad, MCAD \(/);
   assert.match(p, /Fonts for text\(\): Liberation Sans, Liberation Serif, Liberation Mono, Allerta Stencil, Bebas Neue, Pacifico, Orbitron\./);

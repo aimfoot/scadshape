@@ -10,7 +10,7 @@ import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
-import { aiPrompt, codeFromChat, looksLikeScad } from '../../src/aiprompt';
+import { aiPrompt, codeDescription, codeFromChat, looksLikeScad } from '../../src/aiprompt';
 import { scadToDoc, type ConvertEngine } from '../../src/convert/scad2doc';
 import { diagnose, meshProblems, problemsForAi, type Problem } from '../../src/diagnose';
 import { setLang } from '../../src/i18n';
@@ -93,13 +93,19 @@ async function trial(n: number) {
   const slug = request.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
   const dir = `${OUT}/${String(n).padStart(2, '0')}-${slug}`;
   mkdirSync(dir, { recursive: true });
-  const session = randomUUID();
+  let session = randomUUID();
   let text = aiPrompt({ version: VERSION, bed: BED, printer: 'Bambu Lab A1 mini' }) + request;
   const rounds: object[] = [];
   let cost = 0, last: string | null = null, clean = false;
   for (let r = 0; r <= ROUNDS; r++) {
     writeFileSync(`${dir}/r${r}-ask.txt`, text);
-    const a = await ask(session, text, r === 0);
+    let a = await ask(session, text, r === 0);
+    // The CLI now and then gives nothing at all (long answers, several chats at once): once more,
+    // in a new chat if it was the first question.
+    if (!a.reply && !a.cost) {
+      if (r === 0) session = randomUUID();
+      a = await ask(session, text, r === 0);
+    }
     cost += a.cost;
     writeFileSync(`${dir}/r${r}-reply.md`, a.reply || `ERROR: ${a.error}`);
     if (a.error || !a.reply) { rounds.push({ round: r, error: a.error ?? 'empty reply' }); break; }
@@ -133,10 +139,11 @@ async function trial(n: number) {
     text = problemsForAi(problems, code, VERSION);
   }
   // The last code: a picture, and Convert to sketches.
-  let convert: object | null = null;
+  let convert: object | null = null, description: { title: string; body: string } | null = null;
   if (last) {
     await picture(dir, last);
     const src = readFileSync(`${dir}/${last}.scad`, 'utf8');
+    description = codeDescription(src); // what the app shows above the model
     try {
       const r = await Promise.race([scadToDoc(src, engine), new Promise<never>((_, no) => setTimeout(() => no(new Error('convert timeout')), 240_000))]);
       convert = { sketches: r.sketches, extrudes: r.extrudes, revolves: r.revolves, codeBlocks: r.codeBlocks, params: r.params, linked: r.linked };
@@ -144,7 +151,7 @@ async function trial(n: number) {
       convert = { error: String(e).slice(0, 300) };
     }
   }
-  const result = { n, request, session, clean, rounds: rounds.length, cost: Math.round(cost * 10000) / 10000, last, convert, detail: rounds };
+  const result = { n, request, session, clean, rounds: rounds.length, cost: Math.round(cost * 10000) / 10000, last, description, convert, detail: rounds };
   writeFileSync(`${dir}/result.json`, JSON.stringify(result, null, 2));
   console.log(`${String(n).padStart(2)} ${clean ? 'clean' : 'NOT clean'} after ${rounds.length} round(s), $${result.cost}: ${request}`);
   return result;

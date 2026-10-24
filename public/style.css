@@ -270,6 +270,29 @@ main { display: flex; min-height: 0; }
 .status.warn { color: var(--warn); border-color: var(--warn); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* What the code says it is (its top comment, src/ui/modelnote.ts): above the status, tap for the parts. */
+.modelnote {
+  position: absolute;
+  left: max(10px, env(safe-area-inset-left));
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 40px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  max-width: min(440px, calc(100% - 20px));
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--float);
+  backdrop-filter: blur(4px);
+  font-size: 13px;
+}
+.modelnote[hidden] { display: none; }
+.modelnote button { min-height: 34px; border-color: transparent; background: none; }
+#modelNoteToggle { justify-content: flex-start; gap: 8px; min-width: 0; padding: 0 4px 0 10px; text-align: left; }
+#modelNoteTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.modelnote .ni { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font: italic 700 12px Georgia, serif; }
+#modelNoteClose { width: 34px; padding: 0; color: var(--muted); }
+#modelNoteBody { grid-column: 1 / -1; max-height: 35vh; overflow: auto; padding: 0 12px 10px 36px; white-space: pre-wrap; line-height: 1.4; }
+#modelNoteBody[hidden] { display: none; }
+
 /*
  * Until main.ts has loaded the models (IndexedDB) and wired up the buttons: nothing to tap. After
  * 3 s the page shows anyway (in case the startup crashed).
@@ -594,7 +617,7 @@ body { grid-template-columns: minmax(0, 1fr); }
 .bar > * { min-width: 0; }
 .bar select { width: 0; flex: 1 1 auto; }
 @media (orientation: portrait) {
-  #viewport:has(#featPanel:not([hidden])) .status { display: none; }
+  #viewport:has(#featPanel:not([hidden])) .status, #viewport:has(#featPanel:not([hidden])) .modelnote { display: none; }
 }
 
 .fp-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }

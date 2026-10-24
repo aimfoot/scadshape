@@ -12,6 +12,7 @@ import { Viewer } from '../viewer';
 import { bedOf, fitsBed, meshSize, parseBedChoice } from '../bed';
 import { t, type Key } from '../i18n';
 import { $, el, fmtInt, fmtMs, store } from './dom';
+import { showModelNote } from './modelnote';
 import { clearProblems, showProblems } from './problems';
 import { app, on, vars } from './state';
 import cube from '../examples/cube.scad';
@@ -160,6 +161,7 @@ async function renderOnce() {
   const src = app.source === 'custom' ? code.value : currentCode();
   if (app.source !== 'custom') code.value = src;
   else store.set('code', code.value);
+  showModelNote(app.source === 'model' ? null : src);
   for (const cb of renderOpts.onRendered) cb();
   const errs = app.source === 'model' ? app.model.errors.size : 0;
   const errText = errs ? ` · ${t('status.treeErrors', { n: errs })}` : '';

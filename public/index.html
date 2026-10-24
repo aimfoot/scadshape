@@ -125,6 +125,11 @@
         <button id="btnFit" data-i18n-aria="view.fit">⤢</button>
       </div>
       <div id="status" class="status busy"></div>
+      <div id="modelNote" class="modelnote" hidden>
+        <button type="button" id="modelNoteToggle" aria-expanded="false" data-i18n-title="note.title"><span class="ni">i</span><b id="modelNoteTitle"></b></button>
+        <button type="button" id="modelNoteClose" class="icon" data-i18n-aria="ui.close" data-i18n-title="ui.close">×</button>
+        <div id="modelNoteBody" hidden></div>
+      </div>
       <div id="measureBar" class="hintbar measurebar" hidden>
         <span class="mtext"><b id="measureMain"></b><small id="measureDetail"></small></span>
         <button id="measureClear" data-i18n="measure.clear" hidden>Clear</button>
