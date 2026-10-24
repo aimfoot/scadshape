@@ -1,9 +1,12 @@
 // Text: raised or engraved text at chosen points in a sketch (or at the sketch's origin). The fonts
 // are in fonts.ts; the engine only gets the fonts that are used.
 
+import { tangentSide, type TangentSide } from '../faceref';
 import { fontById, FONTS } from '../fonts';
+import { add, cross, dot, scale, sketchFrame, sub, type Frame } from '../frame';
 import { t } from '../i18n';
-import { FieldReader, inwardOf, num, outwardOf, type FeatureBase, type FeatureKind, type Op, type SketchFeature } from './common';
+import { segmentsFor } from '../sketch/geom';
+import { FieldReader, inwardOf, num, outwardOf, type BuildCtx, type Built, type FeatureBase, type FeatureKind, type Op, type SketchFeature } from './common';
 import { holeCandidates } from './hole';
 
 export interface TextFeature extends FeatureBase {
@@ -103,12 +106,94 @@ export const text: FeatureKind<TextFeature> = {
     const h = f.op === 'remove' ? `${depth.code} + 0.01` : depth.code;
     const rot = angle.v ? `rotate(${angle.code}) ` : '';
     const font = fontById(f.font);
+    const glyphs = `text(${scadString(f.text)}, size = ${size.code}, font = ${scadString(font.family)}, halign = "${f.halign}", valign = "center", $fn = 24)`;
+    // Sketched on a cylinder wall: the text follows the round side instead of a flat slab that
+    // only touches it along a line.
+    if (ctx.doc) {
+      const fr = sketchFrame(sk, ctx.vars, ctx.doc);
+      const at = ids.length ? ids.map(id => sk.points[id]) : [{ x: 0, y: 0 }];
+      const side = tangentSide(ctx.doc, fr, at, ctx.vars, f.id);
+      if (side) return wrapped(f, sk, ctx, fr, side, { at, rot, glyphs, size: size.v, angle: angle.v, depth, start });
+    }
     const code =
       `module ${ctx.module}() {\n  ${ctx.place(sk)}for (p = [${pts}])\n` +
       `    translate([p[0], p[1], ${start.code}]) ${flip}${lift}${rot}linear_extrude(height = ${h})\n` +
-      `      text(${scadString(f.text)}, size = ${size.code}, font = ${scadString(font.family)}, halign = "${f.halign}", valign = "center", $fn = 24);\n}`;
+      `      ${glyphs};\n}`;
     return { code, tools: [{ op: f.op, call: `${ctx.module}();` }] };
   },
 };
+
+/** An expression field's value and code. */
+type Field = { v: number; code: string };
+
+/**
+ * Text on the round side of an extruded circle/arc that the sketch plane touches. The flat text is
+ * laid along the circle (its x as arc length at the radius) in thin strips, each one a wedge
+ * around the axis. A strip widens with the distance from the axis (linear_extrude's scale), so the
+ * letters' sides point at the axis and neighbouring strips meet exactly.
+ */
+function wrapped(
+  f: TextFeature, sk: SketchFeature, ctx: BuildCtx, fr: Frame, side: TangentSide,
+  o: { at: { x: number; y: number }[]; rot: string; glyphs: string; size: number; angle: number; depth: Field; start: Field },
+): Built {
+  const r = side.r;
+  const ax = side.axis;
+  const toAxis = sub(fr.o, side.a);
+  const sgn = dot(toAxis, fr.n) >= 0 ? 1 : -1; // the sketch normal points away from the axis
+  const o0 = add(side.a, scale(ax, dot(toAxis, ax))); // on the axis, level with the sketch origin
+  const e1 = scale(fr.n, sgn); // from the axis to the line of contact
+  const e2 = cross(ax, fr.n); // along the circle; e2 × axis = normal, so the text is not mirrored
+  // The sketch's (x, y) → (s along the circle at radius r, t along the axis).
+  const m = [[dot(fr.u, e2), dot(fr.v, e2), dot(sub(fr.o, o0), e2)], [dot(fr.u, ax), dot(fr.v, ax), 0]];
+  const fn = side.fn ?? segmentsFor(r, 2 * Math.PI);
+  const step = Math.min(Math.PI / 18, 2 * Math.acos(1 - 0.01 / r)); // a strip is at most 0.01 mm off the circle
+  // Raised text goes this far into the body, engraved text starts this far out of it: past the
+  // side's facets and the strips' chords.
+  const margin = 0.01 + r * (1 - Math.cos(Math.PI / fn)) + r * (1 - Math.cos(step / 2));
+  // Distance from the axis = r + sgn·(start + dir·z), z = height in the text's own extrusion.
+  const dir = f.direction === 'reverse' ? -1 : 1;
+  const k = sgn * dir;
+  const into = f.op === 'remove' || f.direction === outwardOf(sk) ? margin : 0;
+  const plain = /^[\w.]+$/.test(o.start.code);
+  const base = o.start.v === 0 && o.start.code === '0' ? num(r) : `${num(r)} ${sgn > 0 ? '+' : '-'} ${plain ? o.start.code : `(${o.start.code})`}`;
+  const depth = /^[\w.]+$/.test(o.depth.code) ? o.depth.code : `(${o.depth.code})`;
+  const near = into ? `${base} ${k > 0 ? '-' : '+'} ${num(into)}` : base;
+  const far = `${base} ${k > 0 ? '+' : '-'} ${depth}`;
+  const [lo, hi] = k > 0 ? [near, far] : [far, near];
+  const rLo = r + sgn * o.start.v - (k > 0 ? into : o.depth.v);
+  if (!(rLo > 0.01)) return { error: t('err.surfaceTooDeep') };
+  // The strips that can hold text: a generous box around each line of text.
+  const len = [...f.text].length * o.size * 1.1;
+  const x0 = f.halign === 'left' ? 0 : f.halign === 'right' ? -len : -len / 2;
+  const ca = Math.cos((o.angle * Math.PI) / 180), sa = Math.sin((o.angle * Math.PI) / 180);
+  const ss: number[] = [], ts: number[] = [];
+  for (const p of o.at)
+    for (const [x, y] of [[x0, -o.size], [x0 + len, -o.size], [x0, o.size], [x0 + len, o.size]]) {
+      const px = p.x + x * ca - y * sa, py = p.y + x * sa + y * ca;
+      ss.push(m[0][0] * px + m[0][1] * py + m[0][2]);
+      ts.push(m[1][0] * px + m[1][1] * py);
+    }
+  const w = r * step;
+  const most = Math.floor(Math.PI / step - 0.5); // no more than once around
+  const k0 = Math.max(-most, Math.floor(Math.min(...ss) / w + 0.5));
+  const k1 = Math.min(most, Math.ceil(Math.max(...ss) / w - 0.5));
+  const h = num(2 * Math.max(...ts.map(Math.abs)) + 2);
+  const deg = num((step * 180) / Math.PI), half = num((step * 90) / Math.PI);
+  const r9 = (x: number) => String(Math.round(x * 1e9) / 1e9).replace(/^-0$/, '0');
+  const row = (i: number) => `[${r9(e1[i])}, ${r9(e2[i])}, ${r9(ax[i])}, ${r9(o0[i])}]`;
+  const pts = o.at.map(p => `[${num(p.x)}, ${num(p.y)}]`).join(', ');
+  const code =
+    `module ${ctx.module}() {\n` +
+    `  // Around the round side (r = ${num(r)}): strips of ${deg}° that widen away from the axis.\n` +
+    `  r0 = ${lo}; r1 = ${hi};\n` +
+    `  multmatrix([${row(0)}, ${row(1)}, ${row(2)}, [0, 0, 0, 1]]) for (k = [${k0}:${k1}]) rotate(k * ${deg}) intersection() {\n` +
+    `    linear_extrude(height = ${h}, center = true) polygon([[0, 0], [2 * r1, -2 * r1 * tan(${half})], [2 * r1, 2 * r1 * tan(${half})]]);\n` +
+    `    multmatrix([[0, 0, 1, r0], [1, 0, 0, 0], [0, 1, 0, 0]]) linear_extrude(height = r1 - r0, scale = [r1 / r0, 1]) scale([r0 / ${num(r)}, 1]) intersection() {\n` +
+    `      translate([-k * ${num(w)}, 0]) multmatrix([[${r9(m[0][0])}, ${r9(m[0][1])}, 0, ${r9(m[0][2])}], [${r9(m[1][0])}, ${r9(m[1][1])}, 0, 0], [0, 0, 1, 0]])\n` +
+    `        for (p = [${pts}]) translate(p) ${o.rot}${o.glyphs};\n` +
+    `      square([${num(2 * r * Math.tan(step / 2) + 0.02)}, ${h}], center = true);\n` +
+    `    }\n  }\n}`;
+  return { code, tools: [{ op: f.op, call: `${ctx.module}();` }] };
+}
 
 export { holeCandidates as textCandidates };

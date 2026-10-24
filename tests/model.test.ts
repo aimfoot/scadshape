@@ -523,6 +523,54 @@ await test('text: raised at a point, engraved in a plate, non-ASCII characters a
   r = await render(buildModel(doc).code); near(r.max[2], 5, 1e-3); assert.ok(r.vol < 80 * 30 * 5 - 20, `${r.vol}`);
   tx.text = '  '; assert.match(buildModel(doc).errors.get(tx.id)!, /Type some text/);
 });
+await test('text on a cylinder wall follows the round side (engraved and raised, outside and in a hole)', async () => {
+  const doc = emptyDoc(); const s = newSketch(doc, 'XY'); insertFeature(doc, s); circle(s, 0, 0, 50);
+  const e = newExtrude(doc, s.id); e.depth = '50'; insertFeature(doc, e);
+  // A sketch on the plane touching the wall (as when tapping it), its origin a bit off the line of contact.
+  const ts = newSketch(doc, 'YZ'); ts.face = { o: [50, 3, 0], u: [0, 1, 0], v: [0, 0, 1] }; ts.outward = 'normal'; insertFeature(doc, ts);
+  ts.points[pt(ts, -10, 25)].standalone = true;
+  const tx = newFeature(doc, 'text', ts); tx.text = 'WIDE TEXT'; tx.size = '8'; tx.depth = '1'; tx.op = 'remove';
+  (await import('../src/features/text')).text.changed!(tx, 'op', ts); insertFeature(doc, tx);
+  let m = buildModel(doc); assert.equal(m.errors.size, 0, [...m.errors.values()].join());
+  assert.match(m.code, /Around the round side \(r = 50\)/);
+  const radial = (p: Float32Array) => { const out: { rho: number; ang: number }[] = []; for (let i = 0; i < p.length; i += 3) out.push({ rho: Math.hypot(p[i], p[i + 1]), ang: Math.atan2(p[i + 1], p[i]) }); return out; };
+  let txt = radial((await render(m.code.replace(/\/\/ Model[\s\S]*$/, 'text_1();'))).pos);
+  // The letters span about 60 mm of the wall: the floor is 1 mm deep at the ends too (flat text
+  // would float 8 mm off the wall there), and nothing starts more than a little outside it.
+  const span = Math.max(...txt.map(q => q.ang)) - Math.min(...txt.map(q => q.ang));
+  assert.ok(span * 50 > 50, `${span * 50} mm around`);
+  const ends = txt.filter(q => Math.abs(q.ang - (Math.min(...txt.map(z => z.ang)))) < 0.05);
+  near(Math.min(...ends.map(q => q.rho)), 49, 0.02); near(Math.min(...txt.map(q => q.rho)), 49, 0.02);
+  assert.ok(Math.max(...txt.map(q => q.rho)) < 50.06, `${Math.max(...txt.map(q => q.rho))}`);
+  // The text is centered on the point: 10 mm left of the origin, which is 3 mm along the wall.
+  const mid = (Math.max(...txt.map(q => q.ang)) + Math.min(...txt.map(q => q.ang))) / 2;
+  near(mid * 50, 3 - 10, 1.5);
+  // The cut removes about as much as flat text of that area (a closed, valid result).
+  const area = (await render(`linear_extrude(1) text("WIDE TEXT", size = 8, font = "Liberation Sans:style=Bold", halign = "center", valign = "center", $fn = 24);`)).vol;
+  const full = (await render(buildModel(doc).code.replace(/\/\/ Model[\s\S]*$/, 'extrude_1();'))).vol;
+  let r = await render(m.code);
+  near((full - r.vol) / area, 1, 0.05);
+  // Raised: from inside the wall out to 1 mm outside it.
+  tx.op = 'add'; tx.text = 'WIDE TEXT'; (await import('../src/features/text')).text.changed!(tx, 'op', ts);
+  m = buildModel(doc); txt = radial((await render(m.code.replace(/\/\/ Model[\s\S]*$/, 'text_1();'))).pos);
+  near(Math.max(...txt.map(q => q.rho)), 51, 0.02); assert.ok(Math.min(...txt.map(q => q.rho)) < 50 * Math.cos(Math.PI / 158));
+  r = await render(m.code); near((r.vol - full) / area, 1, 0.05);
+  // A sketch beyond the cylinder's ends (the same plane) stays flat.
+  ts.points[Object.keys(ts.points)[0]].y = 80; tx.size = '4';
+  assert.doesNotMatch(buildModel(doc).code, /Around the round side/);
+  // In a hole: the wall faces the axis, the text is cut outwards into the material.
+  const d2 = emptyDoc(); const s2 = newSketch(d2, 'XY'); insertFeature(d2, s2); rect(s2, -30, -30, 30, 30); circle(s2, 0, 0, 20);
+  const e2 = newExtrude(d2, s2.id); e2.depth = '30'; insertFeature(d2, e2);
+  const t2 = newSketch(d2, 'YZ'); t2.face = { o: [20, 0, 0], u: [0, -1, 0], v: [0, 0, 1] }; t2.outward = 'normal'; insertFeature(d2, t2);
+  t2.points[pt(t2, 0, 15)].standalone = true;
+  const x2 = newFeature(d2, 'text', t2); x2.text = 'HOLE'; x2.size = '6'; x2.depth = '1.5'; x2.op = 'remove';
+  (await import('../src/features/text')).text.changed!(x2, 'op', t2); insertFeature(d2, x2);
+  m = buildModel(d2); assert.equal(m.errors.size, 0, [...m.errors.values()].join());
+  txt = radial((await render(m.code.replace(/\/\/ Model[\s\S]*$/, 'text_1();'))).pos);
+  near(Math.max(...txt.map(q => q.rho)), 21.5, 0.02); assert.ok(Math.min(...txt.map(q => q.rho)) > 19.9);
+  const hole = (await render(m.code.replace(/\/\/ Model[\s\S]*$/, 'extrude_1();'))).vol;
+  r = await render(m.code); assert.ok(hole - r.vol > 30, `${hole - r.vol}`);
+});
 await test('Orbitron, Bold and Black are chosen (not the fallback font) and the whole family comes along', async () => {
   const vol: Record<string, number> = {};
   for (const id of ['sans', 'orbitron', 'orbitron-bold', 'orbitron-black'])

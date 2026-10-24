@@ -452,6 +452,44 @@ export function findCurveRef(doc: Doc, vars: Vars, n: V3, p: V3): CurveRef | nul
   return null;
 }
 
+/** A round side that a sketch plane touches along a line: its axis in the world (point a, unit direction axis). */
+export interface TangentSide extends CurveSide {
+  a: V3;
+  axis: V3;
+}
+
+/**
+ * The round side of an extruded circle/arc (before `before`) that the plane `fr` touches along a
+ * line, where the points `at` (in the plane) lie: e.g. text sketched on a cylinder wall. Null if
+ * the plane does not touch one there.
+ */
+export function tangentSide(doc: Doc, fr: Frame, at: Vec[], vars: Vars | undefined, before: string): TangentSide | null {
+  const bi = doc.features.findIndex(f => f.id === before);
+  const active = doc.features.slice(0, bi >= 0 ? Math.min(bi, activeCount(doc)) : activeCount(doc)).filter(f => !f.suppressed);
+  for (const f of [...active].reverse()) {
+    if (f.type !== 'extrude') continue;
+    const sk = active.find((g): g is SketchFeature => g.type === 'sketch' && g.id === f.sketch);
+    if (!sk) continue;
+    const fs = sketchFrame(sk, vars, doc);
+    if (Math.abs(dot(fr.n, fs.n)) > 1e-6) continue; // the axis must lie in the plane
+    for (const entity of Object.keys(sk.entities)) {
+      const side = curveSide(sk, f, entity, vars);
+      if (!side) continue;
+      const a = toWorld(fs, side.c);
+      const dist = dot(sub(fr.o, a), fr.n);
+      if (Math.abs(Math.abs(dist) - side.r) > 0.01 + side.r * 1e-4) continue;
+      // The line of contact, as an angle in the circle's sketch, must be on the arc.
+      const touch = toPlane(fs, add(a, scale(fr.n, dist)));
+      if (side.sweep < 2 * Math.PI - 1e-9 && ccwSweep(side.a0, Math.atan2(touch.y - side.c.y, touch.x - side.c.x)) > side.sweep + 0.02) continue;
+      // The points must be along the side, not beyond its ends.
+      const w = at.map(p => toPlane(fs, toWorld(fr, p)).w);
+      if (w.some(x => x < side.span[0] - 0.01 || x > side.span[1] + 0.01)) continue;
+      return { ...side, a, axis: fs.n };
+    }
+  }
+  return null;
+}
+
 /** Resolve a CurveRef (the extrude must be active and come before `before`, if given). */
 export function resolveCurveRef(doc: Doc, ref: CurveRef, vars: Vars | undefined, before?: string): CurveSide | null {
   const fi = doc.features.findIndex(f => f.id === ref.feature);
