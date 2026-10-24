@@ -55,7 +55,10 @@
       <button type="button" id="btnConvert"><svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><path d="M14 20h6M17 17v6" transform="translate(0 -3)"/></svg><span data-i18n="convert.button">Convert to sketches</span></button>
       <button type="button" id="btnPrompt" data-i18n-title="ai.promptTitle"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H10l-4 4v-4H5z"/><path d="M9 10h6"/></svg><span data-i18n="ai.copyPrompt">Copy prompt</span></button>
     </div>
-    <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" data-i18n-aria="ui.code"></textarea>
+    <div class="codewrap">
+      <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" data-i18n-aria="ui.code"></textarea>
+      <button type="button" id="btnClearCode" data-i18n-title="code.clear" data-i18n-aria="code.clear"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg><span></span></button>
+    </div>
     <div id="problems" hidden>
       <div class="problems-head">
         <strong id="problemsTitle"></strong>

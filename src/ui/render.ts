@@ -93,6 +93,7 @@ export function setSource(s: string) {
   app.source = s;
   store.set('source', s);
   $('#codeBar').hidden = s === 'model'; // "Convert to sketches" only for code
+  $('#btnClearCode').hidden = s === 'model'; // the model's code is generated
   ($<HTMLSelectElement>('#source')).value = s;
   syncCodePanel();
 }

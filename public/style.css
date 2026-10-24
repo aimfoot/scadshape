@@ -131,8 +131,24 @@ main { display: flex; min-height: 0; }
 .codebar { display: flex; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .codebar[hidden] { display: none; }
 .codebar button { min-height: 38px; gap: 6px; }
+.codewrap { position: relative; flex: 1; min-height: 0; display: flex; }
+/* Clear the code: in the code's top corner; for a few seconds after, "Undo" brings the code back. */
+#btnClearCode {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  min-width: 40px;
+  min-height: 40px;
+  gap: 6px;
+  padding: 0 9px;
+  background: var(--panel);
+  opacity: .92;
+}
+#btnClearCode[hidden], #btnClearCode span:empty { display: none; }
+#btnClearCode.undo { color: var(--accent); border-color: var(--accent); opacity: 1; }
 #code {
   flex: 1;
+  width: 100%;
   min-height: 0;
   resize: none;
   border: 0;

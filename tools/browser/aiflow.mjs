@@ -1,6 +1,6 @@
 // Code from an AI chat: the start card's "Copy prompt" (with the printer from Settings) and "Paste
 // code" (an answer with text and ``` fences → only the code, in Custom code, rendered), and pasting a
-// whole answer straight into the code.
+// whole answer straight into the code, and Clear (with its Undo).
 // node aiflow.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
@@ -56,6 +56,26 @@ await page.evaluate(t => {
 assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
 assert.equal(await toast(), 'Only the code from the answer was pasted');
 
+// Clear: empties the code; the button is Undo for a while and brings it back; typing ends that
+const clearBtn = () => page.evaluate(() => { const b = document.querySelector('#btnClearCode'); return { text: b.textContent, undo: b.classList.contains('undo'), label: b.getAttribute('aria-label') }; });
+assert.deepEqual(await clearBtn(), { text: '', undo: false, label: 'Clear the code' });
+await page.screenshot({ path: `${out}/a-clear.png` });
+await page.tap('#btnClearCode');
+assert.equal(await page.inputValue('#code'), '');
+assert.equal(await toast(), 'Code cleared – tap Undo to get it back');
+assert.deepEqual(await clearBtn(), { text: 'Undo', undo: true, label: 'Clear the code' });
+await page.screenshot({ path: `${out}/a-cleared.png` });
+await page.tap('#btnClearCode');
+assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
+assert.equal((await clearBtn()).undo, false);
+await page.tap('#btnClearCode');
+await page.focus('#code');
+await page.keyboard.type('cube(5);');
+assert.equal((await clearBtn()).undo, false, 'typed: no undo any more');
+// The code's own undo still has it (typing can be more than one undo step)
+for (let i = 0; i < 4 && (await page.inputValue('#code')) !== 'cylinder(d = 20, h = 5);\n'; i++) await page.keyboard.press('Control+z');
+assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
+
 // 4. Nothing usable on the clipboard: paste by hand
 await page.evaluate(() => navigator.clipboard.writeText('Sorry, I cannot help with that.'));
 await page.selectOption('#source', 'model');
@@ -64,6 +84,11 @@ await page.click('#btnTree'); await page.click('#btnStart');
 await page.click('#startPaste');
 await page.waitForFunction(() => /^The clipboard has no OpenSCAD code/.test(document.querySelector('#partToast').textContent));
 assert.equal(await page.evaluate(() => document.querySelector('#source').value), 'custom');
+assert.ok(await page.isVisible('#btnClearCode'));
+// The model's own code is generated: no Clear
+await page.selectOption('#source', 'model');
+await page.waitForTimeout(300);
+assert.ok(await page.isHidden('#btnClearCode'));
 
 await browser.close();
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');

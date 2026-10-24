@@ -1,5 +1,6 @@
 // Code from an AI chat: "Copy prompt" (on the start card and in the code bar) gives the AI the app's
-// rules, "Paste code" puts the code from the clipboard in Custom code. Pasting an answer with
+// rules, "Paste code" puts the code from the clipboard in Custom code, and Clear empties it for the
+// next answer. Pasting an answer with
 // ``` fences into the code keeps only the code, and text shared from another app (Android) opens
 // the same way.
 
@@ -34,13 +35,44 @@ function putCode(text: string) {
   const ta = code();
   ta.focus({ preventScroll: true });
   ta.select();
-  if (!document.execCommand('insertText', false, text)) {
+  // Emptying is a delete (an empty insertText is no edit, so undo would not have it).
+  if (!document.execCommand(text ? 'insertText' : 'delete', false, text)) {
     ta.value = text;
     ta.dispatchEvent(new Event('input'));
   }
   ta.setSelectionRange(0, 0);
   ta.scrollTop = 0;
   ta.blur(); // no keyboard over the new model
+}
+
+// Clear: empties the code (as if deleted, so it renders and the code's undo works). For a few seconds
+// after, the button is Undo and brings the code back – a stray tap must not lose it (it is saved at once).
+let cleared: string | null = null, clearTimer = 0, putting = false;
+function offerUndo(text: string | null) {
+  cleared = text;
+  clearTimeout(clearTimer);
+  const b = $('#btnClearCode');
+  b.classList.toggle('undo', text !== null);
+  b.querySelector('span')!.textContent = text !== null ? t('code.undoClear') : '';
+  if (text !== null) clearTimer = window.setTimeout(() => offerUndo(null), 6000);
+}
+function put(text: string) {
+  putting = true;
+  putCode(text);
+  putting = false;
+}
+function clearCode() {
+  if (cleared !== null) {
+    const text = cleared;
+    offerUndo(null);
+    put(text);
+    return;
+  }
+  const text = code().value;
+  if (!text || code().readOnly) return;
+  put('');
+  offerUndo(text);
+  showToast(t('code.cleared'));
 }
 
 /** Open code from an AI chat (an answer with or without ``` fences). Returns false if it is not code. */
@@ -71,6 +103,11 @@ export function initAiFlow() {
   $('#startPrompt').addEventListener('click', () => void copyPrompt());
   $('#startPaste').addEventListener('click', () => void pasteCode());
   $('#btnPrompt').addEventListener('click', () => void copyPrompt());
+  $('#btnClearCode').addEventListener('click', clearCode);
+  // Typing after a clear: that is the new code, no more undo.
+  code().addEventListener('input', () => {
+    if (!putting && cleared !== null) offerUndo(null);
+  });
   // A whole chat answer pasted into the code: keep only the code block.
   code().addEventListener('paste', e => {
     const text = e.clipboardData?.getData('text/plain') ?? '';

@@ -73,5 +73,6 @@ export async function convertCode() {
 
 export function initConvert() {
   $('#codeBar').hidden = app.source === 'model';
+  $('#btnClearCode').hidden = app.source === 'model';
   $('#btnConvert').addEventListener('click', () => void convertCode());
 }
