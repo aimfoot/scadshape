@@ -11,7 +11,7 @@ import { midAirStarts } from './floating';
 import { overhangs } from './overhangs';
 import { FAMILIES } from './fonts';
 import { t } from './i18n';
-import { BOSL2_NAMES, MCAD_NAMES } from './libnames.gen';
+import { BOSL2_NAMES, LIB_PARAMS, MCAD_NAMES } from './libnames.gen';
 import { LIBRARIES } from './libs';
 import { lint } from './lint';
 
@@ -117,7 +117,11 @@ function syntaxHint(lines: string[], line: number | null): string {
   return t('dx.syntax');
 }
 
-function hintFor(msg: string, line: number | null, src: string, lines: string[]): string | null {
+/** "takes these parameters" for a library module, or null. */
+const libParams = (name: string | undefined) => (name && LIB_PARAMS[name] ? LIB_PARAMS[name].split(' ').join(', ') : null);
+
+/** `callee`: the library module the user's line called, when the problem is inside it (from the TRACE). */
+function hintFor(msg: string, line: number | null, src: string, lines: string[], callee?: string): string | null {
   let m: RegExpExecArray | null;
   if ((m = /Ignoring unknown function '(\w+)'/.exec(msg))) {
     const n = m[1];
@@ -151,7 +155,17 @@ function hintFor(msg: string, line: number | null, src: string, lines: string[])
   if (/Can't open import file/.test(msg)) return t('dx.importFile');
   if ((m = /Can't get font (.+)/.exec(msg))) return t('dx.font', { font: m[1].trim(), fonts: FAMILIES.join(', ') });
   if ((m = /"(\w+)" was assigned on line (\d+) but was overwritten/.exec(msg))) return t('dx.overwritten', { name: m[1] });
-  if (/^Assertion/.test(msg)) return t('dx.assertion');
+  if (/^Assertion/.test(msg)) {
+    const params = libParams(callee);
+    return params ? t('dx.assertionLib', { name: callee!, params }) : t('dx.assertion');
+  }
+  if ((m = /variable "(\$?\w+)" not specified as parameter/.exec(msg))) {
+    // The library module called on that line that has no such parameter (AI code guesses names).
+    const arg = m[1];
+    const name = line ? [...names(lines[line - 1] ?? '', /\b([A-Za-z_]\w*)\s*\(/g)].find(n => LIB_PARAMS[n] && !LIB_PARAMS[n].split(' ').includes(arg)) : undefined;
+    const params = libParams(name);
+    return params ? t('dx.notParamLib', { arg, name: name!, params }) : t('dx.notParam', { arg });
+  }
   if (/top level object is empty/.test(msg)) return t('dx.empty');
   if (/top level object is not a 3D object/.test(msg)) return t('dx.not3d');
   if (FOLLOW_UP.test(msg)) return t('dx.undef');
@@ -179,12 +193,17 @@ export function diagnose(log: string[], src: string): Problem[] {
   const out: Problem[] = [];
   const byKey = new Map<string, Problem>();
   let last: Problem | null = null;
+  const callee = new Map<Problem, string>();
   for (const raw of log) {
     const text = raw.trim();
     // An error inside a library (or without a place) is placed on the user's line that called it.
     if (text.startsWith('TRACE:')) {
       const loc = LOCATION.exec(text);
-      if (last && last.line === null && loc && loc[1] === USER_FILE) last.line = Number(loc[2]);
+      if (last && last.line === null && loc && loc[1] === USER_FILE) {
+        last.line = Number(loc[2]);
+        const by = /^TRACE: called by '(\w+)'/.exec(text);
+        if (by) callee.set(last, by[1]);
+      }
       continue;
     }
     let severity: Problem['severity'], msg: string;
@@ -218,7 +237,7 @@ export function diagnose(log: string[], src: string): Problem[] {
   const hasCause = list.some(p => !p.followUp);
   const found = list.map(p => {
     const fix = fixFor(p.message, src);
-    return { ...p, followUp: p.followUp && hasCause, hint: hintFor(p.message, p.line, src, lines), ...(fix ? { fix } : {}) };
+    return { ...p, followUp: p.followUp && hasCause, hint: hintFor(p.message, p.line, src, lines, callee.get(p)), ...(fix ? { fix } : {}) };
   });
   // With the app's own checks (what OpenSCAD renders without a word), in the order of the code.
   return [...found, ...lint(src)].sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));
