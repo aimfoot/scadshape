@@ -244,6 +244,10 @@ await test('long flat ceilings are found, the short way across; a walled hollow 
     'difference() { cube(40); translate([5, 5, 5]) cube([30, 30, 40]); }', // an open box: no ceiling
     'cube([10, 10, 20]); translate([-8, 0, 20]) cube([26, 10, 3]);', // a T: arms 8 mm out
     'difference() { cube(40); translate([20, 20, 5]) sphere(15); }', // round: no flat ceiling
+    // A pot with drainage holes (an AI trial's): Manifold splits the floor into needles, whose facing
+    // can flip after rounding to float32 – a floor must not look like a ceiling.
+    // (Where it lies matters to how the floor is split: these are the trial's numbers.)
+    '$fn = 96; translate([42, 90, 0]) difference() { cylinder(h = 80, r1 = 32, r2 = 40); translate([0, 0, 4]) cylinder(h = 80, r1 = 29.5, r2 = 37.5); translate([0, 0, -1]) cylinder(d = 6, h = 6); for (i = [0:5]) translate([14 * cos(i * 60), 14 * sin(i * 60), -1]) cylinder(d = 6, h = 6); } translate([132, 90, 0]) difference() { cylinder(h = 14, d = 88); translate([0, 0, 3]) cylinder(h = 14, d = 70); }',
   ];
   for (const src of fine) assert.deepEqual(await ceilings(src), [], src);
   for (const ex of EXAMPLES) assert.deepEqual(await ceilings(buildModel(buildExample(ex.id)).code), [], ex.id);

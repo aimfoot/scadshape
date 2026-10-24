@@ -62,12 +62,17 @@ export function flatCeilings(pos: Float32Array): FlatCeiling[] {
   let bottom = Infinity;
   for (let v = 0; v < count; v++) bottom = Math.min(bottom, z[v]);
 
-  // Flat triangles facing down, above the bed.
+  // Flat triangles above the bed: 2 facing down, 1 a needle (Manifold leaves them where it splits a
+  // face around holes). A needle's facing can flip after rounding to float32, so needles only join a
+  // ceiling that has real downward triangles – a strip of needles in a floor is not one.
   const flat = new Uint8Array(n);
   for (let t = 0; t < n; t++) {
     const [a, b, c] = [id[t * 3], id[t * 3 + 1], id[t * 3 + 2]], p = t * 9;
+    if (Math.abs(z[a] - z[b]) > FLAT || Math.abs(z[a] - z[c]) > FLAT || z[a] - bottom <= TOUCH) continue;
     const up = (pos[p + 3] - pos[p]) * (pos[p + 7] - pos[p + 1]) - (pos[p + 4] - pos[p + 1]) * (pos[p + 6] - pos[p]);
-    flat[t] = Number(up < 0 && Math.abs(z[a] - z[b]) <= FLAT && Math.abs(z[a] - z[c]) <= FLAT && z[a] - bottom > TOUCH);
+    const longest = Math.max((pos[p + 3] - pos[p]) ** 2 + (pos[p + 4] - pos[p + 1]) ** 2, (pos[p + 6] - pos[p]) ** 2 + (pos[p + 7] - pos[p + 1]) ** 2,
+      (pos[p + 6] - pos[p + 3]) ** 2 + (pos[p + 7] - pos[p + 4]) ** 2);
+    flat[t] = Math.abs(up) <= 1e-3 * longest ? 1 : up < 0 ? 2 : 0;
   }
   // The flat triangles' edges → the triangles on them (only those edges: most of a model is not
   // ceiling), and flat triangles joined over shared edges into patches.
@@ -99,6 +104,7 @@ export function flatCeilings(pos: Float32Array): FlatCeiling[] {
 
   const out: FlatCeiling[] = [];
   for (const tris of patches.values()) {
+    if (!tris.some(t => flat[t] === 2)) continue; // only needles: not a ceiling
     const h = pos[tris[0] * 9 + 2];
     // Its walls: patch edges where the surface beyond goes down.
     const inPatch = new Set(tris), walls: number[] = [];

@@ -20,3 +20,6 @@ tools/browser/*
 
 # Claude Code's worktrees
 .claude/
+
+# The AI trial's output (tools/aitrial/run.mjs)
+tools/aitrial/out/
