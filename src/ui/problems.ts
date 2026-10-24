@@ -1,12 +1,15 @@
 // The code's problems under the code (diagnose.ts): one row per problem with its line and a plain
 // explanation – tap to go to the line – and "Copy for AI", which puts them on the clipboard as text
-// for the AI chat the code came from. The raw log is only shown on request.
+// for the AI chat the code came from. Where the change is clear, a Fix button under the row shows the
+// fixed line and makes the change (fixes.ts). The raw log is only shown on request.
 
 import { diagnose, problemsForAi, type Problem } from '../diagnose';
+import { applyFix } from '../fixes';
 import { t } from '../i18n';
 import { PARTS } from '../licenses';
+import { remoteLog } from '../remote';
 import { copyText } from './clipboard';
-import { $, el } from './dom';
+import { $, $$, el } from './dom';
 import { showToast } from './toast';
 
 let shown: { problems: Problem[]; src: string } = { problems: [], src: '' };
@@ -22,15 +25,49 @@ function gotoLine(n: number) {
   code.scrollTop = Math.max(0, (n - 1) * lh - code.clientHeight / 3);
 }
 
+/** Apply a fix to the code as if typed (undo keeps working, and it renders by itself). */
+function applyFixToCode(p: Problem) {
+  const code = $<HTMLTextAreaElement>('#code');
+  // Typed since the render: the fix's places are no longer right.
+  if (code.value !== shown.src || code.readOnly) {
+    showToast(t('fix.stale'), 'error');
+    return;
+  }
+  const edits = p.fix!.edits, after = applyFix(shown.src, p.fix!);
+  const from = Math.min(...edits.map(e => e.from)), to = Math.max(...edits.map(e => e.to));
+  const scroll = code.scrollTop;
+  code.focus({ preventScroll: true });
+  code.setSelectionRange(from, to);
+  const text = after.slice(from, after.length - (shown.src.length - to));
+  if (!document.execCommand('insertText', false, text)) {
+    code.value = after;
+    code.dispatchEvent(new Event('input'));
+  }
+  code.scrollTop = scroll;
+  code.blur(); // no keyboard over the list
+  for (const b of $$<HTMLButtonElement>('#problemList .fix')) b.disabled = true; // until the new render
+  remoteLog('code-fix', { message: p.message.slice(0, 80) });
+}
+
 function row(p: Problem) {
-  const b = el('button', { type: 'button' },
+  const b = el('button', { type: 'button', className: 'row' },
     el('span', { className: 'where', textContent: p.line ? t('dx.line', { n: p.line }) : '–' }),
     el('span', { className: 'hint', textContent: p.hint ?? p.message }),
     el('span', { className: 'count', textContent: p.count > 1 ? t('dx.times', { n: p.count }) : '' }),
   );
   if (p.hint) b.append(el('span', { className: 'raw', textContent: p.message }));
   if (p.line) b.addEventListener('click', () => gotoLine(p.line!));
-  return el('li', { className: p.severity }, b);
+  const li = el('li', { className: p.severity }, b);
+  if (p.fix && !$<HTMLTextAreaElement>('#code').readOnly) {
+    const f = el('button', { type: 'button', className: 'fix' },
+      el('strong', { textContent: t('fix.button') }),
+      el('code', { textContent: p.fix.preview }),
+      el('span', { className: 'count', textContent: p.fix.more ? t('fix.more', { n: p.fix.more }) : '' }),
+    );
+    f.addEventListener('click', () => applyFixToCode(p));
+    li.append(f);
+  }
+  return li;
 }
 
 /** Show the problems in a render's log. Returns how many there are (follow-ups and notes not counted). */
@@ -44,7 +81,7 @@ export function showProblems(log: string[], src: string): number {
   const items = main.map(row);
   if (follow.length) {
     const first = follow.find(p => p.line);
-    const b = el('button', { type: 'button' }, el('span', { className: 'where' }), el('span', { className: 'hint', textContent: t('dx.followUps', { n: follow.reduce((s, p) => s + p.count, 0) }) }));
+    const b = el('button', { type: 'button', className: 'row' }, el('span', { className: 'where' }), el('span', { className: 'hint', textContent: t('dx.followUps', { n: follow.reduce((s, p) => s + p.count, 0) }) }));
     if (first) b.addEventListener('click', () => gotoLine(first.line!));
     items.push(el('li', { className: 'follow' }, b));
   }

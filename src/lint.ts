@@ -6,36 +6,19 @@
 import { FAMILIES, fontAlias } from './fonts';
 import { t } from './i18n';
 import type { Problem } from './diagnose';
-
-/** The code with comments and the insides of strings blanked out (same length, same lines). */
-function blank(src: string) {
-  return src.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"/g, m =>
-    m.startsWith('"') ? `"${m.slice(1, -1).replace(/[^\n]/g, ' ')}"` : m.replace(/[^\n]/g, ' '));
-}
-const lineAt = (src: string, i: number) => src.slice(0, i).split('\n').length;
-/** The index of the ) that closes the ( at `open`, or the end. */
-function closing(code: string, open: number) {
-  let d = 0;
-  for (let i = open; i < code.length; i++) {
-    if (code[i] === '(' || code[i] === '[') d++;
-    else if ((code[i] === ')' || code[i] === ']') && --d === 0) return i;
-  }
-  return code.length - 1;
-}
+import { degreesFix, removeFix, type Fix } from './fixes';
+import { blank, calls as callsIn, lineAt } from './scadcode';
 
 export function lint(src: string): Problem[] {
   const code = blank(src);
   const out: Problem[] = [];
-  const add = (at: number, severity: Problem['severity'], fragment: string, hint: string) =>
-    out.push({ severity, message: fragment.replace(/\s+/g, ' ').trim(), line: lineAt(src, at), count: 1, hint, followUp: false, check: true });
-  const calls = (name: string) => [...code.matchAll(new RegExp(`\\b(${name})\\s*\\(`, 'g'))].map(m => {
-    const open = m.index! + m[0].length - 1, close = closing(code, open);
-    return { at: m.index!, name: m[1], arg: code.slice(open + 1, close), text: src.slice(m.index!, close + 1) };
-  });
+  const add = (at: number, severity: Problem['severity'], fragment: string, hint: string, fix?: Fix | null) =>
+    out.push({ severity, message: fragment.replace(/\s+/g, ' ').trim(), line: lineAt(src, at), count: 1, hint, followUp: false, check: true, ...(fix ? { fix } : {}) });
+  const calls = (name: string) => callsIn(code, name).map(c => ({ ...c, arg: code.slice(c.open + 1, c.close), text: src.slice(c.at, c.close + 1) }));
 
   // Angles in radians: OpenSCAD's sin/cos/tan and rotate() take degrees.
-  for (const c of calls('sin|cos|tan')) if (/\bPI\b/.test(c.arg) && !/180/.test(c.arg)) add(c.at, 'warn', c.text, t('lint.trigRadians', { fn: c.name }));
-  for (const c of calls('rotate')) if (/\bPI\b/.test(c.arg) && !/180/.test(c.arg)) add(c.at, 'warn', c.text, t('lint.rotateRadians'));
+  for (const c of calls('sin|cos|tan')) if (/\bPI\b/.test(c.arg) && !/180/.test(c.arg)) add(c.at, 'warn', c.text, t('lint.trigRadians', { fn: c.name }), degreesFix(src, code, c));
+  for (const c of calls('rotate')) if (/\bPI\b/.test(c.arg) && !/180/.test(c.arg)) add(c.at, 'warn', c.text, t('lint.rotateRadians'), degreesFix(src, code, c));
 
   // A font the app doesn't have: fontconfig falls back to Liberation Sans without a warning. A name
   // with an alias of the same letter widths (Arial → Liberation Sans) is fine; another alias is
@@ -97,7 +80,7 @@ export function lint(src: string): Problem[] {
       // % * ! at the head of a statement (not in an expression) are modifiers.
       if ('%*!'.includes(ch) && !sawEq && ['', ';', '{', '}', ')'].includes(prev) && /^\s*[A-Za-z_]/.test(code.slice(i + 1, i + 40))) {
         const key = ch === '%' ? 'lint.modBackground' : ch === '*' ? 'lint.modDisable' : 'lint.modOnly';
-        add(i, 'warn', src.slice(i, src.indexOf('\n', i) < 0 ? undefined : src.indexOf('\n', i)), t(key));
+        add(i, 'warn', src.slice(i, src.indexOf('\n', i) < 0 ? undefined : src.indexOf('\n', i)), t(key), removeFix(src, i));
       }
       if (brace === 0 && /^color\s*\(/.test(code.slice(i, i + 12)) && code.slice(start, i).trim() === '') colors.push(i);
     }

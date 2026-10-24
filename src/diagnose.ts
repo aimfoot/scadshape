@@ -4,6 +4,7 @@
 // typical mistakes of AI-written code recognised (radians(), +=, Python loops, a forgotten BOSL2
 // include …). problemsForAi() writes them as text to paste back into the AI chat.
 
+import { convertFix, includeFix, renameFix, type Fix } from './fixes';
 import { FAMILIES } from './fonts';
 import { t } from './i18n';
 import { BOSL2_NAMES, MCAD_NAMES } from './libnames.gen';
@@ -24,6 +25,8 @@ export interface Problem {
   followUp: boolean;
   /** Found by the app's own check of the code (lint.ts), not by OpenSCAD. */
   check?: true;
+  /** A one-tap fix, where the right change is clear (fixes.ts). */
+  fix?: Fix;
 }
 
 const USER_FILE = '/in.scad';
@@ -144,6 +147,21 @@ function hintFor(msg: string, line: number | null, src: string, lines: string[])
   return null;
 }
 
+/** The fix for an OpenSCAD message where the change is clear (the same cases as the hints), or null. */
+function fixFor(msg: string, src: string): Fix | null {
+  const m = /Ignoring unknown (function|module) '(\w+)'/.exec(msg);
+  if (!m) return null;
+  const n = m[2];
+  if (m[1] === 'function' && /^(radians|degrees|deg2rad|rad2deg)$/.test(n)) return convertFix(src, n);
+  if (m[1] === 'function' && MISSING_FUNCTIONS[n]) return null;
+  if (m[1] === 'module' && n === 'assign') return renameFix(src, 'assign', 'let');
+  if (m[1] === 'module' && n === 'child') return renameFix(src, 'child', 'children');
+  const b = bosl2File(n);
+  if (b) return includeFix(src, 'BOSL2', b);
+  const mc = mcadFile(n);
+  return mc ? includeFix(src, 'MCAD', mc) : null;
+}
+
 /** The problems in an OpenSCAD log, merged and explained, in the order they first appear. */
 export function diagnose(log: string[], src: string): Problem[] {
   const lines = src.split('\n');
@@ -187,11 +205,10 @@ export function diagnose(log: string[], src: string): Problem[] {
   const list = real.length ? real : out;
   // Follow-ups only count as such when there is a cause to point at.
   const hasCause = list.some(p => !p.followUp);
-  const found = list.map(p => ({
-    ...p,
-    followUp: p.followUp && hasCause,
-    hint: hintFor(p.message, p.line, src, lines),
-  }));
+  const found = list.map(p => {
+    const fix = fixFor(p.message, src);
+    return { ...p, followUp: p.followUp && hasCause, hint: hintFor(p.message, p.line, src, lines), ...(fix ? { fix } : {}) };
+  });
   // With the app's own checks (what OpenSCAD renders without a word), in the order of the code.
   return [...found, ...lint(src)].sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));
 }

@@ -1,6 +1,7 @@
 // The code's problem list: AI-written code with radians() (OpenSCAD has none) renders without the
 // gears – the status bar says "1 problem", the list explains it on line 28 with its count, a tap goes
-// to the line, and "Copy for AI" puts the text for the chat on the clipboard. Then a syntax error.
+// to the line, and "Copy for AI" puts the text for the chat on the clipboard. Fix changes the code
+// (undo works; after typing it refuses). Then a silent rotate(PI/4) and its fix, and a syntax error.
 // node problems.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
@@ -46,16 +47,17 @@ await page.fill('#code', gears);
 let st = await waitRendered();
 assert.match(st.text, /triangles · 1 problem$/, st.text);
 assert.match(st.cls, /warn/);
-const rows = () => page.$$eval('#problemList li', ls => ls.map(l => ({ cls: l.className, text: l.textContent })));
+const rows = () => page.$$eval('#problemList li', ls => ls.map(l => ({ cls: l.className, text: l.querySelector('.row').textContent, fix: l.querySelector('.fix')?.textContent ?? null })));
 let list = await rows();
 assert.match(await page.textContent('#problemsTitle'), /^1 problem in the code$/);
 assert.match(list[0].text, /^Line 5OpenSCAD has no radians\(\)\. Write x \* PI \/ 180 instead\.× \d+Ignoring unknown function 'radians'$/, list[0].text);
+assert.equal(list[0].fix, 'Fixfunction inv(a) = tan(a) - a * PI / 180;');
 assert.match(list.at(-1).text, /^\+ \d+ follow-on warnings about undefined values$/);
 assert.ok(await page.isHidden('#log'), 'the raw log is hidden behind "Full log"');
 await page.screenshot({ path: `${out}/p-portrait.png` });
 
 // Tap the problem: line 5 is selected in the code
-await page.click('#problemList li:first-child button');
+await page.click('#problemList li:first-child .row');
 const sel = await page.evaluate(() => { const c = document.querySelector('#code'); return c.value.slice(c.selectionStart, c.selectionEnd); });
 assert.equal(sel, 'function inv(a) = tan(a) - radians(a);');
 
@@ -71,11 +73,25 @@ await page.click('#btnFullLog');
 assert.ok(await page.isVisible('#log'));
 assert.match(await page.textContent('#log'), /Ignoring unknown function 'radians' in file \/in\.scad, line 5 × \d+/);
 
-// The fix: no problems, no list
-await page.fill('#code', gears.replace('radians(a)', 'a * PI / 180'));
+// Fix: the code is changed in place, renders without problems, and undo brings the old code back
+await page.click('#btnFullLog'); // off again
+await page.tap('#problemList .fix');
+assert.equal(await page.inputValue('#code'), gears.replace('radians(a)', 'a * PI / 180'));
+assert.ok(await page.$eval('#problemList .fix', b => b.disabled), 'disabled until the new render');
 st = await waitRendered();
 assert.doesNotMatch(st.text, /problem/); assert.doesNotMatch(st.cls, /warn|error/);
 assert.ok(await page.isHidden('#problems'));
+await page.focus('#code');
+await page.keyboard.press('Control+z');
+assert.equal(await page.inputValue('#code'), gears, 'undo after a fix');
+st = await waitRendered();
+assert.match(st.text, /1 problem$/);
+// Typed since the render: the fix refuses instead of changing the wrong place
+await page.evaluate(() => { const c = document.querySelector('#code'); c.value = '// new\n' + c.value; });
+await page.tap('#problemList .fix');
+await page.waitForFunction(() => /has changed/.test(document.querySelector('#partToast')?.textContent ?? ''));
+assert.match(await page.inputValue('#code'), /^\/\/ new\n/);
+assert.match(await page.inputValue('#code'), /radians\(a\)/);
 
 // A silent mistake: OpenSCAD renders rotate(PI/4) without a word (it turns 0.785°), the app's check
 // finds it and says so in the status bar and the text for the AI.
@@ -85,11 +101,15 @@ assert.match(st.text, /triangles · 1 problem$/, st.text);
 list = await rows();
 assert.match(list[0].text, /^Line 2rotate\(\) takes degrees, but this uses PI \(radians\)/);
 assert.match(list[0].text, /rotate\(\[0, 0, PI \/ 4\]\)$/);
-assert.equal(await page.isVisible('#log'), true, '"Full log" is still on');
+assert.equal(list[0].fix, 'Fixrotate([0, 0, 45]) cube([30, 4, 4]);');
 await page.click('#btnCopyProblems');
 await page.waitForTimeout(300);
 assert.match(await page.evaluate(() => navigator.clipboard.readText()), /\nLine 2: CHECK: rotate\(\) takes degrees, but this uses PI \(radians\): rotate\(90\), not rotate\(PI\/2\)\.\n {4}rotate\(\[0, 0, PI \/ 4\]\) cube\(\[30, 4, 4\]\);\n/);
 await page.screenshot({ path: `${out}/p-check.png` });
+await page.tap('#problemList .fix');
+st = await waitRendered();
+assert.equal(await page.inputValue('#code'), 'cube([30, 4, 4]);\nrotate([0, 0, 45]) cube([30, 4, 4]);\n');
+assert.doesNotMatch(st.text, /problem/);
 
 // A syntax error (+=): fails, the list says why
 await page.fill('#code', 'x = 1;\nx += 1;\ncube(x);\n');

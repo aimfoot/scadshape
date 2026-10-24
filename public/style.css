@@ -166,7 +166,7 @@ main { display: flex; min-height: 0; }
 .problems-head strong { flex: 1; font-size: 13px; }
 .problems-head button { min-height: 34px; min-width: 0; font-size: 13px; }
 #problemList { list-style: none; margin: 0; padding: 0 0 6px; }
-#problemList button {
+#problemList .row {
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 2px 8px;
@@ -179,7 +179,7 @@ main { display: flex; min-height: 0; }
   font-size: 13px;
   color: var(--text);
 }
-#problemList button:active { background: var(--accent-soft); }
+#problemList .row:active { background: var(--accent-soft); }
 #problemList .where { grid-row: span 2; font-weight: 600; color: var(--warn); white-space: nowrap; }
 #problemList .error .where { color: var(--err); }
 #problemList .note .where { color: var(--muted); }
@@ -187,6 +187,24 @@ main { display: flex; min-height: 0; }
 #problemList .raw { grid-column: 2 / 4; font: 11px/1.4 ui-monospace, "Roboto Mono", monospace; color: var(--muted); overflow-wrap: anywhere; }
 #problemList .count { color: var(--muted); font-size: 12px; white-space: nowrap; }
 #problemList .follow button { color: var(--muted); }
+/* Fix: the fixed line, under the problem it fixes. */
+#problemList .fix {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  min-height: 36px;
+  margin: -2px 12px 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+}
+#problemList .fix strong { color: var(--accent); white-space: nowrap; }
+#problemList .fix code { padding: 0; background: none; font: 12px/1.4 ui-monospace, "Roboto Mono", monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 @media (orientation: portrait) {
   main { flex-direction: column-reverse; }

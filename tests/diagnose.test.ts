@@ -8,6 +8,7 @@ import { setLang } from '../src/i18n';
 import { diagnose, problemsForAi } from '../src/diagnose';
 import { FONTS_CONF, fontsFor } from '../src/fonts';
 import { lint } from '../src/lint';
+import { applyFix } from '../src/fixes';
 import { aiPrompt, codeFromChat, looksLikeScad } from '../src/aiprompt';
 import { buildModel } from '../src/model3d';
 import { EXAMPLES, buildExample } from '../src/examples/models';
@@ -66,6 +67,36 @@ await test('the checks raise no false alarms on correct code', () => {
     ...readdirSync(`${process.env.ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')).map(f => `${process.env.ROOT}/tests/fixtures/${f}`)];
   for (const f of files) assert.deepEqual(lint(readFileSync(f, 'utf8')).map(p => `${p.line}: ${p.hint}`), [], f);
   for (const ex of EXAMPLES) assert.deepEqual(lint(buildModel(buildExample(ex.id)).code).map(p => p.hint), [], ex.id);
+});
+
+await test('fixes only where the change is clear, with the brackets the context needs', () => {
+  const unknownFn = (name: string, src: string) => diagnose([`WARNING: Ignoring unknown function '${name}' in file /in.scad, line 1`], src)[0].fix;
+  const fixed = (name: string, src: string) => { const f = unknownFn(name, src); return f ? applyFix(src, f) : null; };
+  assert.equal(fixed('radians', 'x = cos(radians(a));'), 'x = cos(a);');
+  assert.equal(fixed('radians', 'arc = r * radians(a + b);'), 'arc = r * (a + b) * PI / 180;');
+  assert.equal(fixed('radians', 'k = 1 / radians(a);'), 'k = 1 / (a * PI / 180);');
+  assert.equal(fixed('radians', 'v = [radians(a), sin(radians(b))];'), 'v = [a * PI / 180, sin(b)];');
+  assert.equal(fixed('radians', 'x = cos(radians(a) / 2);'), null); // half of what? left to the user
+  assert.equal(fixed('degrees', 'd = degrees(atan2(y, x)) + degrees(t);'), 'd = atan2(y, x) + t * 180 / PI;');
+  assert.equal(fixed('deg2rad', 'echo(str("a", deg2rad(30)));'), 'echo(str("a", 30 * PI / 180));');
+  // Library lines go after the other includes, or after the opening comment.
+  const inc = (name: string, src: string) => applyFix(src, diagnose([`WARNING: Ignoring unknown module '${name}' in file /in.scad, line 3`], src)[0].fix!);
+  assert.equal(inc('cuboid', '// Box\n// by AI\ncuboid(10);\n'), '// Box\n// by AI\ninclude <BOSL2/std.scad>\ncuboid(10);\n');
+  assert.equal(inc('spur_gear', 'include <BOSL2/std.scad>\n$fn = 64;\nspur_gear(mod = 2, teeth = 9);'), 'include <BOSL2/std.scad>\ninclude <BOSL2/gears.scad>\n$fn = 64;\nspur_gear(mod = 2, teeth = 9);');
+  assert.equal(inc('child', 'module m() child();\nmodule n() child(1);'), 'module m() children(0);\nmodule n() children(1);');
+  assert.equal(diagnose(['WARNING: Ignoring unknown module \'widht_box\' in file /in.scad, line 2'], 'module width_box() cube(1);\nwidht_box();')[0].fix, undefined);
+  // PI in angles: only where the angle is PI times something.
+  const deg = (src: string) => { const f = lint(src).find(p => p.fix)?.fix; return f ? applyFix(src, f) : null; };
+  assert.equal(deg('x = sin(PI / 2);'), 'x = sin(90);');
+  assert.equal(deg('x = cos(-PI/4);'), 'x = cos(-45);');
+  assert.equal(deg('x = sin(2 * PI * i / n);'), 'x = sin(2 * 180 * i / n);');
+  assert.equal(deg('x = sin(PI / 7);'), 'x = sin(180 / 7);');
+  assert.equal(deg('rotate(a = PI / 2, v = [1, 0, 0]) cube(1);'), 'rotate(a = 90, v = [1, 0, 0]) cube(1);');
+  assert.equal(deg('rotate([PI / 2, 0, t * PI]) cube(1);'), 'rotate([90, 0, t * 180]) cube(1);');
+  assert.equal(deg('x = sin(PI / 4 + a);'), null);
+  assert.equal(deg('x = sin(sqrt(PI));'), null);
+  assert.equal(deg('x = sin(PI * PI);'), null);
+  assert.equal(deg('// one\n%  translate([1, 0, 0]) cube(1);'), '// one\ntranslate([1, 0, 0]) cube(1);');
 });
 
 await test('the code is picked out of an AI chat answer', () => {
@@ -156,6 +187,16 @@ for (const f of readdirSync(dir).filter(x => x.endsWith('.scad')).sort()) {
     const hit = main.find(p => p.hint?.includes(expect));
     assert.ok(hit, `${main.map(p => `${p.line}: ${p.message} → ${p.hint}`).join(' | ')}`);
     assert.ok(hit.line !== null, `no line: ${hit.message}`);
+    // // fix: the fixed line(s) must contain this, and after the fix the problem is gone and it renders.
+    // Without it there must be no fix: a guess is left to the user.
+    const fix = /^\/\/ fix: (.+)$/m.exec(src)?.[1];
+    if (!fix) return assert.equal(hit.fix?.preview, undefined);
+    assert.ok(hit.fix?.preview.includes(fix), `fix: ${hit.fix?.preview}`);
+    const fixed = applyFix(src, hit.fix!);
+    const r = await run(fixed);
+    const same = (ps: typeof main) => ps.filter(p => !p.followUp && p.hint?.includes(expect)).length;
+    assert.ok(same(diagnose(r.log, fixed)) < same(main), `still there after the fix:\n${fixed}`);
+    assert.ok(shape(r.stl), `nothing rendered after the fix:\n${fixed}`);
   });
 }
 console.log(`${n} diagnose tests ok`);
