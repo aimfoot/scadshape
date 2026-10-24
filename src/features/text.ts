@@ -196,7 +196,8 @@ export function textSurface(f: TextFeature, sk: SketchFeature, doc: Doc, vars: V
  * Text on the round side of an extruded circle/arc that the sketch plane touches. The flat text is
  * laid along the circle (its x as arc length at the radius) in thin strips, each one a wedge
  * around the axis. A strip widens with the distance from the axis (linear_extrude's scale), so the
- * letters' sides point at the axis and neighbouring strips meet exactly.
+ * letters' sides point at the axis. Neighbouring wedges overlap by a hair: strips that only touch
+ * leave open edges and slivers along every seam (thin lines across the letters).
  */
 function wrapped(
   f: TextFeature, sk: SketchFeature, ctx: BuildCtx, fr: Frame, side: TangentSide,
@@ -237,7 +238,7 @@ function wrapped(
   const k0 = Math.max(-most, Math.floor(Math.min(...ss) / w + 0.5));
   const k1 = Math.min(most, Math.ceil(Math.max(...ss) / w - 0.5));
   const h = num(2 * Math.max(...ts.map(Math.abs)) + 2);
-  const deg = num((step * 180) / Math.PI), half = num((step * 90) / Math.PI);
+  const deg = num((step * 180) / Math.PI), half = num(((step / 2 + 0.001 / r) * 180) / Math.PI);
   const r9 = (x: number) => String(Math.round(x * 1e9) / 1e9).replace(/^-0$/, '0');
   const row = (i: number) => `[${r9(e1[i])}, ${r9(e2[i])}, ${r9(ax[i])}, ${r9(o0[i])}]`;
   const pts = o.at.map(p => `[${num(p.x)}, ${num(p.y)}]`).join(', ');

@@ -52,6 +52,18 @@ async function render(code: string) {
   return { min, max, vol, tri: m.triangles, pos: p };
 }
 
+/** Edges not shared by exactly two triangles (cracks that show as thin lines). */
+function openEdges(p: Float32Array) {
+  const key = (i: number) => `${p[i]},${p[i + 1]},${p[i + 2]}`;
+  const n = new Map<string, number>();
+  for (let i = 0; i < p.length; i += 9)
+    for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) {
+      const ka = key(i + a), kb = key(i + b), k = ka < kb ? ka + '|' + kb : kb + '|' + ka;
+      n.set(k, (n.get(k) ?? 0) + 1);
+    }
+  return [...n.values()].filter(c => c !== 2).length;
+}
+
 function pt(sk: SketchData, x: number, y: number) { const id = newId(sk, 'p'); sk.points[id] = { x, y }; return id; }
 function line(sk: SketchData, a: string, b: string) { const id = newId(sk, 'e'); sk.entities[id] = { type: 'line', p1: a, p2: b }; return id; }
 function rect(sk: SketchData, x0: number, y0: number, x1: number, y1: number) {
@@ -550,11 +562,14 @@ await test('text on a cylinder wall follows the round side (engraved and raised,
   const full = (await render(buildModel(doc).code.replace(/\/\/ Model[\s\S]*$/, 'extrude_1();'))).vol;
   let r = await render(m.code);
   near((full - r.vol) / area, 1, 0.05);
+  // The strips overlap a hair: where they only touched, every seam across a letter left open edges.
+  assert.equal(openEdges(r.pos), 0, 'engraved text on the wall is a closed mesh');
   // Raised: from inside the wall out to 1 mm outside it.
   tx.op = 'add'; tx.text = 'WIDE TEXT'; (await import('../src/features/text')).text.changed!(tx, 'op', ts);
   m = buildModel(doc); txt = radial((await render(m.code.replace(/\/\/ Model[\s\S]*$/, 'text_1();'))).pos);
   near(Math.max(...txt.map(q => q.rho)), 51, 0.02); assert.ok(Math.min(...txt.map(q => q.rho)) < 50 * Math.cos(Math.PI / 158));
   r = await render(m.code); near((r.vol - full) / area, 1, 0.05);
+  assert.equal(openEdges(r.pos), 0, 'raised text on the wall is a closed mesh');
   // A sketch beyond the cylinder's ends (the same plane) stays flat.
   ts.points[Object.keys(ts.points)[0]].y = 80; tx.size = '4';
   assert.doesNotMatch(buildModel(doc).code, /Around the round side/);
