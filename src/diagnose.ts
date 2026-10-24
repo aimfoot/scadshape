@@ -7,6 +7,7 @@
 import { fitsBed, meshSize, type Bed } from './bed';
 import { convertFix, includeFix, renameFix, type Fix } from './fixes';
 import { flatCeilings } from './ceilings';
+import { cutLine, type CutTest } from './cuts';
 import { midAirStarts } from './floating';
 import { overhangs } from './overhangs';
 import { FAMILIES } from './fonts';
@@ -270,6 +271,14 @@ export function meshProblems(positions: Float32Array, bed?: Bed): Problem[] {
     ? [row(`${dims(size)} mm`, t('mesh.tooBig', { size: dims(size), bed: dims([bed.w, bed.d, bed.h]) }))]
     : [];
   return [...big, ...mid, ...ceilings, ...over];
+}
+
+/** Cuts in difference() that touch nothing (cuts.ts): one row each, on their line when it can be told. */
+export function cutProblems(missed: CutTest[], src: string): Problem[] {
+  return missed.map(c => ({
+    severity: 'warn', message: c.what, line: cutLine(c, src), count: 1, followUp: false, check: true, mesh: true,
+    hint: t('dx.missedCut', { what: c.what }),
+  }));
 }
 
 /** The problems as text for an AI chat: OpenSCAD's messages with their lines of code. */

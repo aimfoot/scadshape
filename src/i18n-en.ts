@@ -280,6 +280,7 @@ export const en = {
   'lint.fnHigh': '$fn = {n} gives every circle {n} sides – slow, above all on a phone. 48–96 is usually enough for printing.',
   'lint.assembly': 'This looks like an assembly of {n} colored parts. The export is one body, so parts placed together are merged – export and print the parts one at a time (e.g. with a part = "…" variable).',
   'dx.overwritten': '{name} is set twice. OpenSCAD then uses the last value everywhere, also above it.',
+  'dx.missedCut': 'The cut {what} doesn\'t touch the shape it is cut from, so it removes nothing: it is outside the part or in an opening (such as the hole of a ring). Move it into the wall – e.g. start an engraving a little inside the surface and cut outward.',
   'dx.assertion': 'A check in the code or a library failed – the values given don\'t fit together.',
   'dx.assertionLib': 'A check inside {name}() failed – the values given don\'t fit together, or one it needs is missing. {name}() takes: {params}. Give the ones it needs by name.',
   'dx.notParamLib': '{name}() has no parameter "{arg}", so it is ignored. {name}() takes: {params}.',

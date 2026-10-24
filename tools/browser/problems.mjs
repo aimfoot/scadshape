@@ -126,6 +126,17 @@ await page.waitForTimeout(300);
 assert.match(await page.evaluate(() => navigator.clipboard.readText()), /\nCHECK: Something starts in mid-air at z = 35 mm \(x -12…12, y -12…12 mm\)/);
 await page.screenshot({ path: `${out}/p-floating.png` });
 
+// A cut that removes nothing (an AI's ring "engraved" outside its surface): found by an extra check
+// once the model stands still, and added to the list on its line.
+await page.fill('#code', readFileSync(new URL('../../tests/ai-mistakes/engrave-outside.scad', import.meta.url), 'utf8'));
+st = await waitRendered();
+assert.match(st.text, /triangles$/, st.text);
+await page.waitForFunction(() => /1 problem$/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
+list = await rows();
+assert.equal(list.length, 1);
+assert.match(list[0].text, /^Line 16The cut text\("love"\) doesn't touch the shape it is cut from, so it removes nothing/, list[0].text);
+await page.screenshot({ path: `${out}/p-cut.png` });
+
 // A syntax error (+=): fails, the list says why
 await page.fill('#code', 'x = 1;\nx += 1;\ncube(x);\n');
 st = await waitRendered();

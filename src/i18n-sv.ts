@@ -282,6 +282,7 @@ export const sv: Record<keyof typeof en, string> = {
   'lint.fnHigh': '$fn = {n} ger varje cirkel {n} sidor – långsamt, särskilt på en telefon. 48–96 räcker oftast för utskrift.',
   'lint.assembly': 'Det här ser ut som en hopmonterad modell med {n} färgade delar. Exporten blir en enda kropp, så delar som ligger ihop smälter samman – exportera och skriv ut delarna en i taget (t.ex. med en variabel part = "…").',
   'dx.overwritten': '{name} sätts två gånger. OpenSCAD använder då det sista värdet överallt, även ovanför.',
+  'dx.missedCut': 'Snittet {what} rör inte formen det skärs ur, så det tar inte bort något: det ligger utanför delen eller i en öppning (som hålet i en ring). Flytta in det i väggen – börja t.ex. en gravyr en bit innanför ytan och skär utåt.',
   'dx.assertion': 'En kontroll i koden eller ett bibliotek slog till – värdena passar inte ihop.',
   'dx.assertionLib': 'En kontroll i {name}() slog till – värdena passar inte ihop, eller så saknas ett som behövs. {name}() tar: {params}. Ge dem som behövs med namn.',
   'dx.notParamLib': '{name}() har ingen parameter "{arg}", så den ignoreras. {name}() tar: {params}.',

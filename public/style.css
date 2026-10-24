@@ -160,13 +160,15 @@ main { display: flex; min-height: 0; }
   color: var(--text);
   background: var(--panel);
 }
+/* OpenSCAD's own log: about three lines (scroll for more), so the code gets the room; "Full log" makes it taller. */
 #log {
-  max-height: 32%;
+  max-height: 4.4em;
   overflow: auto;
-  padding: 8px 12px;
+  overscroll-behavior: contain;
+  padding: 4px 12px;
   border-top: 1px solid var(--line);
   background: var(--sunken);
-  font: 12px/1.45 ui-monospace, "Roboto Mono", monospace;
+  font: 11px/1.4 ui-monospace, "Roboto Mono", monospace;
   white-space: pre-wrap;
   color: var(--muted);
 }
@@ -178,6 +180,7 @@ main { display: flex; min-height: 0; }
 #problems { max-height: 45%; overflow: auto; border-top: 1px solid var(--line); background: var(--sunken); }
 #problems[hidden] { display: none; }
 #codePanel.has-problems:not(.full-log) #log { display: none; }
+#codePanel.full-log #log { max-height: 32%; }
 .problems-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; position: sticky; top: 0; background: var(--sunken); }
 .problems-head strong { flex: 1; font-size: 13px; }
 .problems-head button { min-height: 34px; min-width: 0; font-size: 13px; }

@@ -6,7 +6,8 @@ import { sketchFrame } from '../frame';
 import { remoteLog } from '../remote';
 import { ScadEngine, RenderCancelled, logProblems, type RenderResult } from '../scad';
 import { sketchPolylines } from '../sketch3d';
-import { meshProblems } from '../diagnose';
+import { cutTests, missedCuts } from '../cuts';
+import { cutProblems, meshProblems, type Problem } from '../diagnose';
 import { parseBinaryStl } from '../stl';
 import { Viewer } from '../viewer';
 import { bedOf, fitsBed, meshSize, parseBedChoice } from '../bed';
@@ -40,7 +41,7 @@ const codePanel = $('#codePanel');
 export const renderOpts = { hideSketch: null as string | null, onRendered: [] as (() => void)[] };
 
 /** A finished render, kept so a new build volume can redo the problem list and the fit warning. */
-type Done = { head: string; errs: number; log: string[]; src: string; positions: Float32Array };
+type Done = { head: string; errs: number; log: string[]; src: string; positions: Float32Array; extra?: Problem[] };
 let doneStatus: (Done & { shown: string }) | null = null;
 
 export function setStatus(text: string, kind: '' | 'busy' | 'error' | 'warn' = '') {
@@ -55,13 +56,39 @@ export const currentBed = () => bedOf(parseBedChoice(store.get('bed')));
 /** The problem list (with the model's own: too big for the printer, mid-air …) and the status bar for a render with a model. */
 function showDone(d: Done) {
   const bed = currentBed();
-  const problems = showProblems(d.log, d.src, meshProblems(d.positions, bed));
+  const problems = showProblems(d.log, d.src, [...meshProblems(d.positions, bed), ...(d.extra ?? [])]);
   const probText = problems ? ` · ${problems === 1 ? t('status.problem1') : t('status.problems', { n: problems })}` : '';
   const fits = fitsBed(meshSize(d.positions), bed);
   const mm = (v: number) => String(Math.round(v * 10) / 10);
   const text = `${d.head}${probText}${fits ? '' : ` · ${t('bed.tooBig', { w: mm(bed.w), d: mm(bed.d), h: mm(bed.h) })}`}`;
   setStatus(text, d.errs ? 'error' : problems ? 'warn' : '');
   doneStatus = { ...d, shown: text };
+}
+
+// Cuts that remove nothing (cuts.ts): two more renders (the CSG export, then the test file), so they
+// run once the model has stood still a moment, and not after a slow render; their rows are added
+// to the list when they come.
+const CUT_DELAY = 1500, CUT_MAX_RENDER_MS = 3000;
+let cutTimer = 0, cutGen = 0;
+
+async function checkCuts(src: string) {
+  const gen = cutGen;
+  const fresh = () => gen === cutGen && !rendering && doneStatus?.src === src;
+  try {
+    const csg = await engine.render(src, 'csg');
+    if (!fresh() || !csg.ok || !csg.data) return;
+    const tests = cutTests(new TextDecoder().decode(csg.data));
+    if (!tests) return;
+    const r = await engine.render(tests.scad);
+    if (!fresh() || !r.ok || !r.data) return;
+    const missed = missedCuts(parseBinaryStl(r.data).positions, tests.tests);
+    if (missed.length && doneStatus) {
+      showDone({ ...doneStatus, extra: cutProblems(missed, src) });
+      remoteLog('missed-cuts', { n: missed.length });
+    }
+  } catch {
+    /* cancelled: a newer render wins */
+  }
 }
 
 /** A new build volume: redraw the plate, the problem list and the fit warning. */
@@ -127,6 +154,8 @@ export const isRendering = () => rendering;
 
 export function requestRender() {
   renderWanted = true;
+  clearTimeout(cutTimer);
+  cutGen++;
   if (!rendering) void renderLoop();
 }
 
@@ -211,6 +240,11 @@ async function renderOnce() {
   view.fitNext = false;
   // Rendered, but with problems (an unknown function leaves parts out without failing): say so.
   showDone({ head: `${fmtMs(r.renderMs)} · ${t('status.triangles', { n: fmtInt(mesh.triangles) })}${errText}`, errs, log: r.log, src, positions: mesh.positions });
+  // The user's own model is built from features, not written code: its cuts are not checked.
+  if (app.source !== 'model' && /\bdifference\s*\(/.test(src) && r.renderMs < CUT_MAX_RENDER_MS) {
+    clearTimeout(cutTimer);
+    cutTimer = window.setTimeout(() => void checkCuts(src), CUT_DELAY);
+  }
 }
 
 engine.onLoaded = ms => {

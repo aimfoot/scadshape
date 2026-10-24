@@ -12,7 +12,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
 import { aiPrompt, codeDescription, codeFromChat, looksLikeScad } from '../../src/aiprompt';
 import { scadToDoc, type ConvertEngine } from '../../src/convert/scad2doc';
-import { diagnose, meshProblems, problemsForAi, type Problem } from '../../src/diagnose';
+import { cutTests, missedCuts } from '../../src/cuts';
+import { cutProblems, diagnose, meshProblems, problemsForAi, type Problem } from '../../src/diagnose';
 import { setLang } from '../../src/i18n';
 import { parseBinaryStl } from '../../src/stl';
 
@@ -90,6 +91,15 @@ function judge(text: string) {
   return { fix, found };
 }
 
+/** Cuts that remove nothing, as the app checks them after a render (src/cuts.ts). */
+async function cutsMissed(code: string): Promise<Problem[]> {
+  const csg = await render(code, '/out.csg');
+  const tests = csg.data ? cutTests(new TextDecoder().decode(csg.data)) : null;
+  if (!tests) return [];
+  const r = await render(tests.scad, '/out.stl', ['--export-format=binstl', '--backend=manifold']);
+  return r.data && r.data.length > 84 ? cutProblems(missedCuts(parseBinaryStl(r.data.slice().buffer).positions, tests.tests), code) : [];
+}
+
 async function trial(n: number) {
   const request = requests[n - 1];
   const slug = request.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
@@ -124,7 +134,7 @@ async function trial(n: number) {
     const renderMs = Math.round(performance.now() - t0);
     writeFileSync(`${dir}/r${r}.log`, res.log.join('\n'));
     const mesh = res.data && res.data.length > 84 ? parseBinaryStl(res.data.slice().buffer) : null;
-    const problems = [...diagnose(res.log, code), ...(mesh ? meshProblems(mesh.positions, BED) : [])];
+    const problems = [...diagnose(res.log, code), ...(mesh ? [...meshProblems(mesh.positions, BED), ...(await cutsMissed(code))] : [])];
     const counted = problems.filter(p => !p.followUp && p.severity !== 'note');
     let checked = null;
     if (mesh) {

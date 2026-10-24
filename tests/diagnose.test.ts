@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { setLang } from '../src/i18n';
-import { diagnose, meshProblems, problemsForAi } from '../src/diagnose';
+import { cutProblems, diagnose, meshProblems, problemsForAi } from '../src/diagnose';
+import { cutTests, missedCuts } from '../src/cuts';
 import { midAirStarts } from '../src/floating';
 import { flatCeilings } from '../src/ceilings';
 import { overhangs } from '../src/overhangs';
@@ -147,7 +148,7 @@ walk(ROOT + '/vendor/libraries');
 async function log(src: string) {
   return (await run(src)).log;
 }
-async function run(src: string) {
+async function run(src: string, file = '/out.stl', format = 'binstl') {
   const out: string[] = [];
   const inst = await OpenSCAD({ noInitialRun: true, wasmBinary, print: (s: string) => out.push(s), printErr: (s: string) => out.push(s),
     preRun: [(m: { ENV: Record<string, string> }) => { m.ENV.OPENSCADPATH = '/libraries'; m.ENV.FONTCONFIG_FILE = '/fonts/fonts.conf'; }] });
@@ -156,10 +157,18 @@ async function run(src: string) {
   for (const f of fontsFor(src)) inst.FS.writeFile(`/fonts/${f}`, readFileSync(ROOT + '/public/fonts/' + f));
   inst.FS.writeFile('/fonts/fonts.conf', FONTS_CONF);
   inst.FS.writeFile('/in.scad', src);
-  try { inst.callMain(['/in.scad', '-o', '/out.stl', '--export-format=binstl', '--backend=manifold']); } catch (e) { out.push(String(e)); }
+  try { inst.callMain(['/in.scad', '-o', file, `--export-format=${format}`, '--backend=manifold']); } catch (e) { out.push(String(e)); }
   let stl: Uint8Array | null = null;
-  try { stl = inst.FS.readFile('/out.stl') as Uint8Array; } catch { /* nothing rendered */ }
+  try { stl = inst.FS.readFile(file) as Uint8Array; } catch { /* nothing rendered */ }
   return { log: out, stl };
+}
+/** The cuts in difference() that remove nothing (cuts.ts), as the app checks them: the CSG export, then one test render. */
+async function missed(src: string) {
+  const csg = (await run(src, '/out.csg', 'csg')).stl;
+  const t = csg ? cutTests(new TextDecoder().decode(csg)) : null;
+  if (!t) return [];
+  const r = await run(t.scad);
+  return r.stl ? missedCuts(parseBinaryStl(r.stl.slice().buffer).positions, t.tests) : [];
 }
 /** Triangles and size of a binary STL (or null). */
 function shape(stl: Uint8Array | null) {
@@ -193,7 +202,8 @@ await test('MCAD is in the app: its involute gear renders without problems', asy
 /** All problems the app shows: OpenSCAD's log, the checks of the code, and of the rendered model. */
 async function problems(src: string) {
   const r = await run(src);
-  return [...diagnose(r.log, src), ...(r.stl ? meshProblems(parseBinaryStl(r.stl.slice().buffer).positions) : [])];
+  if (!r.stl) return diagnose(r.log, src);
+  return [...diagnose(r.log, src), ...meshProblems(parseBinaryStl(r.stl.slice().buffer).positions), ...cutProblems(await missed(src), src)];
 }
 const floating = async (src: string) => {
   const stl = (await run(src)).stl;
@@ -291,6 +301,25 @@ await test('overhangs steeper than 45° are found; a 45° chamfer, a narrow ledg
   const expected: Record<string, string[]> = {};
   for (const f of readdirSync(`${ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')))
     assert.deepEqual(await found(readFileSync(`${ROOT}/tests/fixtures/${f}`, 'utf8')), expected[f] ?? [], f);
+});
+
+await test('cuts that remove nothing are found; real cuts, empty ones and 2D cuts are not', async () => {
+  const what = async (src: string) => (await missed(src)).map(c => c.what);
+  // Beside the part, and inside its hole; the hole itself is a real cut.
+  assert.deepEqual(await what('difference() { cube(10); translate([20, 0, 0]) cube(5); translate([2, 2, 2]) cube(3); }'), ['cube([5, 5, 5])']);
+  assert.deepEqual(await what('difference() { cylinder(d = 20, h = 5); translate([0, 0, -1]) cylinder(d = 16, h = 7); translate([0, 0, 2]) cylinder(d = 4, h = 5); }'), ['cylinder(d = 4, h = 5)']);
+  // Only touching a face removes nothing either.
+  assert.deepEqual(await what('difference() { cube(10); translate([10, 0, 0]) cube(5); }'), ['cube([5, 5, 5])']);
+  // A cut with no shape (a hole switched off with size 0), a cut in 2D before extruding, nested differences.
+  assert.deepEqual(await what('difference() { cube(10); cylinder(d = 0, h = 20); }'), []);
+  assert.deepEqual(await what('linear_extrude(5) difference() { square(10); translate([20, 0]) square(2); }'), []);
+  assert.deepEqual(await what('difference() { cube(20); difference() { translate([5, 5, 5]) cube(10); translate([40, 0, 0]) cube(1); } }'), ['cube([1, 1, 1])']);
+  // The line: the text's string, or the only call of the primitive.
+  const src = readFileSync(`${ROOT}/tests/ai-mistakes/engrave-outside.scad`, 'utf8');
+  assert.deepEqual(cutProblems(await missed(src), src).map(p => [p.line, p.message]), [[16, 'text("love")']]);
+  for (const f of readdirSync(`${ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')))
+    assert.deepEqual(await what(readFileSync(`${ROOT}/tests/fixtures/${f}`, 'utf8')), [], f);
+  for (const ex of EXAMPLES) assert.deepEqual(await what(buildModel(buildExample(ex.id)).code), [], ex.id);
 });
 
 await test('a model larger than the printer is a problem row (so "Copy for AI" says it), turned 90° if that fits', async () => {
