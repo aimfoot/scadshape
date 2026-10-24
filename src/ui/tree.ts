@@ -5,6 +5,7 @@ import { kindOf } from '../features';
 import { repeatDetail } from '../features/pattern';
 import { t } from '../i18n';
 import { PLANE_NAMES } from '../sketch/model';
+import { planeFrame } from '../frame';
 import { $, $$, el } from './dom';
 import { app, emit } from './state';
 
@@ -14,9 +15,13 @@ const SKETCH_ICON =
 /** What happens when a feature is tapped (set by main: sketch mode or the panel). */
 export const treeActions = { edit: (_f: Feature) => {} };
 
-/** The sketch's plane: "Top +t", "Front −20" or "Slanted face". */
+/** The sketch's plane: "Top +t", "Front −20", "Top, moved" (e.g. a lid beside its box) or "Slanted face". */
 export function planeLabel(f: SketchFeature): string {
-  if (f.face) return t('plane.slantedFace');
+  if (f.face) {
+    const pf = planeFrame(f.plane);
+    const same = (a: number[], b: number[]) => a.every((x, i) => Math.abs(x - b[i]) < 1e-9);
+    return same(f.face.u, pf.u) && same(f.face.v, pf.v) ? t('plane.moved', { plane: t(PLANE_NAMES[f.plane]) }) : t('plane.slantedFace');
+  }
   return t(PLANE_NAMES[f.plane]) + (f.offset && f.offset !== '0' ? (f.offset.startsWith('-') ? ` −${f.offset.slice(1)}` : ` +${f.offset}`) : '');
 }
 

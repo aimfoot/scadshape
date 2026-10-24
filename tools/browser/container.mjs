@@ -1,5 +1,5 @@
 // Container: template sketch when there is no sketch, lid choice, cancel removes the template, OK
-// gives two bodies.
+// puts the box's parts in the tree (extrudes, a lid beside it, threads), and text finds their faces.
 // node container.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
@@ -45,16 +45,19 @@ assert.ok(await page.isHidden('#fpError')); assert.ok(await page.isHidden('#fp-c
 await page.click('#fpCancel'); await page.waitForTimeout(300);
 assert.deepEqual((await S()).features, []);
 
-// 4. Again, with a lid, OK → sketch + container, two bodies in the code
+// 4. Again, with a lid, OK → the box's parts in the tree, shared sizes as variables
 await page.click('#btnContainer'); await page.waitForSelector('#featPanel:not([hidden])');
 await page.fill('#fp-height', '30'); await page.fill('#fp-cellsX', '3'); await page.fill('#fp-cellsY', '2'); await page.click('#fpOk');
 st = await waitRendered();
-assert.deepEqual(st.features, ['sketch', 'container']);
+assert.deepEqual(st.features, ['sketch', 'extrude', 'extrude', 'sketch', 'extrude', 'sketch', 'extrude', 'extrude', 'extrude']);
 assert.equal(st.errors.length, 0, st.errors.join());
 assert.match(st.status, /triangles/);
-const code = await page.evaluate(() => window.__scadshape.model.code);
-assert.match(code, /container_1\(\);[\s\S]*container_1_lid\(\);/);
-assert.equal((code.match(/cube\(/g) ?? []).length, 3, 'two dividers in X and one in Y');
+assert.match(await page.textContent('#partToast'), /6 parts/);
+const names = await page.evaluate(() => window.__scadshape.doc.features.map(f => f.name));
+assert.deepEqual(names.slice(1), ['Box', 'Cavity', 'Divider sketch', 'Dividers', 'Lid sketch', 'Lid', 'Lid lip', 'Inside of lip']);
+assert.deepEqual(await page.evaluate(() => window.__scadshape.doc.params.map(p => `${p.name}=${p.expr}`)), ['height=30', 'wall=2', 'floor=2', 'clearance=0,2', 'corner=4', 'lip=6']);
+const divs = await page.evaluate(() => Object.keys(window.__scadshape.doc.features[3].entities).length);
+assert.equal(divs, 12, 'two dividers in X and one in Y, 4 lines each');
 await page.screenshot({ path: `${out}/c-cells.png` });
 
 // 5. The template sketch is fully defined (black) and keeps its dimensions when solved
@@ -68,6 +71,53 @@ assert.deepEqual([...new Set(ed.xs)], [-40, 0, 40]);
 await page.screenshot({ path: `${out}/c-sketch.png` });
 await page.click('#btnDone'); st = await waitRendered();
 await page.screenshot({ path: `${out}/c-done.png` });
+const cdp = await ctx.newCDPSession(page);
+const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((p, i) => ({ x: p.x, y: p.y, id: i })) });
+const tapWorld = async (x, y, z) => {
+  const p = await page.evaluate(([x, y, z]) => window.__scadshape.viewer.screenOfWorld(x, y, z), [x, y, z]);
+  const r = await page.evaluate(() => document.querySelector('#viewport canvas').getBoundingClientRect().toJSON());
+  await touch('touchStart', [{ x: r.left + p.x, y: r.top + p.y }]); await touch('touchEnd', []);
+};
+
+// 6. Text on the box's front wall: it lands on the wall (a sketch on the Box's face), raised outwards
+await page.evaluate(v => { const w = window.__scadshape.viewer; w.setView(v); w.fit(); }, 'front');
+await page.click('#btnText'); await page.waitForSelector('#faceBar:not([hidden])');
+await tapWorld(0, -30, 15);
+await page.waitForSelector('#featPanel:not([hidden])');
+st = await waitRendered(); assert.equal(st.errors.length, 0, st.errors.join());
+const wall = await page.evaluate(() => { const s = window.__scadshape, sk = s.doc.features.find(g => g.id === s.panel.f.sketch); return { plane: sk.plane, offset: sk.offset, outward: sk.outward, dir: s.panel.f.direction }; });
+assert.deepEqual(wall, { plane: 'XZ', offset: '30', outward: 'normal', dir: 'normal' });
+await page.click('#fpOk'); st = await waitRendered(); assert.equal(st.errors.length, 0, st.errors.join());
+await page.screenshot({ path: `${out}/c-text.png` });
+console.log('text on the box wall ok');
+
+// 7. A jar with a screw lid (a new model): thread features; text on the jar's wall wraps around it
+if (await page.isHidden('#tree')) await page.click('#btnTree');
+await page.click('#btnProjects'); await page.waitForSelector('#projDlg[open]'); await page.click('#projNew');
+await page.click('#btnNewSketch'); await page.click('[data-plane="XY"]');
+await page.waitForFunction(() => window.__scadshape.editor?.solverReady, null, { timeout: 15000 });
+const C = p => page.evaluate(p => window.__scadshape.editor.clientPoint(p), p);
+const tapSk = async p => { const c = await C(p); await touch('touchStart', [c]); await touch('touchEnd', []); };
+await page.click('[data-tool="circle"]'); await tapSk({ x: 0, y: 0 }); await tapSk({ x: 25, y: 0 });
+await page.click('#btnDone'); await waitRendered();
+await page.click('#btnContainer'); await page.waitForSelector('#featPanel:not([hidden])');
+await page.click('#fp-lid [data-value="screw"]'); st = await waitRendered();
+assert.ok(await page.isHidden('#fpError'), await page.textContent('#fpError'));
+await page.click('#fpOk'); st = await waitRendered();
+assert.equal(st.errors.length, 0, st.errors.join());
+const jar = await page.evaluate(() => window.__scadshape.doc.features.slice(1).map(f => `${f.type}:${f.name}`));
+assert.deepEqual(jar, ['extrude:Box', 'thread:Thread', 'extrude:Cavity', 'extrude:Neck', 'sketch:Lid sketch', 'extrude:Lid', 'sketch:Grip sketch', 'extrude:Grip', 'thread:Lid thread']);
+await page.evaluate(v => { const w = window.__scadshape.viewer; w.setView(v); w.fit(); }, 'front');
+await page.click('#btnText'); await page.waitForSelector('#faceBar:not([hidden])');
+const R = await page.evaluate(() => { const c = Object.values(window.__scadshape.doc.features[0].entities)[0]; return c.r; });
+await tapWorld(0, -R, 12);
+await page.waitForSelector('#featPanel:not([hidden])');
+st = await waitRendered(); assert.equal(st.errors.length, 0, st.errors.join());
+assert.match(await page.evaluate(() => window.__scadshape.model.code), /Around the round side/);
+await page.fill('#fp-text', 'JAR'); await page.click('#fpOk'); st = await waitRendered();
+assert.equal(st.errors.length, 0, st.errors.join());
+await page.screenshot({ path: `${out}/c-jar.png` });
+console.log('screw jar as parts, text around its wall ok');
 
 await browser.close();
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');

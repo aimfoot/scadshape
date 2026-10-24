@@ -8,7 +8,7 @@ import { parseExpr } from './expr';
 import type { Vars } from './expr';
 import type { Vec } from './sketch/geom';
 import type { Plane } from './sketch/model';
-import { add, cross, dot, extrudeSpan, extrudeFace, scale, sketchFrame, sub, toPlane, toWorld, unit, type Frame, type V3 } from './frame';
+import { add, cross, dot, extrudeInset, extrudeSpan, extrudeFace, scale, sketchFrame, sub, toPlane, toWorld, unit, type Frame, type V3 } from './frame';
 import type { FaceRef } from './features/common';
 import type { ExtrudeFeature } from './features/extrude';
 import { arcGeom } from './sketch/model';
@@ -378,7 +378,7 @@ export function findFaceRef(doc: Doc, vars: Vars, n: V3, p: V3): FaceRef | null 
     const fs = sketchFrame(sk, vars, doc);
     const keys: { entity?: string; cap?: 'lo' | 'hi' }[] = [{ cap: 'lo' }, { cap: 'hi' }, ...Object.keys(sk.entities).map(entity => ({ entity }))];
     for (const key of keys) {
-      const g = extrudeFace(fs, sk, span, key);
+      const g = extrudeFace(fs, sk, span, key, extrudeInset(f, vars));
       if (!g) continue;
       const d = dot(g.n, n);
       if (Math.abs(d) < 0.9999) continue;
@@ -421,7 +421,10 @@ function curveSide(sk: SketchFeature, f: ExtrudeFeature, entity: string, vars?: 
   const e = sk.entities[entity];
   const span = extrudeSpan(f, vars);
   if (!e || e.construction || e.type === 'line' || !span) return null;
-  if (e.type === 'circle') return { sketch: sk, c: sk.points[e.c], r: e.r, a0: 0, sweep: 2 * Math.PI, span, fn: e.fn };
+  // A profile offset moves a circle's side out (or in); an arc's side then no longer has its ends.
+  const inset = extrudeInset(f, vars);
+  if (e.type === 'circle') return e.r + inset > 0 ? { sketch: sk, c: sk.points[e.c], r: e.r + inset, a0: 0, sweep: 2 * Math.PI, span, fn: inset ? undefined : e.fn } : null;
+  if (inset) return null;
   const g = arcGeom(sk, e);
   return { sketch: sk, c: g.c, r: g.r, a0: g.a0, sweep: g.sweep, span };
 }

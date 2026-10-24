@@ -41,7 +41,7 @@ assert.ok(await card(), 'Get started shows the card');
 assert.ok(await page.isHidden('#tree'), 'the drawer closes');
 
 // 4. Every example becomes a new model, without errors, and the card disappears.
-const want = { 'Box with lid': ['sketch', 'container'], 'Mounting plate': ['sketch', 'extrude', 'sketch', 'hole'], Sign: ['sketch', 'extrude', 'sketch', 'text'], Cup: ['sketch', 'revolve'] };
+const want = { 'Box with lid': ['sketch', 'extrude', 'extrude', 'sketch', 'extrude', 'extrude', 'extrude'], 'Mounting plate': ['sketch', 'extrude', 'sketch', 'hole'], Sign: ['sketch', 'extrude', 'sketch', 'text'], Cup: ['sketch', 'revolve'] };
 for (const [i, name] of Object.keys(want).entries()) {
   if (!(await card())) { await page.click('#btnTree'); await page.click('#btnStart'); }
   const before = await doc();
@@ -73,8 +73,9 @@ assert.deepEqual(await page.$$eval('#startExamples b', bs => bs.map(b => b.textC
 const before = await doc();
 await page.click('#startExamples button >> nth=0');
 await page.waitForFunction(b => window.__scadshape.doc !== b, before);
-assert.deepEqual(await page.evaluate(() => window.__scadshape.doc.params.map(p => p.name)), ['bredd', 'djup', 'höjd']);
-console.log('swedish: Låda med lock · bredd, djup, höjd');
+assert.deepEqual(await page.evaluate(() => window.__scadshape.doc.params.map(p => p.name)), ['bredd', 'djup', 'höjd', 'vägg', 'botten', 'spel', 'hörn', 'kant']);
+assert.deepEqual(await page.evaluate(() => window.__scadshape.doc.features.slice(1).map(f => f.name)), ['Låda', 'Urholkning', 'Skiss lock', 'Lock', 'Lockkant', 'Lockkantens insida']);
+console.log('swedish: Låda med lock · bredd, djup, höjd + the parts\' shared sizes; Swedish part names');
 
 await browser.close();
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');

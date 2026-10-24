@@ -16,6 +16,8 @@ page.on('dialog', d => d.accept());
 await page.route('**/api/**', r => r.fulfill({ status: 204 }));
 const feats = () => page.evaluate(() => window.__scadshape.doc.features.map(f => f.type));
 const sourceName = () => page.evaluate(() => document.querySelector('#source option[value=model]').textContent);
+/** The default container's parts: box, cavity, lid sketch, lid, lip, inside of the lip. */
+const BOX = ['sketch', 'extrude', 'extrude', 'sketch', 'extrude', 'extrude', 'extrude'];
 const openDrawer = async () => { if (await page.isHidden('#tree')) await page.click('#btnTree'); };
 
 // 1. A document from before (one key, scadshape.doc) → the model "My model"
@@ -34,7 +36,7 @@ await page.evaluate(async () => {
 });
 await page.reload();
 await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
-assert.deepEqual(await feats(), ['sketch', 'container']);
+assert.deepEqual(await feats(), BOX);
 assert.equal(await page.evaluate(() => localStorage.getItem('scadshape.doc') ?? window.__scadshape.storage.get('scadshape.doc')), null, 'old key removed');
 assert.equal(await sourceName(), 'My model');
 await openDrawer();
@@ -53,7 +55,7 @@ await page.screenshot({ path: `${out}/m-list.png` });
 // 3. Back to the first model
 await page.locator('#projList .projopen', { hasText: /^My model/ }).click();
 await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
-assert.deepEqual(await feats(), ['sketch', 'container']); assert.equal(await sourceName(), 'My model');
+assert.deepEqual(await feats(), BOX); assert.equal(await sourceName(), 'My model');
 
 // 4. Save as a file and open it again → new model "My model 2"? no: the name no longer exists → "My
 // model 2"
@@ -64,7 +66,7 @@ const path = `${out}/${dl.suggestedFilename()}`; await dl.saveAs(path);
 assert.equal(JSON.parse(readFileSync(path, 'utf8')).format, 'scadshape');
 await page.setInputFiles('#projFile', path);
 await page.waitForFunction(() => document.querySelector('#source option[value=model]').textContent === 'My model 2');
-assert.deepEqual(await feats(), ['sketch', 'container']);
+assert.deepEqual(await feats(), BOX);
 
 // 5. Delete Jar; three → two models left. The export's file name = the model's name.
 await openDrawer(); await page.click('#btnProjects');

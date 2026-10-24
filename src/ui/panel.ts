@@ -4,6 +4,7 @@
 import { activeCount, dependents, insertFeature, newFeature, newSketch, removeFeature, usableSketches, type Doc, type SketchFeature, type SolidFeature } from '../doc';
 import { KINDS, kindOf, type Field } from '../features';
 import { containerTemplate } from '../features/container';
+import { applyContainer } from '../containerparts';
 import { WORLD_SKETCH } from '../features/code';
 import { REPEAT_FIELDS, repeatCircles, repeatDefaults } from '../features/pattern';
 import { t } from '../i18n';
@@ -519,6 +520,16 @@ export function initPanel() {
   $('#fpOk').addEventListener('click', () => {
     if (!panel) return;
     const f = panel.f;
+    if (f.type === 'container') {
+      // The container goes into the tree as its parts (body, cavity, lid, threads …).
+      const r = applyContainer(app.doc, f);
+      if ('error' in r) return showToast(r.error, 'error');
+      remoteLog('feature-ok', { type: f.type, existing: !!panel.existing, parts: r.parts.length });
+      closePanel();
+      emit('docChanged');
+      showToast(t('toast.containerParts', { n: r.parts.filter(g => g.type !== 'sketch').length }));
+      return;
+    }
     if (panel.existing) Object.assign(panel.existing, f);
     else insertFeature(app.doc, f);
     remoteLog('feature-ok', { type: f.type, existing: !!panel.existing, error: buildModel(app.doc).errors.get(f.id) });

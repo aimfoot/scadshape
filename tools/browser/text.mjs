@@ -49,7 +49,7 @@ await page.screenshot({ path: `${out}/x-text-orbitron.png` });
 await page.click('#fp-op [data-value="remove"]');
 assert.equal(await page.getAttribute('#fp-direction [data-value="reverse"]', 'aria-pressed'), 'true');
 await page.click('#fpOk'); st = await waitRendered();
-assert.deepEqual(st.features, ['sketch', 'container', 'sketch', 'text']); assert.equal(st.errors.length, 0, st.errors.join());
+assert.deepEqual(st.features, ['sketch', 'extrude', 'extrude', 'sketch', 'text']); assert.equal(st.errors.length, 0, st.errors.join());
 if (await page.isHidden('#tree')) await page.click('#btnTree');
 assert.match(await page.textContent('#featureList'), /”Screws M3” · 8 mm · engraved/);
 await browser.close();

@@ -14,6 +14,10 @@ export interface ExtrudeFeature extends FeatureBase {
   op: Op;
   /** Radius for the profile's corners (vertical edges); empty/0 = sharp. */
   radius?: string;
+  /** Grow (positive) or shrink (negative) the profile by this much (mm), e.g. a box's inside. */
+  inset?: string;
+  /** Where the extrude starts, mm along the normal from the sketch plane. */
+  start?: string;
   /** Edge shape at the ends. */
   edge?: 'none' | 'fillet' | 'chamfer';
   edgeSize?: string;
@@ -73,8 +77,10 @@ export const extrude: FeatureKind<ExtrudeFeature> = {
         { value: 'intersect', label: 'op.intersect' },
       ],
     },
+    { kind: 'expr', key: 'start', label: 'field.start', unit: 'mm' },
     { kind: 'heading', label: 'edge.title' },
     { kind: 'expr', key: 'radius', label: 'field.cornerRadius', unit: 'mm' },
+    { kind: 'expr', key: 'inset', label: 'field.profileOffset', unit: 'mm' },
     {
       kind: 'choice',
       key: 'edge',
@@ -99,14 +105,15 @@ export const extrude: FeatureKind<ExtrudeFeature> = {
 
   create: (id, name, sk) => ({
     type: 'extrude', id, name, sketch: sk.id, regions: null, depth: '10', direction: outwardOf(sk), op: 'add',
-    radius: '0', edge: 'none', edgeSize: '1', edgeWhere: 'far',
+    radius: '0', inset: '0', start: '0', edge: 'none', edgeSize: '1', edgeWhere: 'far',
   }),
 
   detail: f => {
     const dir = f.direction === 'symmetric' ? ' ↕' : f.direction === 'reverse' ? ' ↓' : '';
     const edge = f.edge && f.edge !== 'none' ? ` · ${t(f.edge === 'fillet' ? 'edge.filletShort' : 'edge.chamferShort')} ${f.edgeSize}` : '';
+    const inset = f.inset && f.inset !== '0' ? ` · ${t('field.profileOffset').toLowerCase()} ${f.inset}` : '';
     const op = f.op === 'add' ? '' : ` · ${t(OP_LABEL[f.op]).toLowerCase()}`;
-    return `${f.depth} mm${dir}${edge}${op}`;
+    return `${f.depth} mm${dir}${inset}${edge}${op}`;
   },
 
   usable: () => true,
@@ -123,6 +130,8 @@ export const extrude: FeatureKind<ExtrudeFeature> = {
     const r = new FieldReader(ctx);
     const h = r.positive(t('field.depth'), f.depth);
     const rad = r.read(t('field.cornerRadius'), f.radius || '0', v => v >= 0, t('err.notNegative'));
+    const inset = r.read(t('field.profileOffset'), f.inset || '0');
+    const start = r.read(t('field.start'), f.start || '0');
     const edge = f.edge ?? 'none';
     const e = edge === 'none' ? null : r.positive(t('edge.size'), f.edgeSize ?? '');
     if (r.error) return { error: r.error };
@@ -131,16 +140,19 @@ export const extrude: FeatureKind<ExtrudeFeature> = {
     const shape = selectedRegionsScad(loops, regions, sel, '    ')!;
     const m = ctx.module;
     // Corner radius: round both convex and concave corners.
-    const profile =
+    const rounded =
       rad.v > 0
         ? `  offset(r = ${rad.code}, $fn = ${fnFor(2 * rad.v)}) offset(delta = -${rad.code}) offset(r = -${rad.code}, $fn = ${fnFor(2 * rad.v)}) offset(delta = ${rad.code}) {\n${shape}\n  }`
         : `  union() {\n${shape}\n  }`;
+    // Profile offset: the corners keep the radius (minus a shrink) and inner corners get rounded.
+    const profile = inset.v ? `  offset(r = ${inset.code}, $fn = ${fnFor(2 * Math.max(rad.v, Math.abs(inset.v)))})\n${rounded}` : rounded;
     const body = e && edge !== 'none' ? edgedBody(`${m}_profile()`, h, edge, e.v, where !== 'far', where !== 'near') : `linear_extrude(height = ${h.code}) ${m}_profile();`;
     const dir = f.direction === 'symmetric' ? `translate([0, 0, -${h.code} / 2]) ` : f.direction === 'reverse' ? 'mirror([0, 0, 1]) ' : '';
+    const at = start.v ? `translate([0, 0, ${start.code}]) ` : '';
     // Outwards from a round face: extend in to the surface (the seat) so there is no gap.
     const seat = f.op === 'add' && sk.seat && f.direction === outwardOf(sk) ? sk.seat : 0;
     const solid = seat ? `union() {\n    ${body}\n    translate([0, 0, -${num(seat)}]) linear_extrude(height = ${num(seat + 0.01)}) ${m}_profile();\n  }` : body;
-    const code = `module ${m}_profile() {\n${profile}\n}\nmodule ${m}() {\n  ${ctx.place(sk)}${dir}${solid}\n}`;
+    const code = `module ${m}_profile() {\n${profile}\n}\nmodule ${m}() {\n  ${ctx.place(sk)}${at}${dir}${solid}\n}`;
     return { code, tools: [{ op: f.op, call: `${m}();` }] };
   },
 };

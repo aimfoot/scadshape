@@ -83,9 +83,13 @@ export function faceAxes(n: V3): { u: V3; v: V3 } {
 /** The extrude's extent along the sketch normal [wa, wb], or null if the depth is invalid. */
 export function extrudeSpan(f: ExtrudeFeature, vars?: Vars): [number, number] | null {
   const h = parseExpr(f.depth, vars).value;
-  if (h === null || !(h > 0)) return null;
-  return f.direction === 'reverse' ? [-h, 0] : f.direction === 'symmetric' ? [-h / 2, h / 2] : [0, h];
+  const s = f.start ? parseExpr(f.start, vars).value : 0;
+  if (h === null || !(h > 0) || s === null) return null;
+  return f.direction === 'reverse' ? [s - h, s] : f.direction === 'symmetric' ? [s - h / 2, s + h / 2] : [s, s + h];
 }
+
+/** The extrude's profile offset (mm), 0 if it is missing or invalid. */
+export const extrudeInset = (f: ExtrudeFeature, vars?: Vars) => (f.inset ? (parseExpr(f.inset, vars).value ?? 0) : 0);
 
 export interface ExtrudeFace {
   /** Normal (unsigned, i.e. before FaceRef.sign). */
@@ -96,12 +100,12 @@ export interface ExtrudeFace {
   point: V3;
 }
 
-/** The geometry of a face on an extrude, in the world. */
-export function extrudeFace(fs: Frame, sk: SketchFeature, span: [number, number], key: { entity?: string; cap?: 'lo' | 'hi' }): ExtrudeFace | null {
+/** The geometry of a face on an extrude, in the world. inset: the profile offset (side faces from lines are then elsewhere). */
+export function extrudeFace(fs: Frame, sk: SketchFeature, span: [number, number], key: { entity?: string; cap?: 'lo' | 'hi' }, inset = 0): ExtrudeFace | null {
   const [wa, wb] = span;
   if (key.cap) return { n: fs.n, point: add(fs.o, scale(fs.n, key.cap === 'lo' ? wa : wb)) };
   const e = key.entity ? sk.entities[key.entity] : undefined;
-  if (!e || e.type !== 'line' || e.construction) return null;
+  if (!e || e.type !== 'line' || e.construction || inset) return null;
   const p1 = sk.points[e.p1], p2 = sk.points[e.p2];
   if (!p1 || !p2) return null;
   const A = toWorld(fs, p1), B = toWorld(fs, p2);
@@ -144,6 +148,6 @@ function resolveFaceRef(doc: Doc, sk: SketchFeature, vars: Vars | undefined, dep
   if (!parent || parent.suppressed) return null;
   const span = extrudeSpan(f, vars);
   if (!span) return null;
-  const g = extrudeFace(sketchFrame(parent, vars, doc, depth + 1), parent, span, ref);
+  const g = extrudeFace(sketchFrame(parent, vars, doc, depth + 1), parent, span, ref, extrudeInset(f, vars));
   return g ? extrudeFaceFrame(g, ref.sign) : null;
 }

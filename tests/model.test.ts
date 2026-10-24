@@ -764,6 +764,64 @@ await test('container with snap lid: the bead fits in the groove, and without a 
   c.snapDepth = '0,6'; c.lipHeight = '2'; assert.match(buildModel(doc).errors.get(c.id)!, /too low/);
 });
 
+/** The model expression (after "// Model") of the document with only some solid features on. */
+function modelOf(doc: Doc, keep: (f: Doc['features'][number]) => boolean) {
+  const d: Doc = JSON.parse(JSON.stringify(doc));
+  for (const f of d.features) if (f.type !== 'sketch' && !keep(f)) f.suppressed = true;
+  return buildModel(d).code.replace(/^[\s\S]*\/\/ Model\n/, '');
+}
+await test('container panel → parts: the same body as the container, threads and lid as ordinary features', async () => {
+  const { applyContainer } = await import('../src/containerparts');
+  const { containerTemplate, container } = await import('../src/features/container');
+  const cases: [string, (doc: Doc) => { s: ReturnType<typeof newSketch> }][] = [
+    ['none', doc => { const s = newSketch(doc, 'XY'); insertFeature(doc, s); containerTemplate(s); return { s }; }],
+    ['lip', doc => { const s = newSketch(doc, 'XY'); insertFeature(doc, s); containerTemplate(s); return { s }; }],
+    ['snap', doc => { const s = newSketch(doc, 'XY'); insertFeature(doc, s); containerTemplate(s); return { s }; }],
+    ['screw', doc => { const s = newSketch(doc, 'XY'); insertFeature(doc, s); circle(s, 0, 0, 25); return { s }; }],
+  ];
+  for (const [lid, mk] of cases) {
+    const doc = emptyDoc(); const { s } = mk(doc);
+    const c = newFeature(doc, 'container', s); c.lid = lid as typeof c.lid; container.changed!(c, 'lid', s);
+    if (lid === 'none') { c.cellsX = '3'; c.cellsY = '2'; }
+    if (lid === 'lip') { c.cellsX = '2'; }
+    insertFeature(doc, c);
+    const before = await render(buildModel(doc).code);
+    const r = applyContainer(doc, c);
+    assert.ok(!('error' in r), JSON.stringify(r));
+    assert.ok(!doc.features.some(f => f.type === 'container'));
+    const m = buildModel(doc); assert.equal(m.errors.size, 0, [...m.errors.values()].join());
+    const after = await render(m.code);
+    console.log(`   ${lid}: ${doc.features.map(f => f.name).join(', ')} · variables ${doc.params.map(q => `${q.name}=${q.expr}`).join(' ')}`);
+    console.log(`   ${lid}: volume ${before.vol.toFixed(1)} → ${after.vol.toFixed(1)}`);
+    assert.deepEqual(box(after).map(Math.round), box(before).map(Math.round));
+    near(after.vol, before.vol, before.vol * 0.002);
+    // The variables tie the parts together: a taller box keeps an open top and a lid that fits.
+    if (lid === 'lip') {
+      doc.params.find(q => q.name === 'height')!.expr = '50';
+      const tall = await render(buildModel(doc).code);
+      near(tall.max[2], 50, 1e-3);
+      near(tall.vol - after.vol, 10 * (roundedRect(80, 60, 4) - roundedRect(76, 56, 2) + 2 * 56), 2); // walls + the divider
+    }
+    if (lid === 'snap') {
+      // The lid put on the box: the bead lies in the groove (only the layers' steps can touch).
+      const lidSk = doc.features.find(f => f.name === 'Lid sketch')!.id;
+      const onLid = (f: Doc['features'][number]) => f.type !== 'sketch' && f.sketch === lidSk;
+      const mod = m.code.replace(/\/\/ Model[\s\S]*$/, '');
+      const fit = await volOrZero(`${mod}\nintersection() {\n${modelOf(doc, f => !onLid(f))}\n  translate([0, 0, 42]) rotate([180, 0, 0]) translate([-90, 0, 0]) {\n${modelOf(doc, onLid)}\n  }\n}`);
+      assert.ok(fit < 1, `overlap with groove: ${fit}`);
+    }
+    if (lid === 'screw') {
+      assert.deepEqual(doc.features.filter(f => f.type === 'thread').map(f => f.type === 'thread' && f.mode), ['external', 'internal']);
+      // Text sketched against the jar's wall wraps around it (it finds the body extrude).
+      const side = newSketch(doc, 'XZ'); side.offset = '25'; side.outward = 'normal'; insertFeature(doc, side);
+      const p = pt(side, 0, 20); side.points[p].standalone = true;
+      const tx = newFeature(doc, 'text', side); insertFeature(doc, tx);
+      const mt = buildModel(doc); assert.equal(mt.errors.size, 0, [...mt.errors.values()].join());
+      assert.match(mt.code, /Around the round side \(r = 25\)/);
+    }
+  }
+});
+
 await test('snap hook and catch: volumes, direction and strain', async () => {
   const { snapStrain } = await import('../src/features/snap');
   const vars = evalParams([]).vars;

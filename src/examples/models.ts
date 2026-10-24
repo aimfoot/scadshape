@@ -3,6 +3,7 @@
 // variable names follow the language (bredd/width …).
 
 import { emptyDoc, insertFeature, newFeature, newSketch, type Doc } from '../doc';
+import { applyContainer } from '../containerparts';
 import { applyHoleSize } from '../features/hole';
 import type { SketchFeature } from '../features/common';
 import { getLang, type Key } from '../i18n';
@@ -76,7 +77,8 @@ export function buildExample(id: ExampleId): Doc {
       doc.params = [{ name: v.width, expr: '80' }, { name: v.depth, expr: '50' }, { name: v.height, expr: '35' }];
       const { sk, s } = sketch(doc);
       s.centeredRect(80, 50, v.width, v.depth);
-      insertFeature(doc, Object.assign(newFeature(doc, 'container', sk), { height: v.height, lid: 'lip' as const, radius: '4' }));
+      // The container panel's result: the box as its parts.
+      applyContainer(doc, Object.assign(newFeature(doc, 'container', sk), { height: v.height, lid: 'lip' as const, radius: '4' }));
       break;
     }
     case 'plate': {
