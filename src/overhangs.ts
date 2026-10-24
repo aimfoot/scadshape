@@ -3,7 +3,9 @@
 // the mesh: triangles above the bed whose normal points down between 46° and nearly flat (flat ones
 // are bridges, ceilings.ts), joined where they share a corner. A narrow ledge prints with little
 // droop, so one only counts when it reaches out 2 mm or more: twice its area seen from below over
-// its outline seen from below (a strip's width).
+// its outline seen from below (a strip's width). Screw thread flanks (ISO: 60° from upright) print
+// fine without support: a flank goes all the way round and climbs, so it is taller than it is deep,
+// while a ring sticking out more steeply than 45° (a flared rim) is always deeper than it is tall.
 
 import { weld } from './floating';
 
@@ -28,6 +30,26 @@ const MIN_REACH = 2;
 const MIN_AREA = 1;
 /** A triangle no higher than this (mm) above the bottom lies on the bed. */
 const ON_BED = 0.01;
+/** Thread flanks: no steeper than this (degrees from upright: ISO 60° with room for facets), no deeper than THREAD_DEPTH (mm). */
+const THREAD_ANGLE = 65;
+const THREAD_DEPTH = 4;
+
+/** Does an overhang look like a screw thread's flank: all the way round a vertical axis, shallow, and taller than deep? */
+function threadFlank(pos: Float32Array, tris: number[], min: number[], max: number[], angle: number) {
+  if (angle > THREAD_ANGLE) return false;
+  const cx = (min[0] + max[0]) / 2, cy = (min[1] + max[1]) / 2;
+  const bins = new Uint8Array(36);
+  let rmin = Infinity, rmax = 0;
+  for (const t of tris)
+    for (let k = 0; k < 9; k += 3) {
+      const x = pos[t * 9 + k] - cx, y = pos[t * 9 + k + 1] - cy, r = Math.hypot(x, y);
+      rmin = Math.min(rmin, r);
+      rmax = Math.max(rmax, r);
+      bins[Math.min(35, Math.floor(((Math.atan2(y, x) + Math.PI) / (2 * Math.PI)) * 36))] = 1;
+    }
+  const depth = rmax - rmin;
+  return bins.every(b => b) && depth <= THREAD_DEPTH && max[2] - min[2] > depth;
+}
 
 export function overhangs(pos: Float32Array): Overhang[] {
   const n = pos.length / 9;
@@ -108,7 +130,9 @@ export function overhangs(pos: Float32Array): Overhang[] {
     }
     const reach = outline ? (2 * below) / outline : 0;
     if (reach < MIN_REACH) continue;
-    out.push({ min, max, area: total, angle: (Math.asin(Math.min(1, steepest)) * 180) / Math.PI, reach });
+    const angle = (Math.asin(Math.min(1, steepest)) * 180) / Math.PI;
+    if (threadFlank(pos, list.map(i => tris[i]), min, max, angle)) continue;
+    out.push({ min, max, area: total, angle, reach });
   }
   return out.sort((a, b) => b.area - a.area);
 }

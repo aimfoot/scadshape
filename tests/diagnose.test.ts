@@ -271,6 +271,12 @@ await test('overhangs steeper than 45° are found; a 45° chamfer, a narrow ledg
   // A block standing on an edge: both faces under it at 45° print; tipped further, the far one does not.
   assert.deepEqual(await found('rotate([0, 45, 0]) cube([10, 20, 10]);'), []);
   assert.deepEqual(await found('rotate([0, 60, 0]) cube([10, 20, 10]);'), ['z -9…-4 60° reach 6']);
+  // Thread flanks (60°) print without support, inside and out (AI trial: a jar lid's thread); a rim
+  // flaring out at 60° all round does not.
+  const thread = 'include <BOSL2/std.scad>\ninclude <BOSL2/threading.scad>\n';
+  assert.deepEqual(await found(`${thread}threaded_rod(d = 40, l = 20, pitch = 4, anchor = BOT, $fn = 64);`), []);
+  assert.deepEqual(await found(`${thread}difference() { cyl(d = 60, h = 20, anchor = BOT); up(2) threaded_rod(d = 40, l = 20, pitch = 4, internal = true, anchor = BOT, $fn = 64); }`), []);
+  assert.deepEqual(await found('cylinder(h = 10, r = 10, $fn = 64); translate([0, 0, 10]) cylinder(h = 3, r1 = 10, r2 = 10 + 3 * tan(60), $fn = 64);'), ['z 10…13 60° reach 5']);
   for (const ex of EXAMPLES) assert.deepEqual(await found(buildModel(buildExample(ex.id)).code), [], ex.id);
   const expected: Record<string, string[]> = {};
   for (const f of readdirSync(`${ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')))

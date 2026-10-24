@@ -22,7 +22,8 @@ const MODEL = process.env.MODEL ?? 'haiku';
 const ROUNDS = Number(process.env.ROUNDS ?? 3); // answers to problems after the first
 const PARALLEL = Number(process.env.PARALLEL ?? 4);
 const VERSION = 'OpenSCAD 2026.10.15';
-const requests: string[] = JSON.parse(readFileSync(`${ROOT}/tools/aitrial/requests.json`, 'utf8'));
+const REQUESTS = process.env.REQUESTS ?? `${ROOT}/tools/aitrial/requests.json`; // a JSON list of strings
+const requests: string[] = JSON.parse(readFileSync(REQUESTS, 'utf8'));
 const pick = process.argv.slice(2).map(Number); // 1-based numbers of the requests to run (all without)
 
 interface RenderOut { rc: number; log: string[]; data: Uint8Array | null; timeout?: boolean }

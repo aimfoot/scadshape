@@ -8,10 +8,13 @@ the app's problem list and "Copy for AI" text get them fixed, and what the check
 node tools/aitrial/run.mjs            # all requests in requests.json
 node tools/aitrial/run.mjs 2 17       # only requests 2 and 17
 MODEL=sonnet ROUNDS=2 PARALLEL=2 node tools/aitrial/run.mjs
+REQUESTS=$PWD/tools/aitrial/requests-hard.json OUT=$PWD/tools/aitrial/out/hard node tools/aitrial/run.mjs
 node tools/browser/aitrial-sheet.mjs  # contact sheets of the results
 ```
 
-The last five requests in `requests.json` are in Swedish on purpose: users write in their own language.
+The last five requests in `requests.json` and `requests-hard.json` are in Swedish on purpose: users
+write in their own language. `requests-hard.json` asks for more: parts that must fit together
+(clearances, threads, snap fits, print-in-place joints), shapes that invite overhangs, and big parts.
 
 Per request: the prompt from "Copy prompt" (A1 mini build volume) plus the request goes to the
 `claude` CLI (`--model`, default haiku) as a plain chat without tools. The code is picked out of the
