@@ -21,6 +21,7 @@ const ROOT = process.env.ROOT!, OUT = process.env.OUT!, WORKER = process.env.WOR
 const MODEL = process.env.MODEL ?? 'haiku';
 const ROUNDS = Number(process.env.ROUNDS ?? 3); // answers to problems after the first
 const PARALLEL = Number(process.env.PARALLEL ?? 4);
+const ASK_MS = Number(process.env.ASK_MS ?? 600_000); // one chat answer (Haiku can think for over 5 minutes)
 const VERSION = 'OpenSCAD 2026.10.15';
 const REQUESTS = process.env.REQUESTS ?? `${ROOT}/tools/aitrial/requests.json`; // a JSON list of strings
 const requests: string[] = JSON.parse(readFileSync(REQUESTS, 'utf8'));
@@ -46,7 +47,8 @@ function ask(session: string, text: string, first: boolean): Promise<{ reply: st
       ...(first ? ['--session-id', session] : ['--resume', session]), '--disallowedTools', ...NO_TOOLS];
     const p = spawn('claude', args, { cwd: CHAT_DIR });
     let out = '', err = '';
-    const timer = setTimeout(() => p.kill(), 300_000);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; p.kill(); }, ASK_MS);
     p.stdout.on('data', d => (out += d));
     p.stderr.on('data', d => (err += d));
     p.on('close', () => {
@@ -55,7 +57,7 @@ function ask(session: string, text: string, first: boolean): Promise<{ reply: st
         const j = JSON.parse(out);
         resolve({ reply: String(j.result ?? ''), cost: Number(j.total_cost_usd ?? 0), error: j.is_error ? String(j.result) : undefined });
       } catch {
-        resolve({ reply: '', cost: 0, error: (err || out).slice(0, 500) || 'no answer' });
+        resolve({ reply: '', cost: 0, error: timedOut ? `timed out after ${ASK_MS / 1000} s` : (err || out).slice(0, 500) || 'no answer' });
       }
     });
     p.stdin.end(text);
@@ -102,7 +104,7 @@ async function trial(n: number) {
     let a = await ask(session, text, r === 0);
     // The CLI now and then gives nothing at all (long answers, several chats at once): once more,
     // in a new chat if it was the first question.
-    if (!a.reply && !a.cost) {
+    if (!a.reply && !a.cost && !a.error?.startsWith('timed out')) {
       if (r === 0) session = randomUUID();
       a = await ask(session, text, r === 0);
     }

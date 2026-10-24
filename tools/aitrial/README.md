@@ -26,7 +26,8 @@ sketches" and is drawn to a PNG. When a `scadcheck` command is installed, it jud
 round independently (slicing-based), to show what the app's own checks miss.
 
 Output (git-ignored) in `tools/aitrial/out/`: per request the prompts, answers, code, logs, STL and
-judge output for each round, `result.json`, and `results.json` for all. It uses the CLI's account,
+judge output for each round, `result.json` (with the last code's top comment, `description`, as the app
+shows it), and `results.json` for all. It uses the CLI's account,
 so it costs usage (about 1 cent per request with Haiku).
 
 Reports of earlier runs: `reports/`.

@@ -1,5 +1,6 @@
 // Build and run the AI trial (trial.ts): node tools/aitrial/run.mjs [request numbers …]
-// Environment: MODEL (default haiku), ROUNDS (3), PARALLEL (4), OUT (default tools/aitrial/out).
+// Environment: MODEL (default haiku), ROUNDS (3), PARALLEL (4), OUT (default tools/aitrial/out),
+// REQUESTS (default tools/aitrial/requests.json), ASK_MS (600000, the limit for one chat answer).
 // Uses the claude CLI with the given model, so it costs usage.
 import * as esbuild from 'esbuild';
 import { mkdirSync } from 'node:fs';
