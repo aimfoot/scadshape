@@ -259,6 +259,18 @@ await test('long flat ceilings are found, the short way across; a walled hollow 
     assert.deepEqual(await ceilings(readFileSync(`${ROOT}/tests/fixtures/${f}`, 'utf8')), expected[f] ?? [], f);
 });
 
+await test('a model larger than the printer is a problem row (so "Copy for AI" says it), turned 90° if that fits', async () => {
+  const bed = { w: 180, d: 180, h: 180 };
+  const rows = async (src: string, b = bed) => meshProblems(parseBinaryStl((await run(src)).stl!.slice().buffer).positions, b);
+  // Two parts side by side, 212 mm in all (trial #24).
+  const big = await rows('cube([100, 60, 20]); translate([112, 0, 0]) cube([100, 60, 20]);');
+  assert.deepEqual(big.map(p => p.message), ['212 × 60 × 20 mm']);
+  assert.deepEqual(await rows('cube([100, 60, 20]);'), []);
+  assert.deepEqual(await rows('cube([200, 100, 20]);', { w: 100, d: 250, h: 50 }), []); // fits turned
+  assert.deepEqual((await rows('cube([20, 20, 190]);')).map(p => p.message), ['20 × 20 × 190 mm']);
+  assert.match(problemsForAi(big, '', 'OpenSCAD'), /212 × 60 × 20 mm, larger than the printer \(180 × 180 × 180 mm/);
+});
+
 const dir = `${ROOT}/tests/ai-mistakes`;
 for (const f of readdirSync(dir).filter(x => x.endsWith('.scad')).sort()) {
   await test(`ai-mistakes/${f}`, async () => {

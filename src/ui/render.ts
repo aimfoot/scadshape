@@ -9,7 +9,7 @@ import { sketchPolylines } from '../sketch3d';
 import { meshProblems } from '../diagnose';
 import { parseBinaryStl } from '../stl';
 import { Viewer } from '../viewer';
-import { bedOf, fitsBed, parseBedChoice } from '../bed';
+import { bedOf, fitsBed, meshSize, parseBedChoice } from '../bed';
 import { t, type Key } from '../i18n';
 import { $, el, fmtInt, fmtMs, store } from './dom';
 import { clearProblems, showProblems } from './problems';
@@ -59,21 +59,14 @@ function showDoneStatus(d: { base: string; errs: number; warn: boolean; size: [n
   doneStatus = { ...d, shown: text };
 }
 
-/** A new build volume: redraw the plate and the fit warning. */
+/** A new build volume: redraw the plate and the fit warning, and render again so the problem list
+ * (and "Copy for AI") says whether it fits. */
 export function applyBed() {
   viewer.setBed(currentBed());
-  if (doneStatus) showDoneStatus(doneStatus);
-}
-
-/** The model's size (x, y, z) from its triangles. */
-function meshSize(pos: Float32Array): [number, number, number] {
-  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < pos.length; i++) {
-    const k = i % 3;
-    if (pos[i] < mn[k]) mn[k] = pos[i];
-    if (pos[i] > mx[k]) mx[k] = pos[i];
+  if (doneStatus) {
+    showDoneStatus(doneStatus);
+    requestRender();
   }
-  return [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]];
 }
 
 export function currentCode(): string {
@@ -194,7 +187,7 @@ async function renderOnce() {
   if (renderWanted) return; // something newer is waiting – do not show old geometry
   showLog(r.log);
   const mesh = r.ok && r.data ? parseBinaryStl(r.data) : null;
-  const problems = showProblems(r.log, src, mesh ? meshProblems(mesh.positions) : []);
+  const problems = showProblems(r.log, src, mesh ? meshProblems(mesh.positions, currentBed()) : []);
   const probText = problems ? ` · ${problems === 1 ? t('status.problem1') : t('status.problems', { n: problems })}` : '';
   if (!mesh) {
     // Empty with no warning that explains it (e.g. if (false) …): just "nothing to show".

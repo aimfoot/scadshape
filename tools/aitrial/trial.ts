@@ -70,6 +70,9 @@ const picture = (dir: string, file: string) => new Promise<void>(resolve =>
   execFile('openscad', ['--render', '--backend=manifold', '--autocenter', '--viewall', '--imgsize=900,700', '--colorscheme=Tomorrow', '-o', `${dir}/${file}.png`, `${dir}/${file}.scad`],
     { timeout: 120_000 }, () => resolve()));
 
+/** The printer the trial asks for (the app's default, Bambu Lab A1 mini). */
+const BED = { w: 180, d: 180, h: 180 };
+
 const engine: ConvertEngine = {
   csg: async src => { const r = await render(src, '/out.csg'); if (!r.data) throw new Error(r.log.slice(-3).join(' ')); return new TextDecoder().decode(r.data); },
   svg: async src => { const r = await render(src, '/out.svg'); if (!r.data) throw new Error(r.log.slice(-3).join(' ')); return new TextDecoder().decode(r.data); },
@@ -90,7 +93,7 @@ async function trial(n: number) {
   const dir = `${OUT}/${String(n).padStart(2, '0')}-${slug}`;
   mkdirSync(dir, { recursive: true });
   const session = randomUUID();
-  let text = aiPrompt({ version: VERSION, bed: { w: 180, d: 180, h: 180 }, printer: 'Bambu Lab A1 mini' }) + request;
+  let text = aiPrompt({ version: VERSION, bed: BED, printer: 'Bambu Lab A1 mini' }) + request;
   const rounds: object[] = [];
   let cost = 0, last: string | null = null, clean = false;
   for (let r = 0; r <= ROUNDS; r++) {
@@ -112,7 +115,7 @@ async function trial(n: number) {
     const renderMs = Math.round(performance.now() - t0);
     writeFileSync(`${dir}/r${r}.log`, res.log.join('\n'));
     const mesh = res.data && res.data.length > 84 ? parseBinaryStl(res.data.slice().buffer) : null;
-    const problems = [...diagnose(res.log, code), ...(mesh ? meshProblems(mesh.positions) : [])];
+    const problems = [...diagnose(res.log, code), ...(mesh ? meshProblems(mesh.positions, BED) : [])];
     const counted = problems.filter(p => !p.followUp && p.severity !== 'note');
     let checked = null;
     if (mesh) {

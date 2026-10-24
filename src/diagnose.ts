@@ -4,6 +4,7 @@
 // typical mistakes of AI-written code recognised (radians(), +=, Python loops, a forgotten BOSL2
 // include …). problemsForAi() writes them as text to paste back into the AI chat.
 
+import { fitsBed, meshSize, type Bed } from './bed';
 import { convertFix, includeFix, renameFix, type Fix } from './fixes';
 import { flatCeilings } from './ceilings';
 import { midAirStarts } from './floating';
@@ -222,9 +223,9 @@ export function diagnose(log: string[], src: string): Problem[] {
   return [...found, ...lint(src)].sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));
 }
 
-/** Problems in the rendered model itself: places that start in mid-air (floating.ts), one row per
- * height, and long flat ceilings (ceilings.ts). */
-export function meshProblems(positions: Float32Array): Problem[] {
+/** Problems in the rendered model itself: too big for the printer (when `bed` is given), places that
+ * start in mid-air (floating.ts), one row per height, and long flat ceilings (ceilings.ts). */
+export function meshProblems(positions: Float32Array, bed?: Bed): Problem[] {
   const mm = (v: number) => String(Math.round(v * 10) / 10 || 0);
   const row = (where: string, hint: string): Problem =>
     ({ severity: 'warn', message: where, line: null, count: 1, followUp: false, check: true, mesh: true, hint });
@@ -238,7 +239,12 @@ export function meshProblems(positions: Float32Array): Problem[] {
     const text = t('mesh.ceiling', { x, y, z: mm(c.z), span: String(Math.round(c.span)) });
     return row(`x ${x}, y ${y}, z ${mm(c.z)}`, c.openBelow ? `${text} ${t('mesh.ceilingOpen')}` : text);
   });
-  return [...mid, ...ceilings];
+  // Said in the status bar too, but the AI only hears of it from this list.
+  const size = meshSize(positions), dims = (v: number[]) => v.map(mm).join(' × ');
+  const big = bed && positions.length && !fitsBed(size, bed)
+    ? [row(`${dims(size)} mm`, t('mesh.tooBig', { size: dims(size), bed: dims([bed.w, bed.d, bed.h]) }))]
+    : [];
+  return [...big, ...mid, ...ceilings];
 }
 
 /** The problems as text for an AI chat: OpenSCAD's messages with their lines of code. */

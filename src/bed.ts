@@ -40,3 +40,14 @@ export function fitsBed(size: [number, number, number], bed: Bed): boolean {
   const [sx, sy, sz] = size, e = 1e-3;
   return sz <= bed.h + e && ((sx <= bed.w + e && sy <= bed.d + e) || (sx <= bed.d + e && sy <= bed.w + e));
 }
+
+/** A model's size (x, y, z) from its triangles. */
+export function meshSize(pos: Float32Array): [number, number, number] {
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i++) {
+    const k = i % 3;
+    if (pos[i] < mn[k]) mn[k] = pos[i];
+    if (pos[i] > mx[k]) mx[k] = pos[i];
+  }
+  return [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]];
+}
