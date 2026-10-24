@@ -16,12 +16,12 @@ export interface MidAirStart {
 }
 
 /** Closer than this (mm) counts as touching: the bed, or something below. Less than a layer. */
-const TOUCH = 0.1;
+export const TOUCH = 0.1;
 /** Edges climbing less than this (mm) are flat: one patch. */
-const FLAT = 0.001;
+export const FLAT = 0.001;
 
 /** One id per corner for corners closer than 0.001 mm (the same point), and how many points there are. */
-function weld(pos: Float32Array): { id: Int32Array; count: number } {
+export function weld(pos: Float32Array): { id: Int32Array; count: number } {
   const corners = pos.length / 3;
   let size = 1;
   while (size < corners * 2) size <<= 1;

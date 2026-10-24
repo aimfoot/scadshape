@@ -7,6 +7,7 @@ import { join, relative } from 'node:path';
 import { setLang } from '../src/i18n';
 import { diagnose, meshProblems, problemsForAi } from '../src/diagnose';
 import { midAirStarts } from '../src/floating';
+import { flatCeilings } from '../src/ceilings';
 import { parseBinaryStl } from '../src/stl';
 import { FONTS_CONF, fontsFor } from '../src/fonts';
 import { lint } from '../src/lint';
@@ -213,12 +214,45 @@ await test('places that start in mid-air are found; on the bed, on another part,
   const heavy = parseBinaryStl((await run('$fn = 360; sphere(20); translate([60, 0, 0]) sphere(20);')).stl!.slice().buffer);
   const t0 = performance.now();
   assert.deepEqual(midAirStarts(heavy.positions), []);
-  console.log(`  floating check: ${heavy.triangles} triangles in ${Math.round(performance.now() - t0)} ms`);
+  assert.deepEqual(flatCeilings(heavy.positions), []);
+  console.log(`  model checks (mid-air, ceilings): ${heavy.triangles} triangles in ${Math.round(performance.now() - t0)} ms`);
   // snap_box's dome button pokes 1 mm out under its lid, so the lid's bottom is z = -1 and the box,
   // from z = 0, really starts 1 mm up in the air.
   const expected: Record<string, string[]> = { 'snap_box.scad': ['z 0'] };
   for (const f of readdirSync(`${ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')))
     assert.deepEqual(await floating(readFileSync(`${ROOT}/tests/fixtures/${f}`, 'utf8')), expected[f] ?? [], f);
+});
+
+const ceilings = async (src: string) => {
+  const stl = (await run(src)).stl;
+  assert.ok(stl, src);
+  return flatCeilings(parseBinaryStl(stl.slice().buffer).positions).map(c => `z ${Math.round(c.z * 10) / 10} span ~${Math.round(c.span / 5) * 5}${c.openBelow ? ' open' : ''}`);
+};
+
+await test('long flat ceilings are found, the short way across; a walled hollow open to the bed is called out', async () => {
+  // An AI's box: the cavity is cut through the floor, so it is open below and closed on top.
+  assert.deepEqual(await ceilings('difference() { cube([100, 100, 80]); translate([5, 5, -1]) cube([90, 90, 73]); }'), ['z 72 span ~90 open']);
+  // A sealed hollow: bridged, but there is a floor under it.
+  assert.deepEqual(await ceilings('difference() { cube(40); translate([5, 5, 5]) cube(30); }'), ['z 35 span ~30']);
+  // A bridge over a gap, open at the sides: long, but not a box upside down.
+  assert.deepEqual(await ceilings('difference() { cube([60, 20, 20]); translate([5, -1, 0]) cube([50, 22, 15]); }'), ['z 15 span ~50']);
+  // 90 × 10 mm: the strands go the short way, 10 mm.
+  assert.deepEqual(await ceilings('difference() { cube([100, 20, 20]); translate([5, 5, 5]) cube([90, 10, 10]); }'), []);
+  // A ledge held at one end only reaches its whole length.
+  assert.deepEqual(await ceilings('cube([10, 10, 20]); translate([10, 0, 17]) cube([15, 3, 3]);'), ['z 17 span ~30']);
+  const fine = [
+    'difference() { cube(40); translate([5, 5, 5]) cube([30, 30, 40]); }', // an open box: no ceiling
+    'cube([10, 10, 20]); translate([-8, 0, 20]) cube([26, 10, 3]);', // a T: arms 8 mm out
+    'difference() { cube(40); translate([20, 20, 5]) sphere(15); }', // round: no flat ceiling
+  ];
+  for (const src of fine) assert.deepEqual(await ceilings(src), [], src);
+  for (const ex of EXAMPLES) assert.deepEqual(await ceilings(buildModel(buildExample(ex.id)).code), [], ex.id);
+  // snap_box's lid is held up only by its dome button poking 1 mm out under it: the rest of its
+  // underside is a ceiling 1 mm above the bed. wall_hook's arm points down below its back plate, so
+  // the plate is a ceiling held only where the arm joins (scadcheck: 62 mm too).
+  const expected: Record<string, string[]> = { 'snap_box.scad': ['z 0 span ~65'], 'wall_hook.scad': ['z 0 span ~60'] };
+  for (const f of readdirSync(`${ROOT}/tests/fixtures`).filter(f => f.endsWith('.scad')))
+    assert.deepEqual(await ceilings(readFileSync(`${ROOT}/tests/fixtures/${f}`, 'utf8')), expected[f] ?? [], f);
 });
 
 const dir = `${ROOT}/tests/ai-mistakes`;

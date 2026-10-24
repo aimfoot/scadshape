@@ -67,7 +67,7 @@ assert.equal(sel, 'function inv(a) = tan(a) - radians(a);');
 await page.click('#btnCopyProblems');
 await page.waitForFunction(() => /Copied/.test(document.querySelector('#partToast')?.textContent ?? ''));
 const clip = await page.evaluate(() => navigator.clipboard.readText());
-assert.match(clip, /^My OpenSCAD code \(OpenSCAD 2026\.10\.15, Manifold backend; libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad, MCAD\) gives these problems:\n\nLine 5: WARNING: Ignoring unknown function 'radians' \(\d+ times\)\n {4}function inv\(a\) = tan\(a\) - radians\(a\);\n {4}Hint: OpenSCAD has no radians\(\)\. Write x \* PI \/ 180 instead\.\n\n\(plus \d+ follow-on warnings about undefined values\)\n\nPlease fix the code and send the whole corrected file\.$/, clip);
+assert.match(clip, /^My OpenSCAD code \(OpenSCAD 2026\.10\.15, Manifold backend; libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad, MCAD\) gives these problems:\n\nLine 5: WARNING: Ignoring unknown function 'radians' \(\d+ times\)\n {4}function inv\(a\) = tan\(a\) - radians\(a\);\n {4}Hint: OpenSCAD has no radians\(\)\. Write x \* PI \/ 180 instead\.\n\n\(plus \d+ follow-on warnings about undefined values\)\n\nPlease fix the cause and keep what the model is for: don.t remove or fake a feature \(such as a thread\) just to make a warning go away\. Send the whole corrected file\.$/, clip);
 console.log('copied for AI:\n' + clip.split('\n').map(l => '  | ' + l).join('\n'));
 
 // Full log: the raw lines, repeats merged

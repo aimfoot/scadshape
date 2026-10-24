@@ -5,6 +5,7 @@
 // include …). problemsForAi() writes them as text to paste back into the AI chat.
 
 import { convertFix, includeFix, renameFix, type Fix } from './fixes';
+import { flatCeilings } from './ceilings';
 import { midAirStarts } from './floating';
 import { FAMILIES } from './fonts';
 import { t } from './i18n';
@@ -221,17 +222,23 @@ export function diagnose(log: string[], src: string): Problem[] {
   return [...found, ...lint(src)].sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));
 }
 
-/** Problems in the rendered model itself: places that start in mid-air (floating.ts), one row per height. */
+/** Problems in the rendered model itself: places that start in mid-air (floating.ts), one row per
+ * height, and long flat ceilings (ceilings.ts). */
 export function meshProblems(positions: Float32Array): Problem[] {
   const mm = (v: number) => String(Math.round(v * 10) / 10 || 0);
-  return midAirStarts(positions).slice(0, 5).map(p => {
+  const row = (where: string, hint: string): Problem =>
+    ({ severity: 'warn', message: where, line: null, count: 1, followUp: false, check: true, mesh: true, hint });
+  const mid = midAirStarts(positions).slice(0, 5).map(p => {
     const [x, y] = [0, 1].map(k => `${mm(p.min[k])}…${mm(p.max[k])}`);
     const args = { x, y, z: mm(p.min[2]), h: mm(p.above), n: p.count };
-    return {
-      severity: 'warn', message: `x ${x}, y ${y}, z ${mm(p.min[2])}`, line: null, count: 1, followUp: false, check: true, mesh: true,
-      hint: p.count > 1 ? t('mesh.floatingN', args) : t('mesh.floating', args),
-    };
+    return row(`x ${x}, y ${y}, z ${mm(p.min[2])}`, p.count > 1 ? t('mesh.floatingN', args) : t('mesh.floating', args));
   });
+  const ceilings = flatCeilings(positions).slice(0, 3).map(c => {
+    const [x, y] = [0, 1].map(k => `${mm(c.min[k])}…${mm(c.max[k])}`);
+    const text = t('mesh.ceiling', { x, y, z: mm(c.z), span: String(Math.round(c.span)) });
+    return row(`x ${x}, y ${y}, z ${mm(c.z)}`, c.openBelow ? `${text} ${t('mesh.ceilingOpen')}` : text);
+  });
+  return [...mid, ...ceilings];
 }
 
 /** The problems as text for an AI chat: OpenSCAD's messages with their lines of code. */
