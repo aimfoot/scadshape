@@ -138,6 +138,18 @@ translate([60, 0, 0]) difference() { cylinder(h = 20, d = 30, $fn = 64); transla
   assert.ok(r.dv < 0.002 && r.db < 1e-3, `volume ${r.dv}, size ${r.db}`);
 });
 
+await test('code blocks in a row with the same op become one block (a honeycomb is not hundreds of blocks)', async () => {
+  // Hexagonal holes all round a tube (slanted: code), and hooks from hull()s (code) added after it.
+  const r = await compare(`difference() {
+  cylinder(h = 40, d = 60, $fn = 96);
+  translate([0, 0, 2]) cylinder(h = 40, d = 54, $fn = 96);
+  for (z = [10, 20, 30], a = [0 : 30 : 330]) translate([0, 0, z]) rotate([90, 0, a + z]) cylinder(h = 40, d = 6, $fn = 6);
+}
+for (a = [0, 120, 240]) rotate([0, 0, a]) hull() { translate([30, 0, 30]) sphere(2, $fn = 16); translate([36, 0, 36]) sphere(2, $fn = 16); }`);
+  assert.equal(r.codeBlocks, 2, JSON.stringify(r.doc.features.map(f => `${f.type} ${'op' in f ? f.op : ''}`)));
+  assert.ok(r.dv < 0.002 && r.db < 1e-3, `volume ${r.dv}, size ${r.db}`);
+});
+
 await test('offset and text are drawn by OpenSCAD and become lines and arcs', async () => {
   const r = await compare('linear_extrude(3) offset(r = 4, $fn = 32) square([30, 20]);\ntranslate([0, 40, 0]) linear_extrude(2) text("Hej", size = 10, font = "Liberation Sans");');
   assert.equal(r.codeBlocks, 0);

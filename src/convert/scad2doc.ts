@@ -893,6 +893,29 @@ function mergeTools(tools: Tool[]): Tool[] {
 }
 
 /**
+ * One code block per run of tools with the same op: additions in a row are a union and removals in
+ * a row cut the union of them, in any order, so the run's code goes into its first code block (a
+ * honeycomb of holes would otherwise be hundreds of blocks in the tree). Intersections stay apart.
+ */
+function mergeCode(tools: Tool[]): Tool[] {
+  const out: Tool[] = [];
+  let op: Op | null = null, block = -1;
+  for (const t of tools) {
+    if (t.op !== op) [op, block] = [t.op, -1];
+    if (t.kind === 'code' && t.op !== 'intersect') {
+      const first = out[block];
+      if (first?.kind === 'code') {
+        out[block] = { ...first, code: `${first.code}\n${t.code}` };
+        continue;
+      }
+      block = out.length;
+    }
+    out.push(t);
+  }
+  return out;
+}
+
+/**
  * Convert OpenSCAD code to a document with sketches and features. The code's top-level variables
  * become the document's variables, linked to the values that depend on them (convert/params.ts).
  */
@@ -912,7 +935,7 @@ async function buildDoc(src: string, engine: ConvertEngine, linker: ParamLinker,
   const roots = parseCsg(await engine.csg(src));
   const conv = new Converter(engine);
   for (const n of roots) await conv.walk(n, I4, 'add');
-  const tools = mergeTools(conv.tools);
+  const tools = mergeCode(mergeTools(conv.tools));
   const doc = emptyDoc();
   let sketches = 0, extrudes = 0, revolves = 0, codeBlocks = 0;
   for (const t of tools) {
