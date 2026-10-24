@@ -135,9 +135,11 @@ function bbox3(n: CsgNode, m: Mat): Box | null {
       return null;
   }
 }
-/** The box for all children, or null if any is unknown. */
+/** A node with no shape in it: empty groups, such as the one BOSL2's cube() and cylinder() leave for attachments. */
+const empty = (n: CsgNode): boolean => (GROUPS.has(n.name) || n.name === 'multmatrix') && n.children.every(empty);
+/** The box for all children (those with no shape left out), or null if any is unknown. */
 function allKnown(children: CsgNode[], m: Mat): Box | null {
-  const bs = children.map(c => bbox3(c, m));
+  const bs = children.filter(c => !empty(c)).map(c => bbox3(c, m));
   return bs.some(b => !b) ? null : unionBox(bs as Box[]);
 }
 
@@ -413,6 +415,7 @@ class Converter {
       const [first, ...rest] = n.children;
       await this.walk(first, m, 'add');
       for (const c of rest) {
+        if (empty(c)) continue;
         const b = bbox3(c, m) ?? INF_BOX;
         if (prior.some(p => overlaps(p, b))) {
           // Would cut into something added earlier → the whole difference as code.

@@ -127,6 +127,17 @@ await test('rounded box (hull of cylinders), rotation to XZ, hexagon, cone and s
   assert.ok(r.dv < 0.002 && r.db < 0.02, `volume ${r.dv}, size ${r.db}`);
 });
 
+await test('with BOSL2 included, cube() and cylinder() still convert – also a second part with its own cuts', async () => {
+  // BOSL2's cube() and cylinder() leave an empty group() for attachments: no shape, so it must not make
+  // a cut look as if it could reach the first part (then the whole second part became code).
+  const r = await compare(`include <BOSL2/std.scad>
+translate([0, 0, 20]) difference() { cube([40, 40, 40], center = true); translate([0, 0, 5]) cube([30, 30, 40], center = true); }
+translate([60, 0, 0]) difference() { cylinder(h = 20, d = 30, $fn = 64); translate([0, 0, 2]) cylinder(h = 20, d = 26, $fn = 64); }`);
+  assert.equal(r.codeBlocks, 0, JSON.stringify(r.doc.features.map(f => f.type)));
+  assert.deepEqual([r.sketches, r.extrudes], [4, 4]);
+  assert.ok(r.dv < 0.002 && r.db < 1e-3, `volume ${r.dv}, size ${r.db}`);
+});
+
 await test('offset and text are drawn by OpenSCAD and become lines and arcs', async () => {
   const r = await compare('linear_extrude(3) offset(r = 4, $fn = 32) square([30, 20]);\ntranslate([0, 40, 0]) linear_extrude(2) text("Hej", size = 10, font = "Liberation Sans");');
   assert.equal(r.codeBlocks, 0);
