@@ -22,7 +22,6 @@ const bodyBg = page => page.evaluate(() => getComputedStyle(document.body).backg
 const lum = rgb => { const [r, g, b] = rgb.match(/\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 const openSettings = async page => {
   if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
-  if (await page.isHidden('#tree')) await page.click('#btnTree');
   await page.click('#btnSettings');
 };
 const openTree = async page => { if (await page.isHidden('#tree')) await page.click('#btnTree'); };

@@ -35,7 +35,6 @@ assert.ok(await card(), 'back after an empty sketch');
 // 3. × closes; ☰ → Get started shows it again.
 await page.click('#startClose');
 assert.equal(await card(), false);
-await page.click('#btnTree');
 await page.click('#btnStart');
 assert.ok(await card(), 'Get started shows the card');
 assert.ok(await page.isHidden('#tree'), 'the drawer closes');
@@ -43,7 +42,7 @@ assert.ok(await page.isHidden('#tree'), 'the drawer closes');
 // 4. Every example becomes a new model, without errors, and the card disappears.
 const want = { 'Box with lid': ['sketch', 'extrude', 'extrude', 'sketch', 'extrude', 'extrude', 'extrude'], 'Mounting plate': ['sketch', 'extrude', 'sketch', 'hole'], Sign: ['sketch', 'extrude', 'sketch', 'text'], Cup: ['sketch', 'revolve'] };
 for (const [i, name] of Object.keys(want).entries()) {
-  if (!(await card())) { await page.click('#btnTree'); await page.click('#btnStart'); }
+  if (!(await card())) { await page.click('#btnStart'); }
   const before = await doc();
   await page.click(`#startExamples button >> nth=${i}`);
   await page.waitForFunction(b => window.__scadshape.doc !== b, before);
@@ -60,7 +59,6 @@ for (const [i, name] of Object.keys(want).entries()) {
 
 const openSettings = async () => {
   if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
-  if (await page.isHidden('#tree')) await page.click('#btnTree');
   await page.click('#btnSettings');
 };
 const closeSettings = () => page.evaluate(() => document.querySelector('#settingsDlg').close());

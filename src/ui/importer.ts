@@ -131,6 +131,8 @@ function confirmSvg() {
 
 export async function importFile(file: File) {
   if (document.body.dataset.mode !== 'part') return;
+  // An STL or SVG becomes features: they are worked on in Draw.
+  if (document.body.dataset.work === 'code') $('#workMode [data-work=draw]').click();
   const lower = file.name.toLowerCase();
   if (file.size > STL_MAX_BYTES) return showToast(t('import.tooLarge', { mb: STL_MAX_BYTES / 1024 / 1024 }), 'error');
   const bytes = new Uint8Array(await file.arrayBuffer());

@@ -30,8 +30,20 @@
 
   <span class="spacer"></span>
 
+  <!-- Import, export, getting started and settings: icons in the bar's right corner. -->
+  <button id="btnImport" class="icon part-only" data-i18n-aria="import.title" data-i18n-title="import.title">
+    <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+  </button>
+  <!-- No accept filter: Android does not always recognise .stl/.svg. -->
+  <input id="importFile" type="file" hidden>
   <button id="btnExport" class="icon part-only" data-i18n-aria="export.title" data-i18n-title="export.title">
     <svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+  </button>
+  <button id="btnStart" class="icon part-only" data-i18n-aria="ui.start" data-i18n-title="ui.start">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+  <button id="btnSettings" class="icon part-only" data-i18n-aria="ui.settings" data-i18n-title="ui.settings">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/><circle cx="12" cy="12" r="6.5"/></svg>
   </button>
   <button id="btnRender" class="primary part-only" data-i18n="ui.render" hidden>Render</button>
   <button id="btnUndo" class="icon sketch-only" data-i18n-aria="ui.undo" hidden>
@@ -48,8 +60,6 @@
     <ul id="featureList"></ul>
     <p id="treeEmpty" class="muted" data-i18n="tree.empty"></p>
     <span class="spacer"></span>
-    <button id="btnStart" data-i18n="ui.start">Getting started</button>
-    <button id="btnSettings" data-i18n="ui.settings">Settings</button>
     <button id="btnBench" data-i18n="ui.bench">Benchmark</button>
   </aside>
   <aside id="codePanel" hidden>
@@ -92,11 +102,6 @@
       <button id="btnSnap" class="only-draw" data-i18n-title="feat.snap">
         <svg viewBox="0 0 24 24"><path d="M4 21h16"/><path d="M9 21v-3l1-1V6l-1-1V3h3l4 4-2.5 1.5H12V17l1 1v3"/></svg><span data-i18n="feat.snap">Snap hook</span>
       </button>
-      <button id="btnImport" class="only-draw" data-i18n-title="import.title">
-        <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5"/><path d="M4 15v4h16v-4"/></svg><span data-i18n="import.button">Import</span>
-      </button>
-      <!-- No accept filter: Android does not always recognise .stl/.svg. -->
-      <input id="importFile" type="file" hidden>
       <span class="sep only-draw"></span>
       <button id="btnMeasure" data-i18n-title="measure.title" aria-pressed="false">
         <svg viewBox="0 0 24 24"><path d="M3 16l13-13 5 5-13 13z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2M8.5 10.5l1 1M11.5 7.5l1 1"/></svg><span data-i18n="measure.button">Measure</span>
@@ -122,7 +127,7 @@
         <button data-view="top" data-i18n="view.top">Top</button>
         <button data-view="front" data-i18n="view.front">Front</button>
         <button data-view="right" data-i18n="view.right">Right</button>
-        <button id="btnFit" data-i18n-aria="view.fit">⤢</button>
+        <button id="btnFit" data-i18n-aria="view.fit" data-i18n-title="view.fit"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
       </div>
       <div id="status" class="status busy"></div>
       <div id="modelNote" class="modelnote" hidden>

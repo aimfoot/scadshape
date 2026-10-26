@@ -94,7 +94,6 @@ assert.equal(await docCode(), 'cylinder(d = 30, h = 5);\n');
 assert.equal(await feats(), 'code');
 
 // 5. A drawn model: Code shows its code; an edit makes it code, Draw's undo brings the sketches back
-if (await page.isHidden('#tree')) await page.click('#btnTree');
 await page.click('#btnStart');
 await page.click('#startExamples .example');
 await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
@@ -123,7 +122,7 @@ assert.equal(await feats(), drawn, 'undo brings the sketches back');
 // 6. Pasting when the model is not empty: a new model, named by the code's top comment
 const before = await page.textContent('#projName');
 await page.evaluate(t => navigator.clipboard.writeText(t), answer);
-await page.click('#btnTree'); await page.click('#btnStart');
+await page.click('#btnStart');
 await page.click('#startPaste');
 // (step 2 already named the first model so: this one gets a name of its own)
 await page.waitForFunction(b => /^Parametric box \S+$/.test(document.querySelector('#projName').textContent) && document.querySelector('#projName').textContent !== b, before);
@@ -133,7 +132,7 @@ assert.equal(await feats(), 'code');
 // 7. Nothing usable on the clipboard: paste by hand in Code
 await page.evaluate(() => navigator.clipboard.writeText('Sorry, I cannot help with that.'));
 await page.click('#workMode [data-work=draw]');
-await page.click('#btnTree'); await page.click('#btnStart');
+await page.click('#btnStart');
 await page.click('#startPaste');
 await page.waitForFunction(() => /^The clipboard has no OpenSCAD code/.test(document.querySelector('#partToast').textContent));
 assert.equal(await work(), 'code');

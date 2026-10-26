@@ -1,7 +1,7 @@
-// The start card: shown in Draw when the model is empty (or via ☰ → Getting started) – an AI chat's
-// code, drawing, writing the code yourself (Code), and example models (src/examples/models.ts). It
-// does not block the tools and disappears when the model gets content, a panel opens, you enter a
-// sketch or switch to Code.
+// The start card: shown in Draw when the model is empty (or with + in the bar, Getting started) – an
+// AI chat's code, drawing, writing the code yourself (Code), and example models
+// (src/examples/models.ts). It does not block the tools and disappears when the model gets content,
+// a panel opens, you enter a sketch or switch to Code.
 
 import { EXAMPLES, buildExample, type ExampleId } from '../examples/models';
 import { onLangChange, t, type Key } from '../i18n';
@@ -14,11 +14,13 @@ import { showToast } from './toast';
 import { switchWork } from './workmode';
 
 let dismissed = false; // closed with × (applies to the session)
-let forced = false; // opened from ☰, even when the model is not empty
+let forced = false; // opened with +, even when the model is not empty
 
 function update() {
-  const empty = document.body.dataset.work === 'draw' && app.doc.features.length === 0;
-  const free = document.body.dataset.mode === 'part' && $('#featPanel').hidden;
+  const draw = document.body.dataset.work === 'draw';
+  if (!draw) forced = false; // the card belongs to Draw: going to Code closes it
+  const empty = app.doc.features.length === 0;
+  const free = draw && document.body.dataset.mode === 'part' && $('#featPanel').hidden;
   $('#startCard').hidden = !(free && (forced || (!dismissed && empty)));
 }
 
@@ -42,8 +44,15 @@ function renderExamples() {
   );
 }
 
-/** ☰ → Getting started. */
+/** + in the bar: Getting started (a second tap closes it). */
 export function showStart() {
+  if (!$('#startCard').hidden) {
+    forced = false;
+    dismissed = true;
+    update();
+    return;
+  }
+  if (document.body.dataset.work !== 'draw') switchWork('draw');
   forced = true;
   if (!$('#tree').hidden) $('#btnTree').click(); // the drawer would otherwise cover the card
   update();

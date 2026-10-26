@@ -30,7 +30,7 @@ async function session(scale) {
 }
 const rendered = page => page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent) && !document.querySelector('#status').classList.contains('busy'), null, { timeout: 60000 });
 async function openExample(page, i) {
-  if (await page.isHidden('#startCard')) { if (await page.isHidden('#tree')) await page.click('#btnTree'); await page.click('#btnStart'); }
+  if (await page.isHidden('#startCard')) await page.click('#btnStart');
   const before = await page.evaluate(() => window.__scadshape.doc);
   await page.click(`#startExamples button >> nth=${i}`);
   await page.waitForFunction(b => window.__scadshape.doc !== b, before);

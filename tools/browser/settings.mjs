@@ -27,7 +27,6 @@ const waitRendered = async () => {
 };
 const openSettings = async () => {
   if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
-  if (await page.isHidden('#tree')) await page.click('#btnTree');
   await page.click('#btnSettings');
 };
 const closeSettings = () => page.evaluate(() => document.querySelector('#settingsDlg').close());

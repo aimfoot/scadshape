@@ -28,7 +28,6 @@ for (const rate of rates) {
   const row = { rate, ready };
   for (const [i, name] of [[0, 'box'], [1, 'plate'], [2, 'sign'], [3, 'cup']]) {
     if (await page.isHidden('#startCard')) {
-      if (await page.isHidden('#tree')) await page.click('#btnTree');
       await page.click('#btnStart');
     }
     const t1 = Date.now();

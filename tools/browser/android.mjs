@@ -81,7 +81,6 @@ console.log(`back: the dialog + ${n} more, then false`);
 
 const openSettings = async () => {
   if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
-  if (await page.isHidden('#tree')) await page.click('#btnTree');
   await page.click('#btnSettings');
 };
 const closeSettings = () => page.evaluate(() => document.querySelector('#settingsDlg').close());

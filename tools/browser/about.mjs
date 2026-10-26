@@ -13,7 +13,6 @@ page.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(
 await page.route('**/api/**', r => r.fulfill({ status: 204 }));
 const openSettings = async () => {
   if (await page.evaluate(() => document.querySelector('#settingsDlg').open)) return;
-  if (await page.isHidden('#tree')) await page.click('#btnTree');
   await page.click('#btnSettings');
 };
 const closeSettings = () => page.evaluate(() => document.querySelector('#settingsDlg').close());

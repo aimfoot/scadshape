@@ -226,14 +226,24 @@ main { display: flex; min-height: 0; }
   top: 10px;
   right: max(10px, env(safe-area-inset-right));
   display: flex;
-  gap: 4px;
-}
-.views button {
-  min-height: 36px;
-  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
   background: var(--float);
   backdrop-filter: blur(4px);
 }
+/* One compact group: small buttons divided by thin lines. */
+.views button {
+  min-height: 30px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12.5px;
+}
+.views button + button { border-left: 1px solid var(--line); }
+.views svg { width: 16px; height: 16px; }
 
 .status {
   position: absolute;
@@ -330,7 +340,8 @@ dialog form { margin-top: 10px; text-align: right; }
   .bar .title { flex: 1; }
   button.primary { min-width: 0; }
   .views { flex-direction: column; top: 8px; right: max(8px, env(safe-area-inset-right)); }
-  .views button { min-width: 64px; }
+  .views button { min-width: 48px; min-height: 30px; }
+  .views button + button { border-left: 0; border-top: 1px solid var(--line); }
 }
 
 /* ---- Phase 1: icons, features, sketch mode ------------------------------------------ */
