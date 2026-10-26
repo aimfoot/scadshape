@@ -50,7 +50,7 @@ async function openPending() {
   if (!json) return;
   const { name, data, text } = JSON.parse(json) as { name: string; data: string; text?: string };
   if (document.body.dataset.mode === 'sketch') $('#btnDone').click();
-  // Text shared from another app (an AI chat's answer): its code becomes Custom code.
+  // Text shared from another app (an AI chat's answer): its code goes to Paste.
   if (text !== undefined) {
     const ok = receiveCode(text);
     showToast(ok ? t('ai.received') : t('ai.noCode'), ok ? 'info' : 'error');

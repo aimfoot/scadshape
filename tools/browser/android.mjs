@@ -45,9 +45,9 @@ const waitRendered = () => page.waitForFunction(() => /triangles/.test(document.
 
 await page.goto(url);
 
-// 1. The file waiting at start is opened as Custom code and rendered.
+// 1. The file waiting at start is opened as your own code (Code) and rendered.
 await waitRendered();
-assert.equal(await page.evaluate(() => window.__scadshape.source), 'paste');
+assert.equal(await page.evaluate(() => window.__scadshape.source), 'custom');
 console.log('waiting .scad →', await page.textContent('#status'));
 
 // 2. The system bars get the toolbar's color (light theme).
