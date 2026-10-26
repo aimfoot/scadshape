@@ -56,7 +56,13 @@ assert.match(await page.textContent('#problemsTitle'), /^1 problem in the code$/
 assert.match(list[0].text, /^Line 5OpenSCAD has no radians\(\)\. Write x \* PI \/ 180 instead\.× \d+Ignoring unknown function 'radians'$/, list[0].text);
 assert.equal(list[0].fix, 'Fixfunction inv(a) = tan(a) - a * PI / 180;');
 assert.match(list.at(-1).text, /^\+ \d+ follow-on warnings about undefined values$/);
-assert.ok(await page.isHidden('#log'), 'the raw log is hidden behind "Full log"');
+// One line under the code says there is a problem; "Full log" opens the list and OpenSCAD's log.
+assert.ok(await page.isHidden('#problemList')); assert.ok(await page.isHidden('#log'));
+assert.ok(await page.isVisible('#btnCopyProblems'));
+await page.screenshot({ path: `${out}/p-line.png` });
+await page.click('#btnFullLog');
+assert.ok(await page.isVisible('#problemList')); assert.ok(await page.isVisible('#log'));
+assert.match(await page.textContent('#log'), /Ignoring unknown function 'radians' in file \/in\.scad, line 5 × \d+/);
 await page.screenshot({ path: `${out}/p-portrait.png` });
 
 // Tap the problem: line 5 is selected in the code
@@ -71,18 +77,13 @@ const clip = await page.evaluate(() => navigator.clipboard.readText());
 assert.match(clip, /^My OpenSCAD code \(OpenSCAD 2026\.10\.15, Manifold backend; libraries available: BOSL2, Round-Anything, dotSCAD, gridfinity-rebuilt-openscad, MCAD\) gives these problems:\n\nLine 5: WARNING: Ignoring unknown function 'radians' \(\d+ times\)\n {4}function inv\(a\) = tan\(a\) - radians\(a\);\n {4}Hint: OpenSCAD has no radians\(\)\. Write x \* PI \/ 180 instead\.\n\n\(plus \d+ follow-on warnings about undefined values\)\n\nPlease fix the cause and keep what the model is for: don.t remove or fake a feature \(such as a thread\) just to make a warning go away\. Send the whole corrected file\.$/, clip);
 console.log('copied for AI:\n' + clip.split('\n').map(l => '  | ' + l).join('\n'));
 
-// Full log: the raw lines, repeats merged
-await page.click('#btnFullLog');
-assert.ok(await page.isVisible('#log'));
-assert.match(await page.textContent('#log'), /Ignoring unknown function 'radians' in file \/in\.scad, line 5 × \d+/);
-
 // Fix: the code is changed in place, renders without problems, and undo brings the old code back
-await page.click('#btnFullLog'); // off again
 await page.tap('#problemList .fix');
 assert.equal(await page.inputValue('#code'), gears.replace('radians(a)', 'a * PI / 180'));
 st = await waitRendered();
 assert.doesNotMatch(st.text, /problem/); assert.doesNotMatch(st.cls, /warn|error/);
-assert.ok(await page.isHidden('#problems'));
+assert.equal(await page.textContent('#problemsTitle'), 'No problems in the code');
+assert.ok(await page.isHidden('#btnCopyProblems'));
 await page.focus('#code');
 await page.keyboard.press('Control+z');
 assert.equal(await page.inputValue('#code'), gears, 'undo after a fix');

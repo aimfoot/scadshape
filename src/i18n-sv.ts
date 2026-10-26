@@ -238,6 +238,7 @@ export const sv: Record<keyof typeof en, string> = {
   'convert.linking': 'Kopplar variablerna …',
   'dx.title': '{n} problem i koden',
   'dx.title1': '1 problem i koden',
+  'dx.none': 'Inga problem i koden',
   'dx.copy': 'Kopiera för AI',
   'dx.copied': 'Kopierat – klistra in i din AI-chatt',
   'dx.copyFailed': 'Kunde inte kopiera',

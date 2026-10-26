@@ -170,8 +170,12 @@ main { display: flex; min-height: 0; }
 /* The code's problems (src/ui/problems.ts): merged and explained; the raw log only on request. */
 #problems { max-height: 45%; overflow: auto; border-top: 1px solid var(--line); background: var(--sunken); }
 #problems[hidden] { display: none; }
-#codePanel.has-problems:not(.full-log) #log { display: none; }
+/* Only the line that says if there are problems, until "Full log" opens the list and the log. */
+#codePanel:not(.full-log) #problemList, #codePanel:not(.full-log) #log { display: none; }
 #codePanel.full-log #log { max-height: 32%; }
+#problems[data-level="error"] .problems-head strong { color: var(--err); }
+#problems[data-level="warn"] .problems-head strong { color: var(--warn); }
+#problems:not([data-level="error"]):not([data-level="warn"]) .problems-head strong { color: var(--muted); font-weight: 500; }
 .problems-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; position: sticky; top: 0; background: var(--sunken); }
 .problems-head strong { flex: 1; font-size: 13px; }
 .problems-head button { min-height: 34px; min-width: 0; font-size: 13px; }

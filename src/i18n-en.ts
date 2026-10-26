@@ -236,6 +236,7 @@ export const en = {
   'convert.linking': 'Linking the variables …',
   'dx.title': '{n} problems in the code',
   'dx.title1': '1 problem in the code',
+  'dx.none': 'No problems in the code',
   'dx.copy': 'Copy for AI',
   'dx.copied': 'Copied – paste it into your AI chat',
   'dx.copyFailed': 'Could not copy',

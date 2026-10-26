@@ -1,7 +1,7 @@
-// The code's problems under the code (diagnose.ts): one row per problem with its line and a plain
-// explanation – tap to go to the line – and "Copy for AI", which puts them on the clipboard as text
-// for the AI chat the code came from. Where the change is clear, a Fix button under the row shows the
-// fixed line and makes the change (fixes.ts). The raw log is only shown on request.
+// The code's problems under the code (diagnose.ts). One line says whether there are any, with "Copy
+// for AI" (the problems as text for an AI chat) and "Full log", which opens the list – one row per
+// problem with its line and a plain explanation, tap to go to the line; where the change is clear, a
+// Fix button shows the fixed line and makes the change (fixes.ts) – and OpenSCAD's own log.
 
 import { diagnose, problemsForAi, type Problem } from '../diagnose';
 import { applyFix } from '../fixes';
@@ -76,9 +76,10 @@ export function showProblems(log: string[], src: string, extra: Problem[] = []):
   const problems = [...diagnose(log, src), ...extra];
   shown = { problems, src };
   const main = problems.filter(p => !p.followUp), follow = problems.filter(p => p.followUp);
-  $('#problems').hidden = !problems.length;
-  $('#codePanel').classList.toggle('has-problems', problems.length > 0);
-  $('#problemsTitle').textContent = main.length === 1 ? t('dx.title1') : t('dx.title', { n: main.length });
+  const level = problems.some(p => p.severity === 'error') ? 'error' : main.some(p => p.severity !== 'note') ? 'warn' : '';
+  $('#problems').dataset.level = level;
+  $('#problemsTitle').textContent = !main.length ? t('dx.none') : main.length === 1 ? t('dx.title1') : t('dx.title', { n: main.length });
+  $('#btnCopyProblems').hidden = !problems.length;
   const items = main.map(row);
   if (follow.length) {
     const first = follow.find(p => p.line);
@@ -91,6 +92,12 @@ export function showProblems(log: string[], src: string, extra: Problem[] = []):
 }
 
 export const clearProblems = () => showProblems([], '');
+
+/** Open (or close) the problem list and OpenSCAD's log under the line that says if there are problems. */
+function showFullLog(on: boolean) {
+  $('#codePanel').classList.toggle('full-log', on);
+  $('#btnFullLog').setAttribute('aria-pressed', String(on));
+}
 export const hasProblems = () => shown.problems.length > 0;
 
 async function copyForAi() {
@@ -101,13 +108,11 @@ async function copyForAi() {
 
 export function initProblems() {
   $('#btnCopyProblems').addEventListener('click', () => void copyForAi());
-  const full = $('#btnFullLog');
-  full.addEventListener('click', () => {
-    const on = $('#codePanel').classList.toggle('full-log');
-    full.setAttribute('aria-pressed', String(on));
-  });
-  // The status bar says "· 2 problems": tapping it opens the code with the list.
+  $('#btnFullLog').addEventListener('click', () => showFullLog(!$('#codePanel').classList.contains('full-log')));
+  // The status bar says "· 2 problems": tapping it opens Code with the list.
   $('#status').addEventListener('click', () => {
-    if (hasProblems() && $('#codePanel').hidden) $('#btnCode').click();
+    if (!hasProblems()) return;
+    if (document.body.dataset.work !== 'code') $('#workMode [data-work=code]').click();
+    showFullLog(true);
   });
 }
