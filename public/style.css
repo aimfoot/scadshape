@@ -22,6 +22,9 @@
   --toast-err: #a8322a;
   --viewport-top: #fbfcfd;
   --viewport-bottom: #dbe2e9;
+  /* Code colours (src/scadhl.ts) */
+  --hl-comment: #64707d; --hl-keyword: #7c3aed; --hl-shape: #b9530b; --hl-transform: #1a6fc4; --hl-function: #0e7c86;
+  --hl-define: var(--text); --hl-number: #1d7a3a; --hl-string: #b42318; --hl-special: #946000; --hl-selection: rgba(26, 111, 196, .25);
 }
 /* Dark: chosen in ☰ (data-theme is set by theme.ts), or the phone's setting before the script has run. */
 :root[data-theme="dark"] {
@@ -47,6 +50,8 @@
   --toast-err: #8e2c25;
   --viewport-top: #232b33;
   --viewport-bottom: #12171c;
+  --hl-comment: #8a98a6; --hl-keyword: #c4a1ff; --hl-shape: #f59a4a; --hl-transform: #6cb2f5; --hl-function: #5cc8c8;
+  --hl-define: var(--text); --hl-number: #7fd796; --hl-string: #f28b8b; --hl-special: #e0b45c; --hl-selection: rgba(94, 164, 236, .35);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
@@ -62,6 +67,8 @@
     --float: rgba(27, 34, 41, .92);
     --viewport-top: #232b33;
     --viewport-bottom: #12171c;
+    --hl-comment: #8a98a6; --hl-keyword: #c4a1ff; --hl-shape: #f59a4a; --hl-transform: #6cb2f5; --hl-function: #5cc8c8;
+    --hl-define: var(--text); --hl-number: #7fd796; --hl-string: #f28b8b; --hl-special: #e0b45c; --hl-selection: rgba(94, 164, 236, .35);
   }
 }
 * { box-sizing: border-box; }
@@ -151,6 +158,34 @@ main { display: flex; min-height: 0; }
   color: var(--text);
   background: var(--panel);
 }
+/* Colours (src/ui/codehl.ts): the code area's text is transparent over a coloured copy behind it,
+   with exactly the same font, padding and scrolling. */
+#code, #codeHl { font-variant-ligatures: none; -webkit-text-size-adjust: none; text-size-adjust: none; }
+#code:not(.plain) { position: relative; background: transparent; color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--text); }
+#code::selection { background: var(--hl-selection); }
+#codeHl {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  /* Extra room right and below: the text area's scroll bars take room the copy does not have. */
+  padding: 10px 52px 52px 12px;
+  overflow: hidden;
+  pointer-events: none;
+  font: 13px/1.5 ui-monospace, "JetBrains Mono", "Roboto Mono", monospace;
+  tab-size: 2;
+  white-space: pre;
+  color: var(--text);
+  background: var(--panel);
+}
+.hl-c { color: var(--hl-comment); font-style: italic; }
+.hl-k { color: var(--hl-keyword); }
+.hl-g { color: var(--hl-shape); }
+.hl-t { color: var(--hl-transform); }
+.hl-f { color: var(--hl-function); }
+.hl-d { color: var(--hl-define); font-weight: 600; }
+.hl-n { color: var(--hl-number); }
+.hl-s { color: var(--hl-string); }
+.hl-v { color: var(--hl-special); }
 /* OpenSCAD's own log: about three lines (scroll for more), so the code gets the room; "Full log" makes it taller. */
 #log {
   max-height: 4.4em;

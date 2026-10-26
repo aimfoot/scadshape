@@ -32,6 +32,7 @@ import { applyTheme, onThemeChange, setThemeChoice, themeChoice, type ThemeChoic
 import { initParams, openParams, refreshChips } from './ui/params';
 import { commitCode, initRenderUi, requestRender, setWork, syncCodePanel, viewer } from './ui/render';
 import { initWorkMode } from './ui/workmode';
+import { initCodeHighlight } from './ui/codehl';
 import { currentEditor, enterSketch, initSketchMode, refreshSketchTexts, setMode, sketchHooks } from './ui/sketchmode';
 import { app, emit, initState, on, saveDoc } from './ui/state';
 import { initProjects } from './ui/projects';
@@ -122,6 +123,7 @@ function initLanguage() {
 
 document.documentElement.lang = getLang();
 applyI18n();
+initCodeHighlight(); // first: it colours whatever puts code in the editor
 initLanguage();
 initTheme();
 initRenderUi();
