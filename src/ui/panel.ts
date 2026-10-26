@@ -13,7 +13,7 @@ import { planeLabel } from './tree';
 import { buildModel } from '../model3d';
 import { $, $$, el } from './dom';
 import { pickerFor, type PickMode } from './pickers';
-import { renderOpts, setSource, viewer } from './render';
+import { renderOpts, setWork, viewer, work } from './render';
 import { app, emit, vars } from './state';
 import { showToast } from './toast';
 import { chipRow } from './params';
@@ -209,7 +209,7 @@ export function openPanel(f: SolidFeature, existing: boolean) {
   const landscape = innerWidth > innerHeight;
   viewer.setRightInset(landscape ? panelEl().offsetWidth + 16 : 0);
   viewer.setBottomInset(landscape ? 0 : panelEl().offsetHeight + 8);
-  if (app.source !== 'model') setSource('model');
+  if (work() !== 'draw') setWork('draw'); // features are edited in Draw
   $('#tree').hidden = true;
   $('#btnTree').setAttribute('aria-pressed', 'false');
   renderOpts.hideSketch = panel.f.sketch;
@@ -333,7 +333,7 @@ function textOnFace(hit: FaceHit) {
 function moveTextTo(p: { x: number; y: number }): boolean {
   const sk = panelSketch();
   const f = panel?.f;
-  if (!sk || f?.type !== 'text' || !placeSketch(f, sk) || app.source !== 'model') return false;
+  if (!sk || f?.type !== 'text' || !placeSketch(f, sk)) return false;
   const hit = viewer.pickFace(p);
   if (!hit) return false;
   keepSketch(sk);
@@ -363,7 +363,7 @@ const dragText: NonNullable<typeof viewer.drag> = {
   start(p) {
     const sk = panelSketch();
     const f = panel?.f;
-    if (!sk || f?.type !== 'text' || !placeSketch(f, sk) || app.source !== 'model') return false;
+    if (!sk || f?.type !== 'text' || !placeSketch(f, sk)) return false;
     const surface = textSurface(f, sk, app.doc, vars());
     const ray = viewer.rayAt(p);
     const at = surface.fromRay(ray.o, ray.d);
@@ -474,13 +474,13 @@ export function startFeature(type: SolidFeature['type']) {
   if (KINDS[type].pick.kind === 'none') return openPanel(newFeature(app.doc, type, WORLD_SKETCH), false);
   const sk = defaultSketch(type);
   // Extrude without a closed sketch but with a model: pick a face to extrude.
-  if (!sk && type === 'extrude' && app.source === 'model' && viewer.meshPositions) {
+  if (!sk && type === 'extrude' && viewer.meshPositions) {
     showToast(t('face.pickHint'), 'info');
     return extrudeFace();
   }
   // Text with a model and no points sketched for it: tap the face to put it on.
   const prepared = !!sk && !dependents(app.doc, sk.id).length && Object.values(sk.points).some(p => p.standalone);
-  if (type === 'text' && !prepared && app.source === 'model' && viewer.meshPositions) {
+  if (type === 'text' && !prepared && viewer.meshPositions) {
     showToast(t('text.pickFace'), 'info');
     pickFaceThen(textOnFace);
     return;

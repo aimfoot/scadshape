@@ -107,6 +107,10 @@ export const text: FeatureKind<TextFeature> = {
     const lift = f.op === 'remove' ? `translate([0, 0, -0.01]) ` : '';
     const h = f.op === 'remove' ? `${depth.code} + 0.01` : depth.code;
     const rot = angle.v ? `rotate(${angle.code}) ` : '';
+    // On a face that looks the other way than its sketch plane (an underside, the back, the left
+    // side) the plane's x runs right to left seen from outside: the letters are mirrored back so they
+    // read from outside, and the angle turns counterclockwise seen from there too.
+    const facing = outwardOf(sk) === 'reverse' ? 'mirror([1, 0, 0]) ' : '';
     const font = fontById(f.font);
     const glyphs = `text(${scadString(f.text)}, size = ${size.code}, font = ${scadString(font.family)}, halign = "${f.halign}", valign = "center", $fn = 24)`;
     // Sketched on a cylinder wall: the text follows the round side instead of a flat slab that
@@ -119,7 +123,7 @@ export const text: FeatureKind<TextFeature> = {
     }
     const code =
       `module ${ctx.module}() {\n  ${ctx.place(sk)}for (p = [${pts}])\n` +
-      `    translate([p[0], p[1], ${start.code}]) ${flip}${lift}${rot}linear_extrude(height = ${h})\n` +
+      `    translate([p[0], p[1], ${start.code}]) ${flip}${lift}${facing}${rot}linear_extrude(height = ${h})\n` +
       `      ${glyphs};\n}`;
     return { code, tools: [{ op: f.op, call: `${ctx.module}();` }] };
   },

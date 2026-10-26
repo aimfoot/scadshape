@@ -76,9 +76,9 @@ const corner = await page.evaluate(() => window.__scadshape.viewer.screenOfWorld
 await touch('touchStart', [{ x: r.left + corner.x, y: r.top + corner.y }]); await touch('touchEnd', []);
 await page.screenshot({ path: `${out}/th-3d-dark.png` });
 await page.click('#measureDone');
-await page.click('#btnCode');
+await page.click('#workMode [data-work=code]');
 await page.screenshot({ path: `${out}/th-code-dark.png` });
-await page.click('#btnCode');
+await page.click('#workMode [data-work=draw]');
 await openTree(page);
 await page.screenshot({ path: `${out}/th-tree-dark.png` });
 

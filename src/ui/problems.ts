@@ -29,7 +29,7 @@ function gotoLine(n: number) {
 function applyFixToCode(p: Problem) {
   const code = $<HTMLTextAreaElement>('#code');
   // Typed since the render: the fix's places are no longer right.
-  if (code.value !== shown.src || code.readOnly) {
+  if (code.value !== shown.src) {
     showToast(t('fix.stale'), 'error');
     return;
   }
@@ -45,6 +45,7 @@ function applyFixToCode(p: Problem) {
   }
   code.scrollTop = scroll;
   code.blur(); // no keyboard over the list
+  $('#btnRunCode').click(); // a fix is asked for: into the model and rendered
   for (const b of $$<HTMLButtonElement>('#problemList .fix')) b.disabled = true; // until the new render
   remoteLog('code-fix', { message: p.message.slice(0, 80) });
 }
@@ -58,7 +59,7 @@ function row(p: Problem) {
   if (p.hint) b.append(el('span', { className: 'raw', textContent: p.message }));
   if (p.line) b.addEventListener('click', () => gotoLine(p.line!));
   const li = el('li', { className: p.severity }, b);
-  if (p.fix && !$<HTMLTextAreaElement>('#code').readOnly) {
+  if (p.fix) {
     const f = el('button', { type: 'button', className: 'fix' },
       el('strong', { textContent: t('fix.button') }),
       el('code', { textContent: p.fix.preview }),

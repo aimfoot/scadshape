@@ -18,6 +18,7 @@ page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => m.type() === 'error' && errors.push(m.text()));
 await page.route('**/api/**', r => r.fulfill({ status: 204 }));
 const status = () => page.evaluate(() => ({ text: document.querySelector('#status').textContent, cls: document.querySelector('#status').className }));
+const fillCode = async c => { await page.fill('#code', c); await page.click('#btnRunCode'); await page.waitForTimeout(300); };
 const waitRendered = async () => {
   await page.waitForTimeout(1200); // the code renders 0.8 s after typing
   await page.waitForFunction(() => !/Rendering|Loading/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
@@ -41,11 +42,11 @@ module gear2d(z) polygon([for (k = [0:z-1], s = [-1, 1]) polar(m*z/2, k*360/z + 
 cylinder(r = 30, h = 3);
 translate([0, 0, 3]) linear_extrude(8) gear2d(14);
 `;
-// Code from an AI chat: Paste, which has "Copy for AI".
-await page.click('#workMode [data-work=paste]');
+// The model's code in Code (with "Copy for AI"); Render puts what is typed in the model.
+await page.click('#workMode [data-work=code]');
 await page.waitForTimeout(300);
 await page.waitForSelector('#code', { state: 'visible' });
-await page.fill('#code', gears);
+await fillCode(gears);
 let st = await waitRendered();
 assert.match(st.text, /triangles · 1 problem$/, st.text);
 assert.match(st.cls, /warn/);
@@ -79,13 +80,13 @@ assert.match(await page.textContent('#log'), /Ignoring unknown function 'radians
 await page.click('#btnFullLog'); // off again
 await page.tap('#problemList .fix');
 assert.equal(await page.inputValue('#code'), gears.replace('radians(a)', 'a * PI / 180'));
-assert.ok(await page.$eval('#problemList .fix', b => b.disabled), 'disabled until the new render');
 st = await waitRendered();
 assert.doesNotMatch(st.text, /problem/); assert.doesNotMatch(st.cls, /warn|error/);
 assert.ok(await page.isHidden('#problems'));
 await page.focus('#code');
 await page.keyboard.press('Control+z');
 assert.equal(await page.inputValue('#code'), gears, 'undo after a fix');
+await page.keyboard.press('Control+Enter'); // renders, like Render
 st = await waitRendered();
 assert.match(st.text, /1 problem$/);
 // Typed since the render: the fix refuses instead of changing the wrong place
@@ -97,7 +98,7 @@ assert.match(await page.inputValue('#code'), /radians\(a\)/);
 
 // A silent mistake: OpenSCAD renders rotate(PI/4) without a word (it turns 0.785°), the app's check
 // finds it and says so in the status bar and the text for the AI.
-await page.fill('#code', 'cube([30, 4, 4]);\nrotate([0, 0, PI / 4]) cube([30, 4, 4]);\n');
+await fillCode('cube([30, 4, 4]);\nrotate([0, 0, PI / 4]) cube([30, 4, 4]);\n');
 st = await waitRendered();
 assert.match(st.text, /triangles · 1 problem$/, st.text);
 list = await rows();
@@ -115,7 +116,7 @@ assert.doesNotMatch(st.text, /problem/);
 
 // A part in mid-air (an AI's screw-top jar: the cavity cut takes away the top the neck stands on).
 // Found in the rendered model, so no line; the lid beside it is fine.
-await page.fill('#code', readFileSync(new URL('../../tests/ai-mistakes/screw-jar.scad', import.meta.url), 'utf8'));
+await fillCode(readFileSync(new URL('../../tests/ai-mistakes/screw-jar.scad', import.meta.url), 'utf8'));
 st = await waitRendered();
 assert.match(st.text, /triangles · 1 problem$/, st.text);
 list = await rows();
@@ -128,7 +129,7 @@ await page.screenshot({ path: `${out}/p-floating.png` });
 
 // A cut that removes nothing (an AI's ring "engraved" outside its surface): found by an extra check
 // once the model stands still, and added to the list on its line.
-await page.fill('#code', readFileSync(new URL('../../tests/ai-mistakes/engrave-outside.scad', import.meta.url), 'utf8'));
+await fillCode(readFileSync(new URL('../../tests/ai-mistakes/engrave-outside.scad', import.meta.url), 'utf8'));
 st = await waitRendered();
 assert.match(st.text, /triangles$/, st.text);
 await page.waitForFunction(() => /1 problem$/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
@@ -138,7 +139,7 @@ assert.match(list[0].text, /^Line 16The cut text\("love"\) doesn't touch the sha
 await page.screenshot({ path: `${out}/p-cut.png` });
 
 // A syntax error (+=): fails, the list says why
-await page.fill('#code', 'x = 1;\nx += 1;\ncube(x);\n');
+await fillCode('x = 1;\nx += 1;\ncube(x);\n');
 st = await waitRendered();
 assert.match(st.cls, /error/);
 assert.equal(st.text, 'Error · 1 problem');
@@ -147,34 +148,16 @@ assert.equal(list.length, 1);
 assert.match(list[0].text, /^Line 2OpenSCAD has no \+= or \+\+/);
 assert.equal(list[0].cls, 'error');
 
-// Code: the same problems for code you write yourself, but no AI aids – and its own code, apart from
-// the pasted code.
-await page.click('#workMode [data-work=code]');
-await page.waitForTimeout(300);
-assert.equal(await page.inputValue('#code'), '');
-await page.fill('#code', 'x = 1;\nx += 1;\ncube(x);\n');
 // Code renders only when asked: Render is highlighted until then.
+await page.fill('#code', 'cube(7);\n');
 await page.waitForTimeout(1500);
-assert.doesNotMatch(await page.textContent('#status'), /problem/, 'no render while writing');
+assert.equal(st.text, (await status()).text, 'no render while writing');
 assert.ok(await page.$eval('#btnRunCode', b => b.classList.contains('stale')));
 await page.click('#btnRunCode');
 await page.waitForTimeout(300);
 st = await waitRendered();
-assert.equal(st.text, 'Error · 1 problem');
+assert.doesNotMatch(st.text, /problem/);
 assert.ok(!(await page.$eval('#btnRunCode', b => b.classList.contains('stale'))));
-assert.ok(await page.isVisible('#problemList li'));
-for (const id of ['#btnCopyProblems', '#btnPrompt', '#btnPaste', '#btnClearCode', '#btnCode', '#btnNewSketch']) assert.ok(await page.isHidden(id), `${id} is not in Code`);
-assert.ok(await page.isVisible('#source'));
-await page.screenshot({ path: `${out}/p-code.png` });
-await page.fill('#code', 'cube(7);\n');
-await page.click('#workMode [data-work=paste]');
-await page.waitForTimeout(300);
-assert.equal(await page.inputValue('#code'), 'x = 1;\nx += 1;\ncube(x);\n', 'the pasted code is kept apart');
-await page.click('#workMode [data-work=code]');
-await page.waitForTimeout(300);
-assert.equal(await page.inputValue('#code'), 'cube(7);\n');
-await page.click('#workMode [data-work=paste]');
-await page.waitForTimeout(300);
 await page.setViewportSize({ width: 915, height: 412 });
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${out}/p-landscape.png` });

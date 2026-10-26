@@ -3,7 +3,9 @@
 // node pwa.mjs [url-of-public-server]   (locally: http://127.0.0.1:8792/?sw – otherwise sw only
 // registers over https)
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
+const example = id => readFileSync(new URL(`../../src/examples/${id}.scad`, import.meta.url), 'utf8');
 const url = process.argv[2] ?? 'http://127.0.0.1:8792/?sw';
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
 const errors = [];
@@ -28,7 +30,7 @@ console.log('cache:', cached);
 await ctx.setOffline(true);
 await page.reload();
 await page.waitForFunction(() => /triangles|Start with/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
-await page.click('#workMode [data-work=code]'); await page.selectOption('#source', 'plate');
+await page.click('#workMode [data-work=code]'); await page.fill('#code', example('plate')); await page.click('#btnRunCode');
 await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 console.log('offline:', await page.textContent('#status'));
 await ctx.setOffline(false);

@@ -535,6 +535,18 @@ await test('text: raised at a point, engraved in a plate, non-ASCII characters a
   r = await render(buildModel(doc).code); near(r.max[2], 5, 1e-3); assert.ok(r.vol < 80 * 30 * 5 - 20, `${r.vol}`);
   tx.text = '  '; assert.match(buildModel(doc).errors.get(tx.id)!, /Type some text/);
 });
+await test('text on an underside reads from below (not mirrored)', async () => {
+  const doc = emptyDoc(); const s = newSketch(doc, 'XY'); insertFeature(doc, s); rect(s, -40, -15, 40, 15);
+  const e = newExtrude(doc, s.id); e.depth = '5'; insertFeature(doc, e);
+  // A sketch on the underside, as tapping it makes one: the XY plane, facing down.
+  const ts = newSketch(doc, 'XY'); ts.outward = 'reverse'; insertFeature(doc, ts); ts.points[pt(ts, 0, 0)].standalone = true;
+  const tx = newFeature(doc, 'text', ts); tx.text = 'LEFT'; tx.halign = 'left'; insertFeature(doc, tx);
+  const m = buildModel(doc); assert.equal(m.errors.size, 0, [...m.errors.values()].join());
+  const txt = await render(m.code.replace(/\/\/ Model[\s\S]*$/, 'text_1();'));
+  // Seen from below, the viewer's right is −x: left-aligned text runs from the point towards −x.
+  near(txt.max[0], 0, 1.5); assert.ok(txt.min[0] < -20, JSON.stringify(txt)); // (the first letter's side bearing)
+  near(txt.max[2], 0, 0.02); near(txt.min[2], -1, 0.02); // raised downwards, out of the underside
+});
 await test('text on a cylinder wall follows the round side (engraved and raised, outside and in a hole)', async () => {
   const doc = emptyDoc(); const s = newSketch(doc, 'XY'); insertFeature(doc, s); circle(s, 0, 0, 50);
   const e = newExtrude(doc, s.id); e.depth = '50'; insertFeature(doc, e);

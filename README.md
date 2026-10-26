@@ -6,9 +6,10 @@ containers, text, snap fits …) and export 3MF/STL for 3D printing. Everything 
 offline: OpenSCAD (WebAssembly, Manifold backend) renders the model and FreeCAD's sketch solver
 (planegcs) solves the constraints.
 
-Three ways of working, switched at the top of the screen: **Draw** (sketches and features),
-**Code** (a plain OpenSCAD editor, for writing the code yourself) and **Paste** (code from an AI
-chat: copy a prompt with the app's rules, paste the answer, copy the problems back).
+One model, two ways to work on it, switched at the top of the screen: **Draw** (sketches and
+features) and **Code** (the model as OpenSCAD code, edited in place and rendered when you tap
+Render). Code also has a prompt for an AI chat with the app's rules, and **Convert to sketches**
+turns a model that is code into sketches you can go on with in Draw.
 
 It runs as a web app (PWA) and as an Android app (a WebView wrapper with no permissions at all).
 To print, open the exported 3MF/STL in a slicer (Bambu Studio, OrcaSlicer, PrusaSlicer, …) – phone

@@ -190,7 +190,7 @@ export function enterSketch(f: SketchFeature) {
     if (app.solver) editor.setSolver(app.solver);
   } else editor.setSketch(f);
   // The model's edges in the sketch plane (e.g. the face being sketched on) to see and snap to.
-  const pos = app.source === 'model' ? viewer.meshPositions : null;
+  const pos = viewer.meshPositions;
   editor.reference = pos ? sketchReference(pos, sketchFrame(f, vars(), app.doc)) : null;
   if (!editor.reference?.segments.length) editor.reference = null;
   editor.fitReference = !!f.outward;
@@ -201,7 +201,7 @@ export function enterSketch(f: SketchFeature) {
 
 /** Sketch on a round face: how far the surface falls away below the drawing (see SketchFeature.seat). */
 function updateSeat(sk: SketchFeature) {
-  const pos = app.source === 'model' ? viewer.meshPositions : null;
+  const pos = viewer.meshPositions;
   if (!sk.outward || !pos) return;
   const xs: number[] = [], ys: number[] = [];
   for (const e of Object.values(sk.entities)) {
@@ -305,7 +305,7 @@ export function sketchForHit(hit: FaceHit): SketchFeature {
 
 /** Let the user tap a face in the 3D view (the "Tap a face" bar with Cancel). */
 export function pickFaceThen(onHit: (hit: FaceHit) => void): boolean {
-  if (app.source !== 'model' || !viewer.meshPositions) {
+  if (!viewer.meshPositions) {
     showToast(t('plane.noModel'), 'info');
     return false;
   }
@@ -347,7 +347,7 @@ function initPlaneDialog() {
     $('#planeDlg h2').textContent = title;
     offset.value = '0';
     $('#planeError').hidden = true;
-    $<HTMLButtonElement>('#btnPickFace').disabled = app.source !== 'model' || !viewer.meshPositions;
+    $<HTMLButtonElement>('#btnPickFace').disabled = !viewer.meshPositions;
     refreshChips();
     dlg.showModal();
   };

@@ -3,7 +3,9 @@
 // button is only Cancel, during a long render).
 // node settings.mjs [url] [outdir]
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
+const example = id => readFileSync(new URL(`../../src/examples/${id}.scad`, import.meta.url), 'utf8');
 const url = process.argv[2] ?? 'http://127.0.0.1:8799/';
 const out = process.argv[3] ?? '.';
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
@@ -89,10 +91,9 @@ console.log('custom size saved, a turned part fits');
 
 // 5. Code renders when asked (Render), not while you write.
 if (await page.isVisible('#tree')) await page.click('#btnTree'); // ☰ would cover the code
-await page.click('#workMode [data-work=code]'); await page.selectOption('#source', 'cube');
+await page.click('#workMode [data-work=code]'); await page.fill('#code', example('cube')); await page.click('#btnRunCode');
 await waitRendered();
 await page.fill('#code', 'cube([7, 7, 7]); translate([20, 0, 0]) cube(3);');
-await page.waitForFunction(() => document.querySelector('#source').value === 'custom');
 await page.waitForTimeout(1500);
 assert.doesNotMatch((await status()).text, /\b24 triangles/, 'not rendered while writing');
 await page.click('#btnRunCode');

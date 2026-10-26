@@ -40,7 +40,7 @@ await page.setInputFiles('#projFile', { name: 'snap_box.scad', mimeType: 'text/p
 await page.waitForSelector('#btnConvert', { state: 'visible', timeout: 60000 });
 await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 await page.click('#btnConvert');
-await page.waitForFunction(() => window.__scadshape.source === 'model' && window.__scadshape.doc.features.length > 5, null, { timeout: 120000 });
+await page.waitForFunction(() => window.__scadshape.work === 'draw' && window.__scadshape.doc.features.length > 5, null, { timeout: 120000 });
 const doc = await page.evaluate(() => JSON.stringify(window.__scadshape.doc));
 const nFeatures = JSON.parse(doc).features.length;
 let s = await stores(page);

@@ -7,6 +7,7 @@ import type { Param } from './params';
 import { emptySketch, normalizeSketch, type Plane } from './sketch/model';
 import { findLoops } from './sketch/regions';
 import { KINDS, type SolidFeature, type SketchFeature } from './features';
+import { WORLD_SKETCH, type CodeFeature } from './features/code';
 import type { ExtrudeFeature } from './features/extrude';
 import type { HoleFeature } from './features/hole';
 import type { RevolveFeature } from './features/revolve';
@@ -59,6 +60,22 @@ const sketchById = (doc: Doc, id: string) => doc.features.find((f): f is SketchF
 export const newExtrude = (doc: Doc, sketch: string): ExtrudeFeature => newFeature(doc, 'extrude', sketchById(doc, sketch));
 export const newRevolve = (doc: Doc, sketch: string): RevolveFeature => newFeature(doc, 'revolve', sketchById(doc, sketch));
 export const newHole = (doc: Doc, sketch: string): HoleFeature => newFeature(doc, 'hole', sketchById(doc, sketch));
+
+/** The model as OpenSCAD code: one code feature holding `code` (what editing the code in Code makes
+ * of a model; also a pasted or opened .scad file). Its own variables are in the code. */
+export function codeDoc(code: string): Doc {
+  const doc = emptyDoc();
+  doc.features.push({ ...newFeature(doc, 'code', WORLD_SKETCH), code });
+  return doc;
+}
+
+/** The code feature of a model that is just code (as codeDoc makes it), else null. Such a model is
+ * rendered from its code as it is, so the problem list's line numbers match the code you see. */
+export function codeOnly(doc: Doc): CodeFeature | null {
+  const [f, ...rest] = doc.features;
+  if (rest.length || !f || f.type !== 'code' || f.suppressed || f.op !== 'add' || (f.rep && f.rep !== 'none') || doc.params.length || doc.rollback !== null) return null;
+  return f;
+}
 
 /** Number of active features (before the rollback marker). */
 export const activeCount = (doc: Doc) => (doc.rollback === null ? doc.features.length : Math.min(doc.rollback, doc.features.length));

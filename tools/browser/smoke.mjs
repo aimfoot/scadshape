@@ -1,6 +1,8 @@
 // Smoke test of scadshape in headless Chromium (mobile emulation, touch screen).
 // node smoke.mjs [url] [outdir] [--bench]
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
+const example = id => readFileSync(new URL(`../../src/examples/${id}.scad`, import.meta.url), 'utf8');
 const url = process.argv[2] ?? 'http://127.0.0.1:8799/';
 const out = process.argv[3] ?? '.';
 const bench = process.argv.includes('--bench');
@@ -17,7 +19,7 @@ for (const [name, vp] of [['landscape', { width: 915, height: 412 }], ['portrait
   page.on('close', () => console.log(name, 'logged:', logged.join(' ')));
   const t0 = Date.now();
   await page.goto(url);
-  await page.click('#workMode [data-work=code]'); await page.selectOption('#source', 'plate');
+  await page.click('#workMode [data-work=code]'); await page.fill('#code', example('plate')); await page.click('#btnRunCode');
   await page.waitForFunction(() => /triangles|Error|Empty/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
   console.log(name, 'status:', await page.textContent('#status'), `(${Date.now() - t0} ms from page load)`);
   await page.screenshot({ path: `${out}/${name}.png` });
@@ -27,7 +29,7 @@ for (const [name, vp] of [['landscape', { width: 915, height: 412 }], ['portrait
     await page.waitForFunction(() => /Error/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
     console.log('syntax error →', await page.textContent('#status'), '|', (await page.textContent('#log')).split('\n').find(l => /ERROR/.test(l)));
     await page.screenshot({ path: `${out}/error.png` });
-    await page.selectOption('#source', 'cup');
+    await page.fill('#code', example('cup')); await page.click('#btnRunCode');
     await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
     console.log('cup →', await page.textContent('#status'));
     await page.click('[data-view="top"]');

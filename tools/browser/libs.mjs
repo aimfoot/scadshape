@@ -3,6 +3,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+const example = id => readFileSync(new URL(`../../src/examples/${id}.scad`, import.meta.url), 'utf8');
 const url = process.argv[2] ?? 'http://127.0.0.1:8799/';
 const out = process.argv[3] ?? '.';
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
@@ -26,7 +27,7 @@ await page.goto(url);
 await page.evaluate(() => { localStorage.clear(); localStorage.setItem('scadshape.lang', 'en'); });
 await page.reload();
 await page.waitForFunction(() => /Start with Sketch/.test(document.querySelector('#status').textContent));
-await page.click('#workMode [data-work=code]'); await page.selectOption('#source', 'cube'); await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent));
+await page.click('#workMode [data-work=code]'); await page.fill('#code', example('cube')); await page.click('#btnRunCode'); await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent));
 assert.deepEqual(libRequests, [], 'no library before it is used');
 
 // BOSL2: rounded cube and an M6 screw (screws.scad fetches more files from the library)
@@ -53,10 +54,9 @@ assert.deepEqual([...libRequests].sort(), ['BOSL2.json', 'Round-Anything.json', 
 st = await renderCode('include <DoesNotExist/std.scad>\ncube(5);');
 assert.match(await page.textContent('#log'), /Can't find include file/);
 
-// Open a .scad file from ☰ → the model → Open file: becomes Custom code and renders
+// Open a .scad file from ☰ → the model → Open file: a new model in Code, rendered
 await page.click('#workMode [data-work=draw]');
 await page.waitForTimeout(500);
-if (await page.isVisible('#codePanel')) await page.click('#btnCode');
 if (await page.isHidden('#tree')) await page.click('#btnTree');
 await page.click('#btnProjects'); await page.waitForSelector('#projDlg[open]');
 assert.equal(await page.getAttribute('#projFile', 'accept'), null, 'no filter that greys out .scad');
@@ -64,7 +64,7 @@ const scadPath = new URL('../../vendor/libraries/BOSL2/LICENSE', import.meta.url
 await page.setInputFiles('#projFile', scadPath);
 await page.waitForSelector('#partToast:not([hidden])'); assert.match(await page.textContent('#partToast'), /neither/);
 await page.setInputFiles('#projFile', { name: 'screw.scad', mimeType: 'application/octet-stream', buffer: Buffer.from('include <BOSL2/std.scad>\ncyl(d = 12, h = 20, chamfer = 1, $fn = 48);') });
-await page.waitForFunction(() => document.querySelector('#source').value === 'custom');
+await page.waitForFunction(() => window.__scadshape.work === 'code' && document.querySelector('#projName').textContent === 'screw');
 assert.ok(await page.isVisible('#codePanel')); assert.match(await page.inputValue('#code'), /cyl\(d = 12/);
 await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent) && !/Rendering/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 console.log('opened .scad:', await status());

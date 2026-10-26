@@ -25,7 +25,7 @@ let file: File | null = null;
 let job = 0;
 
 /** The code that is exported: the whole model (without a preview from an open panel). */
-const exportCode = () => (app.source === 'model' ? buildModel(app.doc).code : currentCode());
+const exportCode = () => currentCode();
 
 /** In the downloaded code import() points to the original file's name (put the file next to the .scad file). */
 function scadForDownload(code: string) {

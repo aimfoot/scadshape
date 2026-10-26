@@ -45,9 +45,10 @@ const waitRendered = () => page.waitForFunction(() => /triangles/.test(document.
 
 await page.goto(url);
 
-// 1. The file waiting at start is opened as your own code (Code) and rendered.
+// 1. The file waiting at start is opened as a model in Code and rendered.
 await waitRendered();
-assert.equal(await page.evaluate(() => window.__scadshape.source), 'custom');
+assert.equal(await page.evaluate(() => window.__scadshape.work), 'code');
+assert.equal(await page.evaluate(() => window.__scadshape.doc.features.map(f => f.type).join()), 'code');
 console.log('waiting .scad →', await page.textContent('#status'));
 
 // 2. The system bars get the toolbar's color (light theme).

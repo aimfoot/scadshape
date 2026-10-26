@@ -1,6 +1,8 @@
-// Code from an AI chat: the start card's "Copy prompt" (with the printer from Settings, and on to
-// Paste) and "Paste code" (an answer with text and ``` fences → only the code, in the pasted code,
-// rendered), and pasting a whole answer straight into the code, and Clear (with its Undo).
+// One model, two ways of working: the start card's "Copy prompt" (with the printer from Settings, and
+// on to Code) and "Paste code" (an answer with text and ``` fences → only the code, as the model, in
+// Code), pasting a whole answer straight into the code, editing the code (Render puts it in the
+// model), a drawn model turned into code by an edit (and back with Draw's undo), and pasting when the
+// model is not empty (a new model).
 // node aiflow.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
@@ -15,54 +17,59 @@ page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => m.type() === 'error' && errors.push(m.text()));
 await page.route('**/api/**', r => r.fulfill({ status: 204 }));
 const toast = () => page.textContent('#partToast');
+const work = () => page.evaluate(() => document.body.dataset.work);
+const feats = () => page.evaluate(() => window.__scadshape.doc.features.map(f => f.type).join());
+const docCode = () => page.evaluate(() => window.__scadshape.doc.features[0]?.code);
+const settled = () => page.waitForFunction(() => /\d+ triangles|Error/.test(document.querySelector('#status').textContent) && !/Rendering/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 
 await page.goto(url);
 await page.evaluate(() => { localStorage.clear(); localStorage.setItem('scadshape.lang', 'en'); });
 await page.reload();
 await page.waitForFunction(() => /Start with Sketch/.test(document.querySelector('#status').textContent));
+assert.equal(await work(), 'draw');
 assert.ok(await page.isVisible('#startCard .ai-start'));
+assert.equal(await page.$$eval('#workMode [data-work]', bs => bs.map(b => b.textContent).join()), 'Draw,Code');
 await page.screenshot({ path: `${out}/a-start.png` });
 
-// 1. Copy prompt
+// 1. Copy prompt: on to Code, which has the prompt and Convert next to Measure
 await page.click('#startPrompt');
 await page.waitForFunction(() => /Prompt copied/.test(document.querySelector('#partToast').textContent));
 const prompt = await page.evaluate(() => navigator.clipboard.readText());
 assert.match(prompt, /^Write an OpenSCAD model for me\. I will open it in scadshape \(OpenSCAD 2026\.10\.15, Manifold backend\)\./);
 assert.match(prompt, /print on Bambu Lab A1 mini \(180 × 180 × 180 mm\)/);
 assert.match(prompt, /\n\nWhat I want: $/);
-assert.equal(await page.evaluate(() => document.body.dataset.work), 'paste', 'on to Paste, where the answer goes');
+assert.equal(await work(), 'code');
 assert.ok(await page.isHidden('#startCard'));
-assert.ok(await page.isVisible('#btnPaste'));
+for (const id of ['#btnMeasure', '#btnPrompt', '#btnConvert', '#code', '#btnRunCode']) assert.ok(await page.isVisible(id), id);
+for (const id of ['#btnNewSketch', '#btnParams', '#btnDocUndo']) assert.ok(await page.isHidden(id), id);
 await page.click('#workMode [data-work=draw]');
 await page.waitForTimeout(300);
 assert.ok(await page.isVisible('#startCard .ai-start'));
+assert.ok(await page.isHidden('#codePanel'));
 
-// 2. The AI's answer, copied whole (text around the code) → Paste code
+// 2. The AI's answer, copied whole (text around the code) → Paste code: the model, in Code
 const answer = 'Sure! Here is a parametric box:\n\n```openscad\n// Parametric box\n// Box: open on top, 2 mm walls all round.\nwidth = 40; // outer width\ndepth = 30;\nheight = 12;\nwall = 2;\ndifference() {\n  cube([width, depth, height]);\n  translate([wall, wall, wall]) cube([width - 2*wall, depth - 2*wall, height]);\n}\n```\n\nChange `width` to make it bigger.';
 await page.evaluate(t => navigator.clipboard.writeText(t), answer);
 await page.click('#startPaste');
 await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 assert.equal(await toast(), 'Code pasted');
-const st = await page.evaluate(() => ({ source: window.__scadshape.source, code: document.querySelector('#code').value, card: document.querySelector('#startCard').hidden, panel: document.querySelector('#codePanel').hidden }));
-assert.deepEqual([st.source, st.card, st.panel], ['paste', true, false]);
-assert.match(st.code, /^\/\/ Parametric box\n\/\/ Box: open on top, 2 mm walls all round.\nwidth = 40;/); assert.doesNotMatch(st.code, /Sure!|```|Change `width`/);
+assert.equal(await work(), 'code');
+const box = await page.inputValue('#code');
+assert.match(box, /^\/\/ Parametric box\n\/\/ Box: open on top, 2 mm walls all round.\nwidth = 40;/); assert.doesNotMatch(box, /Sure!|```|Change `width`/);
+assert.equal(await feats(), 'code'); assert.equal(await docCode(), box, 'the code is the model');
 assert.match(await page.textContent('#status'), /triangles$/, 'no problems');
 await page.screenshot({ path: `${out}/a-pasted.png` });
 
 // What the code says it is (its top comment) above the status: the title, a tap opens the parts, × hides it.
 assert.ok(await page.isVisible('#modelNote'));
 assert.equal(await page.textContent('#modelNoteTitle'), 'Parametric box');
-assert.ok(await page.isHidden('#modelNoteBody'));
 await page.click('#modelNoteToggle');
 assert.equal(await page.textContent('#modelNoteBody'), 'Box: open on top, 2 mm walls all round.');
 await page.screenshot({ path: `${out}/a-note.png` });
 await page.click('#modelNoteClose');
 assert.ok(await page.isHidden('#modelNote'));
 
-// The code bar has the prompt too
-assert.ok(await page.isVisible('#btnPrompt'));
-
-// 3. A whole answer pasted straight into the code: only the code goes in
+// 3. A whole answer pasted straight into the code: only the code goes in; Render puts it in the model
 await page.evaluate(() => { const c = document.querySelector('#code'); c.focus(); c.select(); });
 await page.evaluate(t => {
   const dt = new DataTransfer();
@@ -71,55 +78,65 @@ await page.evaluate(t => {
 }, 'Try this:\n```\ncylinder(d = 20, h = 5);\n```');
 assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
 assert.equal(await toast(), 'Only the code from the answer was pasted');
-// In Code (writing it yourself) a paste goes in as it is.
-await page.click('#workMode [data-work=code]');
+assert.equal(await docCode(), box, 'not in the model before Render');
+assert.ok(await page.$eval('#btnRunCode', b => b.classList.contains('stale')));
+await page.click('#btnRunCode');
 await page.waitForTimeout(300);
-assert.ok(await page.isHidden('#btnPrompt'));
-assert.ok(await page.isHidden('#modelNote'), 'no note for your own code');
-await page.evaluate(() => { const c = document.querySelector('#code'); c.focus(); c.select(); });
-const raw = await page.evaluate(() => {
-  const dt = new DataTransfer();
-  dt.setData('text/plain', '```\ncube(3);\n```');
-  return document.querySelector('#code').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-});
-assert.equal(raw, true, 'not taken over in Code');
-await page.click('#workMode [data-work=paste]');
-await page.waitForTimeout(300);
-assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
+await settled();
+assert.equal(await docCode(), 'cylinder(d = 20, h = 5);\n');
+assert.ok(!(await page.$eval('#btnRunCode', b => b.classList.contains('stale'))));
 
-// Clear: empties the code; the button is Undo for a while and brings it back; typing ends that
-const clearBtn = () => page.evaluate(() => { const b = document.querySelector('#btnClearCode'); return { text: b.textContent, undo: b.classList.contains('undo'), label: b.getAttribute('aria-label') }; });
-assert.deepEqual(await clearBtn(), { text: '', undo: false, label: 'Clear the code' });
-await page.screenshot({ path: `${out}/a-clear.png` });
-await page.tap('#btnClearCode');
-assert.equal(await page.inputValue('#code'), '');
-assert.equal(await toast(), 'Code cleared – tap Undo to get it back');
-assert.deepEqual(await clearBtn(), { text: 'Undo', undo: true, label: 'Clear the code' });
-await page.screenshot({ path: `${out}/a-cleared.png` });
-await page.tap('#btnClearCode');
-assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
-assert.equal((await clearBtn()).undo, false);
-await page.tap('#btnClearCode');
-await page.focus('#code');
-await page.keyboard.type('cube(5);');
-assert.equal((await clearBtn()).undo, false, 'typed: no undo any more');
-// The code's own undo still has it (typing can be more than one undo step)
-for (let i = 0; i < 4 && (await page.inputValue('#code')) !== 'cylinder(d = 20, h = 5);\n'; i++) await page.keyboard.press('Control+z');
-assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
-
-// 4. Nothing usable on the clipboard: paste by hand
-await page.evaluate(() => navigator.clipboard.writeText('Sorry, I cannot help with that.'));
+// 4. Edits go into the model when going back to Draw too, and Draw shows it as one code feature
+await page.fill('#code', 'cylinder(d = 30, h = 5);\n');
 await page.click('#workMode [data-work=draw]');
 await page.waitForTimeout(300);
+assert.equal(await docCode(), 'cylinder(d = 30, h = 5);\n');
+assert.equal(await feats(), 'code');
+
+// 5. A drawn model: Code shows its code; an edit makes it code, Draw's undo brings the sketches back
+if (await page.isHidden('#tree')) await page.click('#btnTree');
+await page.click('#btnStart');
+await page.click('#startExamples .example');
+await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
+const drawn = await feats();
+assert.ok(drawn.split(',').length > 2, drawn);
+await page.click('#workMode [data-work=code]');
+await page.waitForTimeout(300);
+const generated = await page.inputValue('#code');
+assert.match(generated, /^\/\/ Made with scadshape/);
+await page.click('#workMode [data-work=draw]'); // no edit: still drawn
+await page.waitForTimeout(300);
+assert.equal(await feats(), drawn);
+await page.click('#workMode [data-work=code]');
+await page.waitForTimeout(300);
+await page.fill('#code', `${generated}\ntranslate([0, 0, 40]) cube(5);\n`);
+await page.click('#btnRunCode');
+await page.waitForFunction(() => /now code/.test(document.querySelector('#partToast').textContent));
+await settled();
+assert.equal(await feats(), 'code');
+await page.click('#workMode [data-work=draw]');
+await page.waitForTimeout(300);
+await page.click('#btnDocUndo');
+await page.waitForTimeout(300);
+assert.equal(await feats(), drawn, 'undo brings the sketches back');
+
+// 6. Pasting when the model is not empty: a new model, named by the code's top comment
+const before = await page.textContent('#projName');
+await page.evaluate(t => navigator.clipboard.writeText(t), answer);
+await page.click('#btnTree'); await page.click('#btnStart');
+await page.click('#startPaste');
+// (step 2 already named the first model so: this one gets a name of its own)
+await page.waitForFunction(b => /^Parametric box \S+$/.test(document.querySelector('#projName').textContent) && document.querySelector('#projName').textContent !== b, before);
+await settled();
+assert.equal(await feats(), 'code');
+
+// 7. Nothing usable on the clipboard: paste by hand in Code
+await page.evaluate(() => navigator.clipboard.writeText('Sorry, I cannot help with that.'));
+await page.click('#workMode [data-work=draw]');
 await page.click('#btnTree'); await page.click('#btnStart');
 await page.click('#startPaste');
 await page.waitForFunction(() => /^The clipboard has no OpenSCAD code/.test(document.querySelector('#partToast').textContent));
-assert.equal(await page.evaluate(() => window.__scadshape.source), 'paste');
-assert.ok(await page.isVisible('#btnClearCode'));
-// The model's own code is generated: no Clear
-await page.click('#workMode [data-work=draw]');
-await page.waitForTimeout(300);
-assert.ok(await page.isHidden('#btnClearCode'));
+assert.equal(await work(), 'code');
 
 await browser.close();
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');

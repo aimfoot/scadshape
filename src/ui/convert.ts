@@ -1,18 +1,17 @@
-// "Convert to sketches": the code in Custom code (or an example) becomes a new model with sketches
-// and features (convert/scad2doc.ts). Afterwards the volume is compared with the original, so you
-// can see if it is exact.
+// "Convert to sketches" (Code's toolbar): a model that is code becomes sketches and features
+// (convert/scad2doc.ts), in place – Draw's undo brings the code back. Afterwards the volume is
+// compared with the original, so you can see if it is exact.
 
-import { codeDescription } from '../aiprompt';
+import { codeOnly } from '../doc';
 import { scadToDoc, type ConvertEngine } from '../convert/scad2doc';
 import { buildModel } from '../model3d';
 import { getLang, t } from '../i18n';
-import { createProject } from '../projects';
 import { remoteLog } from '../remote';
 import { parseBinaryStl } from '../stl';
-import { $, store } from './dom';
-import { switchProject } from './projects';
-import { currentCode, engine, EXAMPLES, setStatus } from './render';
-import { app } from './state';
+import { $ } from './dom';
+import { commitCode, currentCode, engine, setStatus, view } from './render';
+import { switchWork } from './workmode';
+import { app, emit } from './state';
 import { showToast } from './toast';
 
 const text = async (src: string, format: 'csg' | 'svg') => {
@@ -35,7 +34,12 @@ async function volume(src: string): Promise<number | null> {
 
 let busy = false;
 export async function convertCode() {
-  if (busy || app.source === 'model') return;
+  if (busy) return;
+  commitCode(); // what is in the editor is what gets converted
+  if (!codeOnly(app.doc)) {
+    showToast(t('convert.alreadyDrawn'));
+    return;
+  }
   const src = currentCode();
   busy = true;
   const btn = $<HTMLButtonElement>('#btnConvert');
@@ -43,11 +47,10 @@ export async function convertCode() {
   setStatus(t('convert.running'), 'busy');
   try {
     const r = await scadToDoc(src, convertEngine, () => setStatus(t('convert.linking'), 'busy'));
-    const example = EXAMPLES.find(x => x.id === app.source);
-    // Pasted code is named by its top comment (the AI prompt asks for one), your own code by its file.
-    const own = app.source === 'paste' ? codeDescription(src)?.title : store.get('codeName');
-    const name = example ? t(example.name) : own || t('convert.defaultName');
-    switchProject(createProject(name, r.doc));
+    app.doc = r.doc;
+    view.fitNext = true;
+    emit('docChanged');
+    switchWork('draw');
     const parts = [
       t('convert.sketches', { n: r.sketches }),
       r.extrudes ? t('convert.extrudes', { n: r.extrudes }) : '',

@@ -32,6 +32,13 @@ export const store = {
       /* private mode etc. */
     }
   },
+  remove(k: string) {
+    try {
+      localStorage.removeItem(`scadshape.${k}`);
+    } catch {
+      /* private mode etc. */
+    }
+  },
 };
 
 export const fmtMs = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2).replace('.', ',')} s`);

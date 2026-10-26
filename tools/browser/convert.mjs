@@ -20,17 +20,18 @@ await page.goto(url);
 await page.evaluate(() => { localStorage.clear(); localStorage.setItem('scadshape.lang', 'en'); });
 await page.reload();
 await page.waitForFunction(() => /Start with Sketch/.test(document.querySelector('#status').textContent));
-assert.ok(await page.isHidden('#codeBar'), 'no convert button for the user\'s own model');
+assert.ok(await page.isHidden('#btnConvert'), 'Convert is in Code');
 
 await page.click('#btnTree'); await page.click('#btnProjects');
 const src = readFileSync(new URL('../../tests/fixtures/snap_box.scad', import.meta.url));
 await page.setInputFiles('#projFile', { name: 'snap_box.scad', mimeType: 'application/octet-stream', buffer: src });
-await page.waitForFunction(() => window.__scadshape.source === 'custom');
+await page.waitForFunction(() => window.__scadshape.work === 'code' && window.__scadshape.doc.features[0]?.type === 'code');
 assert.ok(await page.isVisible('#btnConvert'));
 await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 
 await page.click('#btnConvert');
-await page.waitForFunction(() => window.__scadshape.source === 'model' && window.__scadshape.doc.features.length > 0, null, { timeout: 60000 });
+// The same model becomes sketches (in Draw)
+await page.waitForFunction(() => window.__scadshape.work === 'draw' && window.__scadshape.doc.features.length > 1, null, { timeout: 60000 });
 await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent) && !/Rendering|Converting/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 const st = await page.evaluate(() => ({ types: window.__scadshape.doc.features.map(f => f.type), errors: [...window.__scadshape.model.errors.values()], name: document.querySelector('#projName').textContent }));
 assert.equal(st.name, 'snap_box'); assert.equal(st.errors.length, 0, st.errors.join());

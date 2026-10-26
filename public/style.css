@@ -66,8 +66,8 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-/* The way of working (src/ui/workmode.ts): Draw, Code or Paste each shows only its own tools. */
-body:not([data-work="draw"]) .only-draw, body:not([data-work="code"]) .only-code, body:not([data-work="paste"]) .only-paste, body[data-work="draw"] .not-draw { display: none !important; }
+/* The way of working (src/ui/workmode.ts): Draw and Code each show only their own tools. */
+body:not([data-work="draw"]) .only-draw, body:not([data-work="code"]) .only-code { display: none !important; }
 .bar, .toolbar, .drawer, .views, dialog, .featpanel { -webkit-user-select: none; user-select: none; }
 html, body { margin: 0; height: 100%; }
 body {
@@ -130,30 +130,12 @@ main { display: flex; min-height: 0; }
   border-right: 1px solid var(--line);
 }
 #codePanel[hidden] { display: none; }
-.codebar { display: flex; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-.codebar[hidden] { display: none; }
-.codebar { flex-wrap: wrap; }
-.codebar button { min-height: 38px; gap: 6px; }
-.codebar select { flex: 1 1 140px; min-height: 38px; }
 .codewrap { position: relative; flex: 1; min-height: 0; display: flex; }
-/* Clear the code: in the code's top corner; for a few seconds after, "Undo" brings the code back. */
-#btnClearCode {
-  position: absolute;
-  top: 6px;
-  right: 10px;
-  min-width: 40px;
-  min-height: 40px;
-  gap: 6px;
-  padding: 0 9px;
-  background: var(--panel);
-  opacity: .92;
-}
-#btnClearCode[hidden], #btnClearCode span:empty { display: none; }
-#btnClearCode.undo { color: var(--accent); border-color: var(--accent); opacity: 1; }
-/* Code renders only when asked: Render in the same corner, in the accent colour while the code has
+/* Code renders only when asked: Render, last in the toolbar, in the accent colour while the code has
    changes that are not rendered yet. */
-#btnRunCode { position: absolute; top: 6px; right: 10px; min-height: 40px; gap: 6px; padding: 0 12px; background: var(--panel); opacity: .92; }
-#btnRunCode.stale { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; opacity: 1; }
+.toolbar #btnRunCode { margin-top: auto; } /* at the end: the bottom (landscape) or the right (portrait) */
+@media (orientation: portrait) { .toolbar #btnRunCode { margin-top: 0; margin-left: auto; } }
+.toolbar #btnRunCode.stale { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 #btnRunCode svg path { fill: currentColor; stroke: none; }
 #code {
   flex: 1;
@@ -358,7 +340,6 @@ button { display: inline-flex; align-items: center; justify-content: center; gap
 button.icon { padding: 0; width: 40px; }
 button.danger { color: var(--err); }
 .title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-#code.readonly { background: var(--sunken); color: var(--muted); }
 
 main { position: relative; }
 .drawer {

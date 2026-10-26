@@ -30,8 +30,8 @@ import { initBlobs } from './blobs';
 import { buildModel } from './model3d';
 import { applyTheme, onThemeChange, setThemeChoice, themeChoice, type ThemeChoice } from './theme';
 import { initParams, openParams, refreshChips } from './ui/params';
-import { EXAMPLES, initRenderUi, requestRender, setSource, syncCodePanel, viewer, workOf } from './ui/render';
-import { initWorkMode, showSource } from './ui/workmode';
+import { commitCode, initRenderUi, requestRender, setWork, syncCodePanel, viewer } from './ui/render';
+import { initWorkMode } from './ui/workmode';
 import { currentEditor, enterSketch, initSketchMode, refreshSketchTexts, setMode, sketchHooks } from './ui/sketchmode';
 import { app, emit, initState, on, saveDoc } from './ui/state';
 import { initProjects } from './ui/projects';
@@ -53,7 +53,6 @@ storageHooks.error = () => showToast(t('storage.saveFailed'), 'error');
 on('docChanged', () => {
   recordDoc();
   saveDoc();
-  if (app.source !== 'model') setSource('model');
   renderTree();
   requestRender();
 });
@@ -77,15 +76,7 @@ loadSolver()
     showToast(t('toast.solverFailed'), 'error');
   });
 
-// ---- Source, panels and buttons -------------------------------------------------------------
-
-/** Code's drop-down: your own code and the code examples. */
-function fillSources() {
-  const sel = $<HTMLSelectElement>('#source');
-  sel.replaceChildren(new Option(t('source.custom'), 'custom'), ...EXAMPLES.map(e => new Option(t(e.name), e.id)));
-  if (app.source !== 'model' && app.source !== 'paste' && ![...sel.options].some(o => o.value === app.source)) app.source = 'model';
-  if (workOf(app.source) === 'code') sel.value = app.source;
-}
+// ---- Panels and buttons -------------------------------------------------------------------
 
 function togglePanel(panel: HTMLElement, btn: HTMLButtonElement, key: string, open = panel.hidden) {
   panel.hidden = !open;
@@ -116,7 +107,6 @@ function initLanguage() {
     remoteLog('lang', { lang: getLang() });
     localizeDefaultNames(app.doc, type => allLangs(type === 'sketch' ? 'feat.sketch' : KINDS[type].label));
     saveDoc();
-    fillSources();
     renderTree();
     refreshSketchTexts();
     refreshSettingsTexts();
@@ -132,7 +122,6 @@ function initLanguage() {
 
 document.documentElement.lang = getLang();
 applyI18n();
-fillSources();
 initLanguage();
 initTheme();
 initRenderUi();
@@ -155,14 +144,14 @@ initScrollHints();
 initParams();
 initSketchMode();
 initWorkMode();
-setSource(app.source); // the way of working and its code panel
-syncCodePanel();
+setWork(store.get('work') === 'code' ? 'code' : 'draw'); // where you left off, with its code panel
+syncCodePanel(true);
+// Edits in Code that are not rendered yet go into the model before the app may be closed.
+document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && commitCode());
 renderTree();
 refreshChips();
 setMode('part');
 
-$('#source').addEventListener('change', e => showSource((e.target as HTMLSelectElement).value));
-$('#btnCode').addEventListener('click', () => togglePanel($('#codePanel'), $('#btnCode'), 'codeOpen'));
 $('#btnTree').addEventListener('click', () => togglePanel($('#tree'), $('#btnTree'), 'treeOpen'));
 // The benchmark button is a developer tool: not in the app (and runBench is then left out). Only on
 // the dev server: that is where the measurement ends up (the public web and the app have no use for
@@ -186,7 +175,7 @@ Object.assign(window, {
     get doc() { return app.doc; },
     viewer,
     get editor() { return currentEditor(); },
-    get source() { return app.source; },
+    get work() { return document.body.dataset.work; },
     get model() { return app.model; },
     get panel() { return currentPanel(); },
     get face() { return selectedFace(); },

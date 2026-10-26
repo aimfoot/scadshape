@@ -98,7 +98,7 @@ assert.match(await page.locator('#featureList button.feature').nth(2).textConten
 assert.match(await page.locator('#featureList button.feature').nth(0).textContent(), /^Skiss 1/);
 st = await waitRendered();
 assert.match(st.status, /trianglar/);
-assert.match(st.code, /genererad kod/);
+assert.match(st.code, /Gjord med scadshape/);
 await page.screenshot({ path: `${out}/t-swedish.png` });
 await page.click('#btnThread'); await page.waitForSelector('#featPanel:not([hidden])');
 assert.match(await page.textContent('#fp-mode'), /Utvändig.*Invändig/);

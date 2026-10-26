@@ -1,7 +1,8 @@
-// Rendering: the OpenSCAD engine, the 3D view, the status bar, the code panel and the source
-// (model/example/custom/pasted code). Only the latest request is rendered; older results are never
-// shown. The source decides the way of working (Draw, Code or Paste, body[data-work]).
+// Rendering: the OpenSCAD engine, the 3D view, the status bar and the code panel, and the way of
+// working on the model (Draw or Code, body[data-work]). Only the latest request is rendered; older
+// results are never shown.
 
+import { codeDoc, codeOnly } from '../doc';
 import { buildModel, looseSketches } from '../model3d';
 import { sketchFrame } from '../frame';
 import { remoteLog } from '../remote';
@@ -16,7 +17,8 @@ import { t, type Key } from '../i18n';
 import { $, $$, el, fmtInt, fmtMs, store } from './dom';
 import { showModelNote } from './modelnote';
 import { clearProblems, showProblems } from './problems';
-import { app, on, vars } from './state';
+import { app, emit, on, vars } from './state';
+import { showToast } from './toast';
 import cube from '../examples/cube.scad';
 import plate from '../examples/plate.scad';
 import cup from '../examples/cup.scad';
@@ -98,47 +100,56 @@ export function applyBed() {
   if (doneStatus) showDone(doneStatus);
 }
 
-/** The three ways of working: Draw (the model's features), Code (own code and the code examples)
- * and Paste (code from an AI chat, kept apart so a pasted answer never replaces your own code). */
-export type Work = 'draw' | 'code' | 'paste';
-export const workOf = (source: string): Work => (source === 'model' ? 'draw' : source === 'paste' ? 'paste' : 'code');
+/** The two ways of working on the one model: Draw (sketches and features) and Code (the model as
+ * OpenSCAD code, edited in place). */
+export type Work = 'draw' | 'code';
+export const work = (): Work => (document.body.dataset.work === 'code' ? 'code' : 'draw');
 
-/** Where an editable code source is saved (examples are not saved: editing one makes it your own code). */
-const CODE_KEYS: Record<string, string> = { custom: 'code', paste: 'pasteCode' };
-
+/** The model's code: a model that is just code as it is (its lines match the problem list), any
+ * other generated from its features. */
 export function currentCode(): string {
-  if (app.source === 'model') return (app.model = buildModel(app.previewDoc ?? app.doc)).code;
-  if (CODE_KEYS[app.source]) return store.get(CODE_KEYS[app.source]) ?? '';
-  return EXAMPLES.find(e => e.id === app.source)?.src ?? '';
+  const d = app.previewDoc ?? app.doc;
+  app.model = buildModel(d);
+  return codeOnly(d)?.code ?? app.model.code;
 }
 
-export function syncCodePanel() {
-  code.value = currentCode();
-  code.readOnly = app.source === 'model';
-  code.classList.toggle('readonly', code.readOnly);
+/** The model's code as the editor last got it: anything else in the editor is an edit not yet in the
+ * model (Render is highlighted meanwhile). */
+let shownCode = '';
+const syncRunButton = () => $('#btnRunCode').classList.toggle('stale', code.value !== shownCode);
+
+/** Show the model's code in the editor – unless it has edits that are not in the model yet. */
+export function syncCodePanel(force = false) {
+  if (!force && code.value !== shownCode) return;
+  code.value = shownCode = currentCode();
   syncRunButton();
 }
 
-/** The code the last render was asked to show: Render is highlighted while the code differs from it. */
-let renderedSrc: string | null = null;
-function syncRunButton() {
-  $('#btnRunCode').classList.toggle('stale', code.value !== renderedSrc);
+/** Code's edits go into the model: a model that is just code gets the new code; a drawn model
+ * becomes code (Draw's undo brings the sketches back, Convert to sketches turns the code into
+ * sketches). Called by Render, Ctrl+Enter, going back to Draw and the app going to the background.
+ * Returns whether the model changed. */
+export function commitCode(): boolean {
+  if (code.value === shownCode) return false;
+  const c = codeOnly(app.doc);
+  if (c) c.code = code.value;
+  else {
+    const kept = app.doc.features.length > 0;
+    app.doc = codeDoc(code.value);
+    if (kept) showToast(t('code.becameCode'));
+  }
+  shownCode = code.value;
+  syncRunButton();
+  emit('docChanged');
+  return true;
 }
 
-export function setSource(s: string) {
-  if (s !== app.source) view.fitNext = true; // new source = new model
-  const work = workOf(s), was = document.body.dataset.work;
-  app.source = s;
-  store.set('source', s);
-  if (work === 'code') store.set('codeSource', s); // Code comes back to the same code or example
-  document.body.dataset.work = work;
-  for (const b of $$<HTMLButtonElement>('#workMode [data-work]')) b.setAttribute('aria-pressed', String(b.dataset.work === work));
-  if (work === 'code') ($<HTMLSelectElement>('#source')).value = s;
-  // Code and Paste are about the code, so it is always shown; Draw shows the generated code only
-  // when asked for (the Code button).
-  if (work !== 'draw') codePanel.hidden = false;
-  else if (was && was !== 'draw') codePanel.hidden = store.get('codeOpen') !== '1';
-  if (work === 'draw') $('#btnCode').setAttribute('aria-pressed', String(!codePanel.hidden));
+export function setWork(w: Work) {
+  if (w === 'draw') commitCode();
+  document.body.dataset.work = w;
+  store.set('work', w);
+  for (const b of $$<HTMLButtonElement>('#workMode [data-work]')) b.setAttribute('aria-pressed', String(b.dataset.work === w));
+  codePanel.hidden = w !== 'code';
   syncCodePanel();
 }
 
@@ -209,19 +220,17 @@ async function renderLoop() {
 
 async function renderOnce() {
   const d = app.previewDoc ?? app.doc;
-  viewer.setSketchLines(app.source === 'model' ? looseSketches(d).filter(s => s.id !== renderOpts.hideSketch).flatMap(s => sketchPolylines(s, sketchFrame(s, vars(), d))) : []);
-  const key = CODE_KEYS[app.source];
-  const src = key ? code.value : currentCode();
-  if (!key) code.value = src;
-  else store.set(key, code.value);
-  renderedSrc = src;
+  viewer.setSketchLines(looseSketches(d).filter(s => s.id !== renderOpts.hideSketch).flatMap(s => sketchPolylines(s, sketchFrame(s, vars(), d))));
+  const src = currentCode();
+  if (code.value === shownCode) code.value = src; // edits not yet in the model stay in the editor
+  shownCode = src;
   syncRunButton();
-  // The comment at the top of examples and pasted code says what it is; your own code needs no note.
-  showModelNote(app.source === 'model' || app.source === 'custom' ? null : src);
+  // The comment at the top of a model that is code (e.g. from an AI chat) says what it is.
+  showModelNote(codeOnly(d) ? src : null);
   for (const cb of renderOpts.onRendered) cb();
-  const errs = app.source === 'model' ? app.model.errors.size : 0;
+  const errs = app.model.errors.size;
   const errText = errs ? ` · ${t('status.treeErrors', { n: errs })}` : '';
-  if (app.source === 'model' && app.model.solids === 0) {
+  if (app.model.solids === 0) {
     viewer.setMesh(null);
     logEl.replaceChildren();
     clearProblems();
@@ -251,24 +260,23 @@ async function renderOnce() {
     // Empty with no warning that explains it (e.g. if (false) …): just "nothing to show".
     const empty = r.log.some(l => /Current top level object is empty/.test(l)) && !logProblems(r.log).length;
     setStatus(empty ? t('status.empty') + errText : problems ? t('status.error') + probText : t('status.seeLog'), 'error');
-    if (codePanel.hidden && app.source !== 'model') codePanel.hidden = false;
-    if (app.source === 'model') remoteLog('model-error', { problems: logProblems(r.log).slice(0, 5) });
+    remoteLog('model-error', { problems: logProblems(r.log).slice(0, 5) });
     return;
   }
   const before = { center: viewer.bounds.center.clone(), radius: viewer.bounds.radius };
   viewer.setMesh(mesh);
-  // Example/custom code: an entirely different model (size × 2 or moved more than its size) → fit
-  // the view. In the user's own model the camera stays put when a dimension changes.
+  // Code: an entirely different model (size × 2 or moved more than its size) → fit the view. In a
+  // drawn model the camera stays put when a dimension changes.
   const after = viewer.bounds;
   const moved = after.center.distanceTo(before.center) > Math.max(after.radius, before.radius);
   const resized = after.radius > 2 * before.radius || after.radius < before.radius / 2;
-  if (!view.fitNext && app.source !== 'model' && (moved || resized)) viewer.fit();
+  if (!view.fitNext && codeOnly(d) && (moved || resized)) viewer.fit();
   if (view.fitNext) viewer.setView('iso');
   view.fitNext = false;
   // Rendered, but with problems (an unknown function leaves parts out without failing): say so.
   showDone({ head: `${fmtMs(r.renderMs)} · ${t('status.triangles', { n: fmtInt(mesh.triangles) })}${errText}`, errs, log: r.log, src, positions: mesh.positions });
-  // The user's own model is built from features, not written code: its cuts are not checked.
-  if (app.source !== 'model' && /\bdifference\s*\(/.test(src) && r.renderMs < CUT_MAX_RENDER_MS) {
+  // A drawn model is built from features, not written code: its cuts are not checked.
+  if (codeOnly(d) && /\bdifference\s*\(/.test(src) && r.renderMs < CUT_MAX_RENDER_MS) {
     clearTimeout(cutTimer);
     cutTimer = window.setTimeout(() => void checkCuts(src), CUT_DELAY);
   }
@@ -285,32 +293,18 @@ engine.onFatal = err => {
 
 on('render', requestRender);
 
-let codeTimer = 0;
-
 export function initRenderUi() {
   applyBed();
   btnRender.addEventListener('click', () => (rendering ? cancelRender() : requestRender()));
-  code.addEventListener('input', () => {
-    if (app.source === 'model') return;
-    // An edited example becomes your own code; pasted code stays pasted code.
-    store.set(CODE_KEYS[app.source] ?? 'code', code.value); // first – setSource reads back the saved code
-    if (!CODE_KEYS[app.source]) setSource('custom');
-    clearTimeout(codeTimer);
-    // Code renders when you ask (Render or Ctrl+Enter), so you can write freely; pasted code renders
-    // by itself when the typing pauses.
-    if (workOf(app.source) === 'code') syncRunButton();
-    else codeTimer = window.setTimeout(requestRender, 800);
-  });
+  // Code renders when you ask (Render or Ctrl+Enter), so you can write freely.
+  code.addEventListener('input', syncRunButton);
   const run = $('#btnRunCode');
   run.addEventListener('pointerdown', e => e.preventDefault()); // keep the keyboard and the caret
-  run.addEventListener('click', () => {
-    clearTimeout(codeTimer);
-    requestRender();
-  });
+  run.addEventListener('click', () => commitCode() || requestRender());
   code.addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      requestRender();
+      commitCode() || requestRender();
     }
   });
 }

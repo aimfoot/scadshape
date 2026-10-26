@@ -10,7 +10,8 @@ import {
 import { remoteLog } from '../remote';
 import { $, el, store } from './dom';
 import { closePanel, currentPanel } from './panel';
-import { setSource, view } from './render';
+import { commitCode, view } from './render';
+import { openCode } from './workmode';
 import { exitSketch } from './sketchmode';
 import { resetHistory } from './history';
 import { app, emit } from './state';
@@ -22,6 +23,7 @@ const dlg = () => $<HTMLDialogElement>('#projDlg');
 export const currentProjectName = () => projectInfo(app.projectId)?.name ?? 'scadshape';
 
 export function switchProject(id: string) {
+  commitCode(); // edits in Code stay in the model they were made in
   if (currentPanel()) closePanel();
   if (document.body.dataset.mode === 'sketch') exitSketch();
   app.projectId = setCurrentProject(id);
@@ -29,12 +31,11 @@ export function switchProject(id: string) {
   app.previewDoc = null;
   resetHistory(); // undo only applies within one model
   view.fitNext = true;
-  if (app.source !== 'model') setSource('model');
   refreshProjectName();
   emit('docChanged');
 }
 
-function refreshProjectName() {
+export function refreshProjectName() {
   $('#projName').textContent = currentProjectName();
 }
 
@@ -111,18 +112,14 @@ const looksLikeScad = (text: string) =>
     /\b(module|function)\s+\w+\s*\(/.test(text) ||
     /^\s*(include|use)\s*</m.test(text));
 
-/** Show OpenSCAD code as your own code (Code, which always shows the code panel). */
+/** Open OpenSCAD code as a model, in Code. */
 function openScadCode(text: string, name: string) {
-  store.set('codeName', name.replace(/\.scad$/i, ''));
-  if (currentPanel()) closePanel();
   if (document.body.dataset.mode === 'sketch') exitSketch();
-  store.set('code', text); // first – setSource reads the saved code
-  setSource('custom');
   // ☰ is closed so the code is visible (the drawer would otherwise cover the code panel).
   $('#tree').hidden = true;
   $('#btnTree').setAttribute('aria-pressed', 'false');
   store.set('treeOpen', '0');
-  emit('render');
+  openCode(text, name.replace(/\.scad$/i, ''));
 }
 
 export function openProjects() {

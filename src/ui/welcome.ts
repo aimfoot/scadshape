@@ -1,7 +1,7 @@
-// The start card: shown in the 3D area when the model is empty (or via ☰ → Getting started) – the
-// three ways of working (Paste, Draw and Code) and example models (src/examples/models.ts). It does
-// not block the tools and disappears when the model gets content, a panel opens, you enter a sketch
-// or switch to Code or Paste.
+// The start card: shown in Draw when the model is empty (or via ☰ → Getting started) – an AI chat's
+// code, drawing, writing the code yourself (Code), and example models (src/examples/models.ts). It
+// does not block the tools and disappears when the model gets content, a panel opens, you enter a
+// sketch or switch to Code.
 
 import { EXAMPLES, buildExample, type ExampleId } from '../examples/models';
 import { onLangChange, t, type Key } from '../i18n';
@@ -17,7 +17,7 @@ let dismissed = false; // closed with × (applies to the session)
 let forced = false; // opened from ☰, even when the model is not empty
 
 function update() {
-  const empty = app.source === 'model' && app.doc.features.length === 0;
+  const empty = document.body.dataset.work === 'draw' && app.doc.features.length === 0;
   const free = document.body.dataset.mode === 'part' && $('#featPanel').hidden;
   $('#startCard').hidden = !(free && (forced || (!dismissed && empty)));
 }
@@ -27,6 +27,7 @@ function openExample(id: ExampleId, nameKey: Key) {
   forced = false;
   view.fitNext = true;
   switchProject(createProject(name, buildExample(id)));
+  switchWork('draw'); // the examples are drawn
   showToast(t('start.opened', { name }));
   update();
 }
@@ -64,8 +65,7 @@ export function initStart() {
   });
   on('docChanged', update);
   on('render', update);
-  $('#source').addEventListener('change', update);
-  renderOpts.onRendered.push(update); // typing in the code panel switches to Custom code without a change event
+  renderOpts.onRendered.push(update);
   const watch = new MutationObserver(update);
   watch.observe(document.body, { attributes: true, attributeFilter: ['data-mode', 'data-work'] });
   watch.observe($('#featPanel'), { attributes: true, attributeFilter: ['hidden'] });

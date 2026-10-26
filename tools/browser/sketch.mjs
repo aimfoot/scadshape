@@ -145,10 +145,11 @@ await page.waitForSelector('#featPanel:not([hidden])');
 await page.click('#fpOk');
 await page.waitForFunction(() => /triangles|Error/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
 console.log('3D:', await page.textContent('#status'));
-await page.click('#btnCode');
+await page.click('#workMode [data-work=code]');
 const codeText = await page.inputValue('#code');
 assert.match(codeText, /module extrude_1\(\)/); assert.match(codeText, /difference\(\)/);
 await page.screenshot({ path: `${out}/model3d.png` });
+await page.click('#workMode [data-work=draw]');
 
 // Saved after reload
 await page.reload();
