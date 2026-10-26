@@ -1,6 +1,7 @@
-// The start card: shown in the 3D area when the model is empty (or via ☰ → Getting started) – four
-// steps and example models (src/examples/models.ts). It does not block the tools and disappears
-// when the model gets content, a panel opens or you enter a sketch.
+// The start card: shown in the 3D area when the model is empty (or via ☰ → Getting started) – the
+// three ways of working (Paste, Draw and Code) and example models (src/examples/models.ts). It does
+// not block the tools and disappears when the model gets content, a panel opens, you enter a sketch
+// or switch to Code or Paste.
 
 import { EXAMPLES, buildExample, type ExampleId } from '../examples/models';
 import { onLangChange, t, type Key } from '../i18n';
@@ -10,6 +11,7 @@ import { switchProject } from './projects';
 import { renderOpts, view } from './render';
 import { app, on } from './state';
 import { showToast } from './toast';
+import { switchWork } from './workmode';
 
 let dismissed = false; // closed with × (applies to the session)
 let forced = false; // opened from ☰, even when the model is not empty
@@ -55,12 +57,17 @@ export function initStart() {
     update();
   });
   $('#btnStart').addEventListener('click', showStart);
+  $('#startCode').addEventListener('click', () => {
+    forced = false;
+    switchWork('code');
+    update();
+  });
   on('docChanged', update);
   on('render', update);
   $('#source').addEventListener('change', update);
   renderOpts.onRendered.push(update); // typing in the code panel switches to Custom code without a change event
   const watch = new MutationObserver(update);
-  watch.observe(document.body, { attributes: true, attributeFilter: ['data-mode'] });
+  watch.observe(document.body, { attributes: true, attributeFilter: ['data-mode', 'data-work'] });
   watch.observe($('#featPanel'), { attributes: true, attributeFilter: ['hidden'] });
   update();
 }

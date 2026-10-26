@@ -6,6 +6,10 @@ containers, text, snap fits …) and export 3MF/STL for 3D printing. Everything 
 offline: OpenSCAD (WebAssembly, Manifold backend) renders the model and FreeCAD's sketch solver
 (planegcs) solves the constraints.
 
+Three ways of working, switched at the top of the screen: **Draw** (sketches and features),
+**Code** (a plain OpenSCAD editor, for writing the code yourself) and **Paste** (code from an AI
+chat: copy a prompt with the app's rules, paste the answer, copy the problems back).
+
 It runs as a web app (PWA) and as an Android app (a WebView wrapper with no permissions at all).
 To print, open the exported 3MF/STL in a slicer (Bambu Studio, OrcaSlicer, PrusaSlicer, …) – phone
 printer apps such as Bambu Handy can't slice files themselves.

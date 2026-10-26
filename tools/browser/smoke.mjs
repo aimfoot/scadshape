@@ -17,13 +17,12 @@ for (const [name, vp] of [['landscape', { width: 915, height: 412 }], ['portrait
   page.on('close', () => console.log(name, 'logged:', logged.join(' ')));
   const t0 = Date.now();
   await page.goto(url);
-  await page.selectOption('#source', 'plate');
+  await page.click('#workMode [data-work=code]'); await page.selectOption('#source', 'plate');
   await page.waitForFunction(() => /triangles|Error|Empty/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
   console.log(name, 'status:', await page.textContent('#status'), `(${Date.now() - t0} ms from page load)`);
   await page.screenshot({ path: `${out}/${name}.png` });
   if (name === 'landscape') {
-    await page.click('#btnCode');
-    await page.fill('#code', 'cube(10);\nsphere(;'); // a syntax error; renders by itself
+    await page.fill('#code', 'cube(10);\nsphere(;'); // a syntax error; renders by itself (Code always shows the code)
     await page.waitForFunction(() => /Error/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
     console.log('syntax error →', await page.textContent('#status'), '|', (await page.textContent('#log')).split('\n').find(l => /ERROR/.test(l)));
     await page.screenshot({ path: `${out}/error.png` });

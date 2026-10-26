@@ -28,7 +28,7 @@ console.log('cache:', cached);
 await ctx.setOffline(true);
 await page.reload();
 await page.waitForFunction(() => /triangles|Start with/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
-await page.selectOption('#source', 'plate');
+await page.click('#workMode [data-work=code]'); await page.selectOption('#source', 'plate');
 await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 console.log('offline:', await page.textContent('#status'));
 await ctx.setOffline(false);

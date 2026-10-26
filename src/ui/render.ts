@@ -1,5 +1,6 @@
 // Rendering: the OpenSCAD engine, the 3D view, the status bar, the code panel and the source
-// (model/example/custom code). Only the latest request is rendered; older results are never shown.
+// (model/example/custom/pasted code). Only the latest request is rendered; older results are never
+// shown. The source decides the way of working (Draw, Code or Paste, body[data-work]).
 
 import { buildModel, looseSketches } from '../model3d';
 import { sketchFrame } from '../frame';
@@ -12,7 +13,7 @@ import { parseBinaryStl } from '../stl';
 import { Viewer } from '../viewer';
 import { bedOf, fitsBed, meshSize, parseBedChoice } from '../bed';
 import { t, type Key } from '../i18n';
-import { $, el, fmtInt, fmtMs, store } from './dom';
+import { $, $$, el, fmtInt, fmtMs, store } from './dom';
 import { showModelNote } from './modelnote';
 import { clearProblems, showProblems } from './problems';
 import { app, on, vars } from './state';
@@ -97,9 +98,17 @@ export function applyBed() {
   if (doneStatus) showDone(doneStatus);
 }
 
+/** The three ways of working: Draw (the model's features), Code (own code and the code examples)
+ * and Paste (code from an AI chat, kept apart so a pasted answer never replaces your own code). */
+export type Work = 'draw' | 'code' | 'paste';
+export const workOf = (source: string): Work => (source === 'model' ? 'draw' : source === 'paste' ? 'paste' : 'code');
+
+/** Where an editable code source is saved (examples are not saved: editing one makes it your own code). */
+const CODE_KEYS: Record<string, string> = { custom: 'code', paste: 'pasteCode' };
+
 export function currentCode(): string {
   if (app.source === 'model') return (app.model = buildModel(app.previewDoc ?? app.doc)).code;
-  if (app.source === 'custom') return store.get('code') ?? '';
+  if (CODE_KEYS[app.source]) return store.get(CODE_KEYS[app.source]) ?? '';
   return EXAMPLES.find(e => e.id === app.source)?.src ?? '';
 }
 
@@ -111,11 +120,18 @@ export function syncCodePanel() {
 
 export function setSource(s: string) {
   if (s !== app.source) view.fitNext = true; // new source = new model
+  const work = workOf(s), was = document.body.dataset.work;
   app.source = s;
   store.set('source', s);
-  $('#codeBar').hidden = s === 'model'; // "Convert to sketches" only for code
-  $('#btnClearCode').hidden = s === 'model'; // the model's code is generated
-  ($<HTMLSelectElement>('#source')).value = s;
+  if (work === 'code') store.set('codeSource', s); // Code comes back to the same code or example
+  document.body.dataset.work = work;
+  for (const b of $$<HTMLButtonElement>('#workMode [data-work]')) b.setAttribute('aria-pressed', String(b.dataset.work === work));
+  if (work === 'code') ($<HTMLSelectElement>('#source')).value = s;
+  // Code and Paste are about the code, so it is always shown; Draw shows the generated code only
+  // when asked for (the Code button).
+  if (work !== 'draw') codePanel.hidden = false;
+  else if (was && was !== 'draw') codePanel.hidden = store.get('codeOpen') !== '1';
+  if (work === 'draw') $('#btnCode').setAttribute('aria-pressed', String(!codePanel.hidden));
   syncCodePanel();
 }
 
@@ -187,10 +203,12 @@ async function renderLoop() {
 async function renderOnce() {
   const d = app.previewDoc ?? app.doc;
   viewer.setSketchLines(app.source === 'model' ? looseSketches(d).filter(s => s.id !== renderOpts.hideSketch).flatMap(s => sketchPolylines(s, sketchFrame(s, vars(), d))) : []);
-  const src = app.source === 'custom' ? code.value : currentCode();
-  if (app.source !== 'custom') code.value = src;
-  else store.set('code', code.value);
-  showModelNote(app.source === 'model' ? null : src);
+  const key = CODE_KEYS[app.source];
+  const src = key ? code.value : currentCode();
+  if (!key) code.value = src;
+  else store.set(key, code.value);
+  // The comment at the top of examples and pasted code says what it is; your own code needs no note.
+  showModelNote(app.source === 'model' || app.source === 'custom' ? null : src);
   for (const cb of renderOpts.onRendered) cb();
   const errs = app.source === 'model' ? app.model.errors.size : 0;
   const errText = errs ? ` · ${t('status.treeErrors', { n: errs })}` : '';
@@ -265,8 +283,9 @@ export function initRenderUi() {
   btnRender.addEventListener('click', () => (rendering ? cancelRender() : requestRender()));
   code.addEventListener('input', () => {
     if (app.source === 'model') return;
-    store.set('code', code.value); // first – setSource reads back the saved code
-    if (app.source !== 'custom') setSource('custom');
+    // An edited example becomes your own code; pasted code stays pasted code.
+    store.set(CODE_KEYS[app.source] ?? 'code', code.value); // first – setSource reads back the saved code
+    if (!CODE_KEYS[app.source]) setSource('custom');
     // Custom code renders by itself when the typing pauses.
     clearTimeout(codeTimer);
     codeTimer = window.setTimeout(requestRender, 800);

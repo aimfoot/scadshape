@@ -88,9 +88,8 @@ await closeSettings();
 console.log('custom size saved, a turned part fits');
 
 // 5. Custom code renders by itself when the typing pauses.
-await page.selectOption('#source', 'cube');
+await page.click('#workMode [data-work=code]'); await page.selectOption('#source', 'cube');
 await waitRendered();
-await page.click('#btnCode');
 await page.fill('#code', 'cube([7, 7, 7]);');
 await page.waitForFunction(() => document.querySelector('#source').value === 'custom');
 st = await waitRendered();

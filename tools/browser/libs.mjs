@@ -25,9 +25,8 @@ await page.goto(url);
 await page.evaluate(() => { localStorage.clear(); localStorage.setItem('scadshape.lang', 'en'); });
 await page.reload();
 await page.waitForFunction(() => /Start with Sketch/.test(document.querySelector('#status').textContent));
-await page.selectOption('#source', 'cube'); await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent));
+await page.click('#workMode [data-work=code]'); await page.selectOption('#source', 'cube'); await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent));
 assert.deepEqual(libRequests, [], 'no library before it is used');
-if (await page.isHidden('#codePanel')) await page.click('#btnCode');
 
 // BOSL2: rounded cube and an M6 screw (screws.scad fetches more files from the library)
 let st = await renderCode('include <BOSL2/std.scad>\ncuboid([40, 30, 10], rounding = 2, $fn = 24);');
@@ -54,7 +53,7 @@ st = await renderCode('include <DoesNotExist/std.scad>\ncube(5);');
 assert.match(await page.textContent('#log'), /Can't find include file/);
 
 // Open a .scad file from ☰ → the model → Open file: becomes Custom code and renders
-await page.selectOption('#source', 'model');
+await page.click('#workMode [data-work=draw]');
 await page.waitForTimeout(500);
 if (await page.isVisible('#codePanel')) await page.click('#btnCode');
 if (await page.isHidden('#tree')) await page.click('#btnTree');

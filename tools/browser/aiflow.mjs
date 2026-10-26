@@ -1,6 +1,6 @@
-// Code from an AI chat: the start card's "Copy prompt" (with the printer from Settings) and "Paste
-// code" (an answer with text and ``` fences → only the code, in Custom code, rendered), and pasting a
-// whole answer straight into the code, and Clear (with its Undo).
+// Code from an AI chat: the start card's "Copy prompt" (with the printer from Settings, and on to
+// Paste) and "Paste code" (an answer with text and ``` fences → only the code, in the pasted code,
+// rendered), and pasting a whole answer straight into the code, and Clear (with its Undo).
 // node aiflow.mjs [url] [outdir]
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
@@ -30,6 +30,12 @@ const prompt = await page.evaluate(() => navigator.clipboard.readText());
 assert.match(prompt, /^Write an OpenSCAD model for me\. I will open it in scadshape \(OpenSCAD 2026\.10\.15, Manifold backend\)\./);
 assert.match(prompt, /print on Bambu Lab A1 mini \(180 × 180 × 180 mm\)/);
 assert.match(prompt, /\n\nWhat I want: $/);
+assert.equal(await page.evaluate(() => document.body.dataset.work), 'paste', 'on to Paste, where the answer goes');
+assert.ok(await page.isHidden('#startCard'));
+assert.ok(await page.isVisible('#btnPaste'));
+await page.click('#workMode [data-work=draw]');
+await page.waitForTimeout(300);
+assert.ok(await page.isVisible('#startCard .ai-start'));
 
 // 2. The AI's answer, copied whole (text around the code) → Paste code
 const answer = 'Sure! Here is a parametric box:\n\n```openscad\n// Parametric box\n// Box: open on top, 2 mm walls all round.\nwidth = 40; // outer width\ndepth = 30;\nheight = 12;\nwall = 2;\ndifference() {\n  cube([width, depth, height]);\n  translate([wall, wall, wall]) cube([width - 2*wall, depth - 2*wall, height]);\n}\n```\n\nChange `width` to make it bigger.';
@@ -37,8 +43,8 @@ await page.evaluate(t => navigator.clipboard.writeText(t), answer);
 await page.click('#startPaste');
 await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 assert.equal(await toast(), 'Code pasted');
-const st = await page.evaluate(() => ({ source: document.querySelector('#source').value, code: document.querySelector('#code').value, card: document.querySelector('#startCard').hidden, panel: document.querySelector('#codePanel').hidden }));
-assert.deepEqual([st.source, st.card, st.panel], ['custom', true, false]);
+const st = await page.evaluate(() => ({ source: window.__scadshape.source, code: document.querySelector('#code').value, card: document.querySelector('#startCard').hidden, panel: document.querySelector('#codePanel').hidden }));
+assert.deepEqual([st.source, st.card, st.panel], ['paste', true, false]);
 assert.match(st.code, /^\/\/ Parametric box\n\/\/ Box: open on top, 2 mm walls all round.\nwidth = 40;/); assert.doesNotMatch(st.code, /Sure!|```|Change `width`/);
 assert.match(await page.textContent('#status'), /triangles$/, 'no problems');
 await page.screenshot({ path: `${out}/a-pasted.png` });
@@ -65,6 +71,21 @@ await page.evaluate(t => {
 }, 'Try this:\n```\ncylinder(d = 20, h = 5);\n```');
 assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
 assert.equal(await toast(), 'Only the code from the answer was pasted');
+// In Code (writing it yourself) a paste goes in as it is.
+await page.click('#workMode [data-work=code]');
+await page.waitForTimeout(300);
+assert.ok(await page.isHidden('#btnPrompt'));
+assert.ok(await page.isHidden('#modelNote'), 'no note for your own code');
+await page.evaluate(() => { const c = document.querySelector('#code'); c.focus(); c.select(); });
+const raw = await page.evaluate(() => {
+  const dt = new DataTransfer();
+  dt.setData('text/plain', '```\ncube(3);\n```');
+  return document.querySelector('#code').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+});
+assert.equal(raw, true, 'not taken over in Code');
+await page.click('#workMode [data-work=paste]');
+await page.waitForTimeout(300);
+assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
 
 // Clear: empties the code; the button is Undo for a while and brings it back; typing ends that
 const clearBtn = () => page.evaluate(() => { const b = document.querySelector('#btnClearCode'); return { text: b.textContent, undo: b.classList.contains('undo'), label: b.getAttribute('aria-label') }; });
@@ -88,15 +109,15 @@ assert.equal(await page.inputValue('#code'), 'cylinder(d = 20, h = 5);\n');
 
 // 4. Nothing usable on the clipboard: paste by hand
 await page.evaluate(() => navigator.clipboard.writeText('Sorry, I cannot help with that.'));
-await page.selectOption('#source', 'model');
+await page.click('#workMode [data-work=draw]');
 await page.waitForTimeout(300);
 await page.click('#btnTree'); await page.click('#btnStart');
 await page.click('#startPaste');
 await page.waitForFunction(() => /^The clipboard has no OpenSCAD code/.test(document.querySelector('#partToast').textContent));
-assert.equal(await page.evaluate(() => document.querySelector('#source').value), 'custom');
+assert.equal(await page.evaluate(() => window.__scadshape.source), 'paste');
 assert.ok(await page.isVisible('#btnClearCode'));
 // The model's own code is generated: no Clear
-await page.selectOption('#source', 'model');
+await page.click('#workMode [data-work=draw]');
 await page.waitForTimeout(300);
 assert.ok(await page.isHidden('#btnClearCode'));
 

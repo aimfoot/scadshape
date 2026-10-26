@@ -34,7 +34,8 @@ export function setMode(m: 'part' | 'sketch') {
     $('#codePanel').hidden = true;
     $('#tree').hidden = true;
   } else {
-    $('#codePanel').hidden = store.get('codeOpen') !== '1';
+    // Code and Paste always show the code; in Draw it is the Code button's choice.
+    $('#codePanel').hidden = document.body.dataset.work === 'draw' && store.get('codeOpen') !== '1';
     $('#tree').hidden = store.get('treeOpen') !== '1';
   }
 }

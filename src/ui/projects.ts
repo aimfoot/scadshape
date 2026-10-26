@@ -1,5 +1,5 @@
 // Models (projects): list, open, new, rename, duplicate, delete, import/save as file. The current
-// model is shown at the top of ☰ and as the source ("My box") in the drop-down.
+// model is shown at the top of ☰.
 
 import { emptyDoc } from '../doc';
 import { getLang, t } from '../i18n';
@@ -19,9 +19,6 @@ import { embedBlobs, storeEmbedded } from '../blobs';
 import { android, saveViaApp } from '../android';
 
 const dlg = () => $<HTMLDialogElement>('#projDlg');
-/** Called when the model's name has changed (the source list shows the name). */
-export const projectHooks = { renamed: () => {} };
-
 export const currentProjectName = () => projectInfo(app.projectId)?.name ?? 'scadshape';
 
 export function switchProject(id: string) {
@@ -39,7 +36,6 @@ export function switchProject(id: string) {
 
 function refreshProjectName() {
   $('#projName').textContent = currentProjectName();
-  projectHooks.renamed();
 }
 
 const when = (ms: number) =>
@@ -115,16 +111,13 @@ const looksLikeScad = (text: string) =>
     /\b(module|function)\s+\w+\s*\(/.test(text) ||
     /^\s*(include|use)\s*</m.test(text));
 
-/** Show OpenSCAD code as Custom code, with the code panel open. */
+/** Show OpenSCAD code as your own code (Code, which always shows the code panel). */
 function openScadCode(text: string, name: string) {
   store.set('codeName', name.replace(/\.scad$/i, ''));
   if (currentPanel()) closePanel();
   if (document.body.dataset.mode === 'sketch') exitSketch();
   store.set('code', text); // first – setSource reads the saved code
   setSource('custom');
-  $('#codePanel').hidden = false;
-  $('#btnCode').setAttribute('aria-pressed', 'true');
-  store.set('codeOpen', '1');
   // ☰ is closed so the code is visible (the drawer would otherwise cover the code panel).
   $('#tree').hidden = true;
   $('#btnTree').setAttribute('aria-pressed', 'false');

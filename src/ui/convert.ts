@@ -2,6 +2,7 @@
 // and features (convert/scad2doc.ts). Afterwards the volume is compared with the original, so you
 // can see if it is exact.
 
+import { codeDescription } from '../aiprompt';
 import { scadToDoc, type ConvertEngine } from '../convert/scad2doc';
 import { buildModel } from '../model3d';
 import { getLang, t } from '../i18n';
@@ -43,7 +44,9 @@ export async function convertCode() {
   try {
     const r = await scadToDoc(src, convertEngine, () => setStatus(t('convert.linking'), 'busy'));
     const example = EXAMPLES.find(x => x.id === app.source);
-    const name = example ? t(example.name) : store.get('codeName') || t('convert.defaultName');
+    // Pasted code is named by its top comment (the AI prompt asks for one), your own code by its file.
+    const own = app.source === 'paste' ? codeDescription(src)?.title : store.get('codeName');
+    const name = example ? t(example.name) : own || t('convert.defaultName');
     switchProject(createProject(name, r.doc));
     const parts = [
       t('convert.sketches', { n: r.sketches }),
@@ -72,7 +75,5 @@ export async function convertCode() {
 }
 
 export function initConvert() {
-  $('#codeBar').hidden = app.source === 'model';
-  $('#btnClearCode').hidden = app.source === 'model';
   $('#btnConvert').addEventListener('click', () => void convertCode());
 }

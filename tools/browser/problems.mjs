@@ -41,9 +41,9 @@ module gear2d(z) polygon([for (k = [0:z-1], s = [-1, 1]) polar(m*z/2, k*360/z + 
 cylinder(r = 30, h = 3);
 translate([0, 0, 3]) linear_extrude(8) gear2d(14);
 `;
-await page.selectOption('#source', 'custom');
+// Code from an AI chat: Paste, which has "Copy for AI".
+await page.click('#workMode [data-work=paste]');
 await page.waitForTimeout(300);
-if (await page.isHidden('#codePanel')) await page.click('#btnCode');
 await page.waitForSelector('#code', { state: 'visible' });
 await page.fill('#code', gears);
 let st = await waitRendered();
@@ -146,6 +146,29 @@ list = await rows();
 assert.equal(list.length, 1);
 assert.match(list[0].text, /^Line 2OpenSCAD has no \+= or \+\+/);
 assert.equal(list[0].cls, 'error');
+
+// Code: the same problems for code you write yourself, but no AI aids – and its own code, apart from
+// the pasted code.
+await page.click('#workMode [data-work=code]');
+await page.waitForTimeout(300);
+assert.equal(await page.inputValue('#code'), '');
+await page.fill('#code', 'x = 1;\nx += 1;\ncube(x);\n');
+st = await waitRendered();
+assert.equal(st.text, 'Error · 1 problem');
+assert.ok(await page.isVisible('#problemList li'));
+for (const id of ['#btnCopyProblems', '#btnPrompt', '#btnPaste', '#btnClearCode', '#btnCode', '#btnNewSketch']) assert.ok(await page.isHidden(id), `${id} is not in Code`);
+assert.ok(await page.isVisible('#source'));
+await page.screenshot({ path: `${out}/p-code.png` });
+await page.fill('#code', 'cube(7);\n');
+await waitRendered();
+await page.click('#workMode [data-work=paste]');
+await page.waitForTimeout(300);
+assert.equal(await page.inputValue('#code'), 'x = 1;\nx += 1;\ncube(x);\n', 'the pasted code is kept apart');
+await page.click('#workMode [data-work=code]');
+await page.waitForTimeout(300);
+assert.equal(await page.inputValue('#code'), 'cube(7);\n');
+await page.click('#workMode [data-work=paste]');
+await page.waitForTimeout(300);
 await page.setViewportSize({ width: 915, height: 412 });
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${out}/p-landscape.png` });

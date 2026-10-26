@@ -15,7 +15,7 @@ page.on('console', m => m.type() === 'error' && errors.push(m.text()));
 page.on('dialog', d => d.accept());
 await page.route('**/api/**', r => r.fulfill({ status: 204 }));
 const feats = () => page.evaluate(() => window.__scadshape.doc.features.map(f => f.type));
-const sourceName = () => page.evaluate(() => document.querySelector('#source option[value=model]').textContent);
+const sourceName = () => page.evaluate(() => document.querySelector('#projName').textContent);
 /** The default container's parts: box, cavity, lid sketch, lid, lip, inside of the lip. */
 const BOX = ['sketch', 'extrude', 'extrude', 'sketch', 'extrude', 'extrude', 'extrude'];
 const openDrawer = async () => { if (await page.isHidden('#tree')) await page.click('#btnTree'); };
@@ -65,7 +65,7 @@ assert.equal(dl.suggestedFilename(), 'My model.scadshape.json');
 const path = `${out}/${dl.suggestedFilename()}`; await dl.saveAs(path);
 assert.equal(JSON.parse(readFileSync(path, 'utf8')).format, 'scadshape');
 await page.setInputFiles('#projFile', path);
-await page.waitForFunction(() => document.querySelector('#source option[value=model]').textContent === 'My model 2');
+await page.waitForFunction(() => document.querySelector('#projName').textContent === 'My model 2');
 assert.deepEqual(await feats(), BOX);
 
 // 5. Delete Jar; three → two models left. The export's file name = the model's name.

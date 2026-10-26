@@ -66,6 +66,8 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+/* The way of working (src/ui/workmode.ts): Draw, Code or Paste each shows only its own tools. */
+body:not([data-work="draw"]) .only-draw, body:not([data-work="code"]) .only-code, body:not([data-work="paste"]) .only-paste, body[data-work="draw"] .not-draw { display: none !important; }
 .bar, .toolbar, .drawer, .views, dialog, .featpanel { -webkit-user-select: none; user-select: none; }
 html, body { margin: 0; height: 100%; }
 body {
@@ -130,7 +132,9 @@ main { display: flex; min-height: 0; }
 #codePanel[hidden] { display: none; }
 .codebar { display: flex; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .codebar[hidden] { display: none; }
+.codebar { flex-wrap: wrap; }
 .codebar button { min-height: 38px; gap: 6px; }
+.codebar select { flex: 1 1 140px; min-height: 38px; }
 .codewrap { position: relative; flex: 1; min-height: 0; display: flex; }
 /* Clear the code: in the code's top corner; for a few seconds after, "Undo" brings the code back. */
 #btnClearCode {
@@ -335,7 +339,6 @@ dialog form { margin-top: 10px; text-align: right; }
 @media (max-width: 520px) {
   .bar { gap: 4px; padding-left: max(6px, env(safe-area-inset-left)); padding-right: max(6px, env(safe-area-inset-right)); }
   .bar button { padding: 0 10px; }
-  .bar select { flex: 1; }
   .bar .spacer { display: none; }
   .bar .title { flex: 1; }
   button.primary { min-width: 0; }
@@ -618,7 +621,12 @@ body[data-mode="part"] .drawer { left: 73px; }
 /* The page must never get wider than the screen (the dropdown's long options pushed the width up). */
 body { grid-template-columns: minmax(0, 1fr); }
 .bar > * { min-width: 0; }
-.bar select { width: 0; flex: 1 1 auto; }
+/* The way of working in the bar: three equal buttons that share what room there is. */
+.bar .workmode { margin: 0; flex: 0 1 auto; }
+.bar .workmode button { min-height: 36px; padding: 0 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bar .workmode button[aria-pressed="true"] { font-weight: 600; }
+@media (max-width: 520px) { .bar .workmode { flex: 1 1 auto; } .bar .workmode button { flex: 1 1 auto; } }
+@media (max-width: 400px) { .bar .workmode button { padding: 0 8px; } }
 @media (orientation: portrait) {
   #viewport:has(#featPanel:not([hidden])) .status, #viewport:has(#featPanel:not([hidden])) .modelnote { display: none; }
 }

@@ -1,8 +1,8 @@
-// Code from an AI chat: "Copy prompt" (on the start card and in the code bar) gives the AI the app's
-// rules, "Paste code" puts the code from the clipboard in Custom code, and Clear empties it for the
-// next answer. Pasting an answer with
-// ``` fences into the code keeps only the code, and text shared from another app (Android) opens
-// the same way.
+// Paste, the way of working for code from an AI chat: "Copy prompt" (on the start card and in the
+// code bar) gives the AI the app's rules, "Paste code" puts the code from the clipboard in the pasted
+// code (kept apart from your own code), and Clear empties it for the next answer. Pasting an answer
+// with ``` fences into the code keeps only the code, and text shared from another app (Android) opens
+// the same way. None of this is in Code, which is for writing the code yourself.
 
 import { aiPrompt, codeFromChat, looksLikeScad } from '../aiprompt';
 import { BED_PRESETS, parseBedChoice } from '../bed';
@@ -11,7 +11,9 @@ import { PARTS } from '../licenses';
 import { remoteLog } from '../remote';
 import { copyText, readClipboard } from './clipboard';
 import { $, store } from './dom';
-import { currentBed, setSource, view } from './render';
+import { currentBed, view } from './render';
+import { showSource, switchWork } from './workmode';
+import { app } from './state';
 import { showToast } from './toast';
 
 const code = () => $<HTMLTextAreaElement>('#code');
@@ -24,10 +26,9 @@ async function copyPrompt() {
   remoteLog('ai-prompt', { ok });
 }
 
-/** Custom code, with the code panel open. */
-function openCustomCode() {
-  setSource('custom');
-  if ($('#codePanel').hidden) $('#btnCode').click();
+/** The pasted code (Paste always shows the code panel). */
+function openPasted() {
+  if (app.source !== 'paste') showSource('paste');
 }
 
 /** Replace the code with `text` as if typed (the code's undo keeps working, and it renders). */
@@ -80,7 +81,7 @@ export function receiveCode(text: string): boolean {
   const src = codeFromChat(text);
   if (!looksLikeScad(src)) return false;
   view.fitNext = true;
-  openCustomCode();
+  openPasted();
   putCode(src);
   remoteLog('ai-code', { bytes: src.length, fenced: src !== `${text.trim()}\n` });
   return true;
@@ -93,16 +94,21 @@ async function pasteCode() {
     return;
   }
   // Nothing readable (or not code): paste by hand – the whole code is selected, so it is replaced.
-  openCustomCode();
+  openPasted();
   code().focus();
   code().select();
   showToast(text === null ? t('ai.pasteHere') : t('ai.noCode'), text === null ? 'info' : 'error');
 }
 
 export function initAiFlow() {
-  $('#startPrompt').addEventListener('click', () => void copyPrompt());
+  // From the start card: copying the prompt goes to Paste, so the answer has its place when you come back.
+  $('#startPrompt').addEventListener('click', () => {
+    switchWork('paste');
+    void copyPrompt();
+  });
   $('#startPaste').addEventListener('click', () => void pasteCode());
   $('#btnPrompt').addEventListener('click', () => void copyPrompt());
+  $('#btnPaste').addEventListener('click', () => void pasteCode());
   $('#btnClearCode').addEventListener('click', clearCode);
   // Typing after a clear: that is the new code, no more undo.
   code().addEventListener('input', () => {
@@ -111,7 +117,7 @@ export function initAiFlow() {
   // A whole chat answer pasted into the code: keep only the code block.
   code().addEventListener('paste', e => {
     const text = e.clipboardData?.getData('text/plain') ?? '';
-    if (!/```/.test(text) || code().readOnly) return;
+    if (app.source !== 'paste' || !/```/.test(text) || code().readOnly) return;
     const src = codeFromChat(text);
     if (!looksLikeScad(src)) return;
     e.preventDefault();

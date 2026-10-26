@@ -18,7 +18,11 @@
     <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
   </button>
   <span class="brand part-only">scad<b>shape</b></span>
-  <select id="source" class="part-only" data-i18n-aria="ui.source"></select>
+  <div id="workMode" class="segmented workmode part-only" role="group" data-i18n-aria="ui.work">
+    <button type="button" data-work="draw" aria-pressed="false" data-i18n="work.draw">Draw</button>
+    <button type="button" data-work="code" aria-pressed="false" data-i18n="work.code">Code</button>
+    <button type="button" data-work="paste" aria-pressed="false" data-i18n="work.paste">Paste</button>
+  </div>
   <!-- Sketch mode -->
   <button id="btnDone" class="primary sketch-only" hidden>
     <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span data-i18n="ui.done">Done</span>
@@ -30,7 +34,9 @@
   <button id="btnExport" class="icon part-only" data-i18n-aria="export.title" data-i18n-title="export.title">
     <svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
   </button>
-  <button id="btnCode" class="part-only" aria-pressed="false" data-i18n="ui.code">Code</button>
+  <button id="btnCode" class="icon part-only only-draw" aria-pressed="false" data-i18n-aria="code.show" data-i18n-title="code.show">
+    <svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14"/></svg>
+  </button>
   <button id="btnRender" class="primary part-only" data-i18n="ui.render" hidden>Render</button>
   <button id="btnUndo" class="icon sketch-only" data-i18n-aria="ui.undo" hidden>
     <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
@@ -51,18 +57,20 @@
     <button id="btnBench" data-i18n="ui.bench">Benchmark</button>
   </aside>
   <aside id="codePanel" hidden>
-    <div id="codeBar" class="codebar" hidden>
+    <div id="codeBar" class="codebar not-draw">
+      <select id="source" class="only-code" data-i18n-aria="ui.source"></select>
+      <button type="button" id="btnPrompt" class="only-paste" data-i18n-title="ai.promptTitle"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H10l-4 4v-4H5z"/><path d="M9 10h6"/></svg><span data-i18n="ai.copyPrompt">Copy prompt</span></button>
+      <button type="button" id="btnPaste" class="only-paste"><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9z"/><path d="M9 5.5H6v15h12v-15h-3"/></svg><span data-i18n="ai.paste">Paste code</span></button>
       <button type="button" id="btnConvert"><svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><path d="M14 20h6M17 17v6" transform="translate(0 -3)"/></svg><span data-i18n="convert.button">Convert to sketches</span></button>
-      <button type="button" id="btnPrompt" data-i18n-title="ai.promptTitle"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H10l-4 4v-4H5z"/><path d="M9 10h6"/></svg><span data-i18n="ai.copyPrompt">Copy prompt</span></button>
     </div>
     <div class="codewrap">
       <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" data-i18n-aria="ui.code"></textarea>
-      <button type="button" id="btnClearCode" data-i18n-title="code.clear" data-i18n-aria="code.clear"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg><span></span></button>
+      <button type="button" id="btnClearCode" class="only-paste" data-i18n-title="code.clear" data-i18n-aria="code.clear"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg><span></span></button>
     </div>
     <div id="problems" hidden>
       <div class="problems-head">
         <strong id="problemsTitle"></strong>
-        <button type="button" id="btnCopyProblems" class="primary" data-i18n="dx.copy">Copy for AI</button>
+        <button type="button" id="btnCopyProblems" class="primary only-paste" data-i18n="dx.copy">Copy for AI</button>
         <button type="button" id="btnFullLog" aria-pressed="false" data-i18n="dx.fullLog">Full log</button>
       </div>
       <ul id="problemList"></ul>
@@ -71,45 +79,45 @@
   </aside>
   <section id="partArea">
     <nav id="partToolbar" class="toolbar part-only" data-i18n-aria="ui.features">
-      <button id="btnNewSketch" data-i18n-title="feat.sketch">
+      <button id="btnNewSketch" class="only-draw" data-i18n-title="feat.sketch">
         <svg viewBox="0 0 24 24"><path d="M4 18 L10 6 L20 14"/><circle class="dot" cx="4" cy="18" r="1.8"/><circle class="dot" cx="10" cy="6" r="1.8"/><circle class="dot" cx="20" cy="14" r="1.8"/></svg><span data-i18n="feat.sketch">Sketch</span>
       </button>
-      <button id="btnExtrude" data-i18n-title="feat.extrude">
+      <button id="btnExtrude" class="only-draw" data-i18n-title="feat.extrude">
         <svg viewBox="0 0 24 24"><path d="M5 17l7 3 7-3M5 17V9l7 3 7-3v8M12 12v8M5 9l7-3 7 3"/><path d="M12 2v4" stroke-dasharray="1.5 1.5"/></svg><span data-i18n="feat.extrude">Extrude</span>
       </button>
-      <button id="btnRevolve" data-i18n-title="feat.revolve">
+      <button id="btnRevolve" class="only-draw" data-i18n-title="feat.revolve">
         <svg viewBox="0 0 24 24"><ellipse cx="12" cy="17" rx="7" ry="2.5"/><path d="M5 17V8M19 17V8"/><ellipse cx="12" cy="8" rx="7" ry="2.5"/><path d="M12 3v18" stroke-dasharray="2 2"/></svg><span data-i18n="feat.revolve">Revolve</span>
       </button>
-      <button id="btnHole" data-i18n-title="feat.hole">
+      <button id="btnHole" class="only-draw" data-i18n-title="feat.hole">
         <svg viewBox="0 0 24 24"><path d="M4 9l8-4 8 4-8 4z"/><path d="M4 9v7l8 4 8-4V9"/><ellipse cx="12" cy="9" rx="2.6" ry="1.3"/><path d="M9.4 9v4.5M14.6 9v4.5" stroke-dasharray="1.5 1.5"/></svg><span data-i18n="feat.hole">Hole</span>
       </button>
-      <button id="btnThread" data-i18n-title="feat.thread">
+      <button id="btnThread" class="only-draw" data-i18n-title="feat.thread">
         <svg viewBox="0 0 24 24"><path d="M8 3v18M16 3v18"/><path d="M6 6l12 3M6 10l12 3M6 14l12 3M6 18l12 3"/></svg><span data-i18n="feat.thread">Thread</span>
       </button>
-      <button id="btnContainer" data-i18n-title="feat.container">
+      <button id="btnContainer" class="only-draw" data-i18n-title="feat.container">
         <svg viewBox="0 0 24 24"><path d="M5 9v9l7 3 7-3V9"/><path d="M5 9l7 3 7-3-7-3z"/><path d="M8 9.2l4 1.6 4-1.6"/><path d="M4 5.5l8-3 8 3" stroke-dasharray="2 1.5"/></svg><span data-i18n="feat.container">Container</span>
       </button>
-      <button id="btnText" data-i18n-title="feat.text">
+      <button id="btnText" class="only-draw" data-i18n-title="feat.text">
         <svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span data-i18n="feat.text">Text</span>
       </button>
-      <button id="btnSnap" data-i18n-title="feat.snap">
+      <button id="btnSnap" class="only-draw" data-i18n-title="feat.snap">
         <svg viewBox="0 0 24 24"><path d="M4 21h16"/><path d="M9 21v-3l1-1V6l-1-1V3h3l4 4-2.5 1.5H12V17l1 1v3"/></svg><span data-i18n="feat.snap">Snap hook</span>
       </button>
-      <button id="btnImport" data-i18n-title="import.title">
+      <button id="btnImport" class="only-draw" data-i18n-title="import.title">
         <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5"/><path d="M4 15v4h16v-4"/></svg><span data-i18n="import.button">Import</span>
       </button>
       <!-- No accept filter: Android does not always recognise .stl/.svg. -->
       <input id="importFile" type="file" hidden>
-      <span class="sep"></span>
+      <span class="sep only-draw"></span>
       <button id="btnMeasure" data-i18n-title="measure.title" aria-pressed="false">
         <svg viewBox="0 0 24 24"><path d="M3 16l13-13 5 5-13 13z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2M8.5 10.5l1 1M11.5 7.5l1 1"/></svg><span data-i18n="measure.button">Measure</span>
       </button>
-      <button id="btnParams" data-i18n-title="ui.variables">
+      <button id="btnParams" class="only-draw" data-i18n-title="ui.variables">
         <svg viewBox="0 0 24 24"><path d="M7 20c3 0 2.5-16 6-16M6 10h8"/><path d="M14 13l5 6M19 13l-5 6"/></svg><span data-i18n="ui.variables">Variables</span>
       </button>
     </nav>
     <section id="viewport">
-      <div class="histbar part-only">
+      <div class="histbar part-only only-draw">
         <button id="btnDocUndo" class="icon" data-i18n-aria="ui.undo" data-i18n-title="ui.undo" disabled>
           <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
         </button>
@@ -160,6 +168,11 @@
           <li data-i18n="start.step3"></li>
           <li data-i18n="start.step4"></li>
         </ol>
+        <h3 data-i18n="start.code">Or write the code yourself</h3>
+        <p data-i18n="start.codeIntro"></p>
+        <div class="ai-buttons">
+          <button type="button" id="startCode"><span data-i18n="start.codeButton">Write code</span></button>
+        </div>
         <h3 data-i18n="start.examples">Or start from an example</h3>
         <div id="startExamples" class="examples"></div>
         <p class="muted small" data-i18n="start.tip"></p>

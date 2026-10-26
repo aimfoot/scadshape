@@ -25,14 +25,14 @@ assert.ok(await page.isHidden('#codeBar'), 'no convert button for the user\'s ow
 await page.click('#btnTree'); await page.click('#btnProjects');
 const src = readFileSync(new URL('../../tests/fixtures/snap_box.scad', import.meta.url));
 await page.setInputFiles('#projFile', { name: 'snap_box.scad', mimeType: 'application/octet-stream', buffer: src });
-await page.waitForFunction(() => document.querySelector('#source').value === 'custom');
+await page.waitForFunction(() => window.__scadshape.source === 'custom');
 assert.ok(await page.isVisible('#btnConvert'));
 await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 
 await page.click('#btnConvert');
-await page.waitForFunction(() => document.querySelector('#source').value === 'model' && window.__scadshape.doc.features.length > 0, null, { timeout: 60000 });
+await page.waitForFunction(() => window.__scadshape.source === 'model' && window.__scadshape.doc.features.length > 0, null, { timeout: 60000 });
 await page.waitForFunction(() => /\d+ triangles/.test(document.querySelector('#status').textContent) && !/Rendering|Converting/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
-const st = await page.evaluate(() => ({ types: window.__scadshape.doc.features.map(f => f.type), errors: [...window.__scadshape.model.errors.values()], name: document.querySelector('#source option[value=model]').textContent }));
+const st = await page.evaluate(() => ({ types: window.__scadshape.doc.features.map(f => f.type), errors: [...window.__scadshape.model.errors.values()], name: document.querySelector('#projName').textContent }));
 assert.equal(st.name, 'snap_box'); assert.equal(st.errors.length, 0, st.errors.join());
 const count = t => st.types.filter(x => x === t).length;
 assert.deepEqual([count("sketch"), count("extrude"), count("revolve"), count("code")], [8, 6, 2, 1], st.types.join());

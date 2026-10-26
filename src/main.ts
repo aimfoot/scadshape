@@ -30,10 +30,11 @@ import { initBlobs } from './blobs';
 import { buildModel } from './model3d';
 import { applyTheme, onThemeChange, setThemeChoice, themeChoice, type ThemeChoice } from './theme';
 import { initParams, openParams, refreshChips } from './ui/params';
-import { EXAMPLES, initRenderUi, requestRender, setSource, syncCodePanel, view, viewer, cancelRender } from './ui/render';
+import { EXAMPLES, initRenderUi, requestRender, setSource, syncCodePanel, viewer, workOf } from './ui/render';
+import { initWorkMode, showSource } from './ui/workmode';
 import { currentEditor, enterSketch, initSketchMode, refreshSketchTexts, setMode, sketchHooks } from './ui/sketchmode';
 import { app, emit, initState, on, saveDoc } from './ui/state';
-import { currentProjectName, initProjects, projectHooks } from './ui/projects';
+import { initProjects } from './ui/projects';
 import { showToast } from './ui/toast';
 import { initTree, renderTree, treeActions } from './ui/tree';
 
@@ -78,11 +79,12 @@ loadSolver()
 
 // ---- Source, panels and buttons -------------------------------------------------------------
 
+/** Code's drop-down: your own code and the code examples. */
 function fillSources() {
   const sel = $<HTMLSelectElement>('#source');
-  sel.replaceChildren(new Option(currentProjectName(), 'model'), ...EXAMPLES.map(e => new Option(t(e.name), e.id)), new Option(t('source.custom'), 'custom'));
-  if (![...sel.options].some(o => o.value === app.source)) app.source = 'model';
-  sel.value = app.source;
+  sel.replaceChildren(new Option(t('source.custom'), 'custom'), ...EXAMPLES.map(e => new Option(t(e.name), e.id)));
+  if (app.source !== 'model' && app.source !== 'paste' && ![...sel.options].some(o => o.value === app.source)) app.source = 'model';
+  if (workOf(app.source) === 'code') sel.value = app.source;
 }
 
 function togglePanel(panel: HTMLElement, btn: HTMLButtonElement, key: string, open = panel.hidden) {
@@ -145,7 +147,6 @@ initModelNote();
 initAiFlow();
 initMeasure();
 initImport();
-projectHooks.renamed = fillSources;
 initPwa();
 initAbout();
 initSettings();
@@ -153,18 +154,14 @@ initStart();
 initScrollHints();
 initParams();
 initSketchMode();
+initWorkMode();
+setSource(app.source); // the way of working and its code panel
 syncCodePanel();
 renderTree();
 refreshChips();
 setMode('part');
 
-$('#source').addEventListener('change', e => {
-  if (currentPanel()) closePanel();
-  setSource((e.target as HTMLSelectElement).value);
-  view.fitNext = true;
-  cancelRender();
-  requestRender();
-});
+$('#source').addEventListener('change', e => showSource((e.target as HTMLSelectElement).value));
 $('#btnCode').addEventListener('click', () => togglePanel($('#codePanel'), $('#btnCode'), 'codeOpen'));
 $('#btnTree').addEventListener('click', () => togglePanel($('#tree'), $('#btnTree'), 'treeOpen'));
 // The benchmark button is a developer tool: not in the app (and runBench is then left out). Only on
