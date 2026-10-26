@@ -38,7 +38,7 @@ assert.equal(m3.name, 'jar.3mf'); assert.equal(m3.buf.subarray(0, 2).toString(),
 const stl = await get('stl');
 assert.equal(stl.name, 'jar.stl'); assert.equal(stl.buf.readUInt32LE(80), tris); assert.equal(stl.buf.length, 84 + 50 * tris);
 const scad = await get('scad');
-assert.equal(scad.name, 'jar.scad'); assert.match(scad.buf.toString(), /container_1_lid\(\);/);
+assert.equal(scad.name, 'jar.scad'); assert.match(scad.buf.toString(), /module lid\(\)/); // the container's parts, the lid among them
 console.log(`3MF ${m3.buf.length} B, STL ${tris} triangles, scad ${scad.buf.length} B`);
 // The format is saved; the file name is the model's name
 await page.click('#exportDlg form button:not([type])');

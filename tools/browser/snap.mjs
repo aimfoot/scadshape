@@ -88,26 +88,23 @@ const vol = await page.evaluate(() => {
 assert.ok(Math.abs(vol - (30 * 20 * 4 - (1.5 + 1 + 0.4) * 6.4 * 3)) < 0.05, String(vol));
 console.log('catch:', st.status, vol.toFixed(2));
 
-// 3. Container with a snap lid.
+// 3. Container with a snap lid (built as parts: a snap groove in the box, a snap bead on the lid).
 await openTree(); await page.click('#btnProjects'); await page.click('#projNew');
 if (!(await page.isHidden('#tree'))) await page.click('#btnTree');
 await page.click('#btnContainer'); await page.waitForSelector('#featPanel:not([hidden])');
 await page.click('#fp-lid [data-value="snap"]');
 assert.equal(await page.inputValue('#fp-snapDepth'), '0,6');
 assert.equal(await page.isVisible('#fp-lipHeight'), true);
+// Too large a bead → an error in the panel.
+await page.fill('#fp-snapDepth', '1,8'); await page.waitForTimeout(600);
+assert.match(await page.textContent('#fpError'), /too thin/);
+await page.fill('#fp-snapDepth', '0,6'); await page.waitForTimeout(600);
 await page.click('#fpOk');
 st = await waitRendered();
 assert.equal(st.errors.length, 0, st.errors.join());
 assert.deepEqual(await bbox(), [-40, -30, 0, 130, 30, 40]);
-assert.match(await page.textContent('#featureList'), /snap lid/);
+assert.match(await page.textContent('#featureList'), /Snap groove[\s\S]*Snap bead/);
 await page.screenshot({ path: `${out}/sn-box.png` });
-// Too large a bead → error in the tree.
-await openTree();
-await page.locator('#featureList li', { hasText: 'Container' }).first().click();
-await page.waitForSelector('#featPanel:not([hidden])');
-await page.fill('#fp-snapDepth', '1,8'); await page.waitForTimeout(600);
-assert.match(await page.textContent('#fpError'), /too thin/);
-await page.click('#fpCancel');
 console.log('snap lid:', st.status);
 await browser.close();
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');

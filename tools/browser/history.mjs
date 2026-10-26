@@ -21,23 +21,25 @@ await page.reload();
 await page.waitForFunction(() => /Start with Sketch/.test(document.querySelector('#status').textContent));
 assert.ok(await disabled('btnDocUndo')); assert.ok(await disabled('btnDocRedo'));
 
+// The container goes in as its parts: box, cavity, lid sketch, lid, lip, inside of the lip.
+const BOX = 'sketch,extrude,extrude,sketch,extrude,extrude,extrude';
 await page.click('#btnContainer'); await page.waitForSelector('#featPanel:not([hidden])'); await page.click('#fpOk');
-assert.equal(await feats(), 'sketch,container');
+assert.equal(await feats(), BOX);
 await page.click('#btnDocUndo'); assert.equal(await feats(), 'sketch');
 await page.click('#btnDocUndo'); assert.equal(await feats(), '');
 assert.ok(await disabled('btnDocUndo'));
-await page.click('#btnDocRedo'); await page.click('#btnDocRedo'); assert.equal(await feats(), 'sketch,container');
+await page.click('#btnDocRedo'); await page.click('#btnDocRedo'); assert.equal(await feats(), BOX);
 assert.ok(await disabled('btnDocRedo'));
 await page.waitForFunction(() => /triangles/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
 
-// Delete the container via the ⋯ menu and undo
+// Delete the lid sketch via the ⋯ menu (the lid's parts go with it) and undo
 await page.click('#btnTree');
-await page.locator('#featureList li', { hasText: 'Container' }).locator('button.icon').click();
+await page.locator('#featureList li', { hasText: 'Lid sketch' }).locator('button.icon').click();
 await page.waitForSelector('#featMenu[open]');
 await page.click('#featMenu [data-fm="delete"]');
-await page.waitForFunction(() => window.__scadshape.doc.features.length === 1);
+await page.waitForFunction(() => window.__scadshape.doc.features.length === 3);
 await page.click('#btnTree');
-await page.click('#btnDocUndo'); assert.equal(await feats(), 'sketch,container');
+await page.click('#btnDocUndo'); assert.equal(await feats(), BOX);
 await page.screenshot({ path: `${out}/h-undo.png` });
 
 // New model: the history starts over
