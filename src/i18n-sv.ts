@@ -42,6 +42,7 @@ export const sv: Record<keyof typeof en, string> = {
   'ai.intro': 'Kopiera prompten till din AI-chatt och skriv vad du vill ha sist. Kopiera sedan koden den svarar med och klistra in den här. Variablerna blir mått du kan ändra.',
   'ai.copyPrompt': 'Kopiera prompt',
   'code.show': 'Visa koden som modellen blir',
+  'code.runTitle': 'Rendera koden (Ctrl+Enter)',
   'code.clear': 'Rensa koden',
   'code.undoClear': 'Ångra',
   'code.cleared': 'Koden rensad – tryck på Ångra för att få tillbaka den',

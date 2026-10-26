@@ -16,8 +16,9 @@ const libRequests = [];
 page.on('request', r => r.url().includes('/libs/') && libRequests.push(r.url().split('/').pop()));
 const status = () => page.textContent('#status');
 const renderCode = async code => {
-  await page.fill('#code', code); // renders by itself when the typing pauses (0.8 s)
-  await page.waitForTimeout(1200);
+  await page.fill('#code', code);
+  await page.click('#btnRunCode'); // Code renders when asked
+  await page.waitForTimeout(400);
   await page.waitForFunction(() => !/Rendering|Loading/.test(document.querySelector('#status').textContent) && !/Cancel/.test(document.querySelector('#btnRender').textContent), null, { timeout: 90000 });
   return status();
 };

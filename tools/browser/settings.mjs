@@ -87,14 +87,18 @@ assert.doesNotMatch((await status()).text, /larger/);
 await closeSettings();
 console.log('custom size saved, a turned part fits');
 
-// 5. Custom code renders by itself when the typing pauses.
+// 5. Code renders when asked (Render), not while you write.
+if (await page.isVisible('#tree')) await page.click('#btnTree'); // ☰ would cover the code
 await page.click('#workMode [data-work=code]'); await page.selectOption('#source', 'cube');
 await waitRendered();
-await page.fill('#code', 'cube([7, 7, 7]);');
+await page.fill('#code', 'cube([7, 7, 7]); translate([20, 0, 0]) cube(3);');
 await page.waitForFunction(() => document.querySelector('#source').value === 'custom');
+await page.waitForTimeout(1500);
+assert.doesNotMatch((await status()).text, /\b24 triangles/, 'not rendered while writing');
+await page.click('#btnRunCode');
 st = await waitRendered();
-await page.waitForFunction(() => /\b12 triangles/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
-console.log('custom code rendered by itself:', (await status()).text);
+await page.waitForFunction(() => /\b24 triangles/.test(document.querySelector('#status').textContent), null, { timeout: 30000 });
+console.log('code rendered on Render:', (await status()).text);
 
 await browser.close();
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'No console errors. All checks ok.');

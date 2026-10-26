@@ -116,6 +116,13 @@ export function syncCodePanel() {
   code.value = currentCode();
   code.readOnly = app.source === 'model';
   code.classList.toggle('readonly', code.readOnly);
+  syncRunButton();
+}
+
+/** The code the last render was asked to show: Render is highlighted while the code differs from it. */
+let renderedSrc: string | null = null;
+function syncRunButton() {
+  $('#btnRunCode').classList.toggle('stale', code.value !== renderedSrc);
 }
 
 export function setSource(s: string) {
@@ -207,6 +214,8 @@ async function renderOnce() {
   const src = key ? code.value : currentCode();
   if (!key) code.value = src;
   else store.set(key, code.value);
+  renderedSrc = src;
+  syncRunButton();
   // The comment at the top of examples and pasted code says what it is; your own code needs no note.
   showModelNote(app.source === 'model' || app.source === 'custom' ? null : src);
   for (const cb of renderOpts.onRendered) cb();
@@ -286,9 +295,17 @@ export function initRenderUi() {
     // An edited example becomes your own code; pasted code stays pasted code.
     store.set(CODE_KEYS[app.source] ?? 'code', code.value); // first – setSource reads back the saved code
     if (!CODE_KEYS[app.source]) setSource('custom');
-    // Custom code renders by itself when the typing pauses.
     clearTimeout(codeTimer);
-    codeTimer = window.setTimeout(requestRender, 800);
+    // Code renders when you ask (Render or Ctrl+Enter), so you can write freely; pasted code renders
+    // by itself when the typing pauses.
+    if (workOf(app.source) === 'code') syncRunButton();
+    else codeTimer = window.setTimeout(requestRender, 800);
+  });
+  const run = $('#btnRunCode');
+  run.addEventListener('pointerdown', e => e.preventDefault()); // keep the keyboard and the caret
+  run.addEventListener('click', () => {
+    clearTimeout(codeTimer);
+    requestRender();
   });
   code.addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

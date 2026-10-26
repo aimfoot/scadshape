@@ -40,6 +40,7 @@ export const en = {
   'ai.intro': 'Copy the prompt to your AI chat and add what you want at the end. Then copy its code and paste it here. Its variables become dimensions you can change.',
   'ai.copyPrompt': 'Copy prompt',
   'code.show': 'Show the code the model makes',
+  'code.runTitle': 'Render the code (Ctrl+Enter)',
   'code.clear': 'Clear the code',
   'code.undoClear': 'Undo',
   'code.cleared': 'Code cleared – tap Undo to get it back',

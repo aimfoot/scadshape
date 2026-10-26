@@ -17,6 +17,8 @@ const PALETTE: Record<Theme, { minor: number; minorA: number; major: number; maj
   light: { minor: 0x7f8c99, minorA: 0.25, major: 0x5d6b78, majorA: 0.45, sketch: 0x1a6fc4 },
   dark: { minor: 0x8696a5, minorA: 0.16, major: 0x9aa9b7, majorA: 0.3, sketch: 0x5ea4ec },
 };
+/** Selected axes and points and the measure tool's marks: blue, so they stand out on the orange model. */
+const MARK = 0x1a6fc4;
 
 const V = (a: V3) => new THREE.Vector3(a[0], a[1], a[2]);
 /** The sketch's (x, y) and distance w along the normal → the world. */
@@ -332,7 +334,7 @@ export class Viewer {
         const l = new THREE.LineSegments(
           g,
           ax.selected
-            ? new THREE.LineBasicMaterial({ color: 0xe8790c, depthTest: false, transparent: true })
+            ? new THREE.LineBasicMaterial({ color: MARK, depthTest: false, transparent: true })
             : new THREE.LineDashedMaterial({ color: 0x5c6b7a, dashSize: 2, gapSize: 1.5, depthTest: false, transparent: true }),
         );
         l.computeLineDistances();
@@ -346,7 +348,7 @@ export class Viewer {
         const g = new THREE.BufferGeometry().setFromPoints(pts);
         const m = new THREE.Points(
           g,
-          new THREE.PointsMaterial({ color: sel ? 0xe8790c : 0x5c6b7a, size: sel ? 16 : 12, sizeAttenuation: false, depthTest: false, transparent: true }),
+          new THREE.PointsMaterial({ color: sel ? MARK : 0x5c6b7a, size: sel ? 16 : 12, sizeAttenuation: false, depthTest: false, transparent: true }),
         );
         m.renderOrder = 13;
         this.overlay.add(m);
@@ -448,7 +450,7 @@ export class Viewer {
   setMarks(m: { points: V3[]; polylines: V3[][]; lines: [V3, V3][] } | null) {
     Viewer.disposeGroup(this.marks);
     if (m) {
-      const color = 0xe8790c;
+      const color = MARK;
       const segs = m.polylines.flatMap(pl => pl.slice(1).flatMap((q, i) => [V(pl[i]), V(q)]));
       if (segs.length) {
         const l = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(segs), new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true }));
@@ -458,7 +460,7 @@ export class Viewer {
       if (m.lines.length) {
         const l = new THREE.LineSegments(
           new THREE.BufferGeometry().setFromPoints(m.lines.flatMap(([a, b]) => [V(a), V(b)])),
-          new THREE.LineDashedMaterial({ color: 0x1a6fc4, dashSize: Math.max(0.5, this.bounds.radius * 0.03), gapSize: Math.max(0.3, this.bounds.radius * 0.02), depthTest: false, transparent: true }),
+          new THREE.LineDashedMaterial({ color: 0x22303d, dashSize: Math.max(0.5, this.bounds.radius * 0.03), gapSize: Math.max(0.3, this.bounds.radius * 0.02), depthTest: false, transparent: true }),
         );
         l.computeLineDistances();
         l.renderOrder = 21;
@@ -606,7 +608,7 @@ export class Viewer {
     const body = new THREE.Mesh(
       geo,
       new THREE.MeshStandardMaterial({
-        color: 0xb4c2cf,
+        color: 0xffa347, // warm orange (PLA-like); marks on it are blue
         roughness: 0.55,
         metalness: 0.05,
         polygonOffset: true,
