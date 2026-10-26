@@ -42,6 +42,8 @@ export const sv: Record<keyof typeof en, string> = {
   'code.runTitle': 'Rendera koden (Ctrl+Enter)',
   'ai.promptTitle': 'Kopiera en prompt till en AI-chatt som berättar vad appen kan köra',
   'ai.paste': 'Klistra in kod',
+  'ai.pasteShort': 'Klistra in',
+  'ai.pasteTitle': 'Ersätt koden med OpenSCAD-kod från urklipp (t.ex. ett svar från en AI-chatt)',
   'ai.promptCopied': 'Prompten kopierad – klistra in den i din AI-chatt och beskriv sist vad du vill ha',
   'ai.pasted': 'Koden inklistrad',
   'ai.pasteHere': 'Håll fingret i koden och välj Klistra in',

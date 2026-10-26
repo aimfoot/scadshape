@@ -93,6 +93,24 @@ await page.waitForTimeout(300);
 assert.equal(await docCode(), 'cylinder(d = 30, h = 5);\n');
 assert.equal(await feats(), 'code');
 
+// 4b. Code's Paste: the clipboard's code (an AI's corrected file, fences and all) replaces the code, in the model, rendered
+await page.click('#workMode [data-work=code]');
+await page.waitForTimeout(300);
+assert.ok(await page.isVisible('#btnPasteCode'));
+await page.evaluate(() => navigator.clipboard.writeText('Fixed:\n```openscad\ncylinder(d = 12, h = 6);\n```'));
+await page.click('#btnPasteCode');
+await page.waitForFunction(() => /Code pasted/.test(document.querySelector('#partToast').textContent));
+assert.equal(await page.inputValue('#code'), 'cylinder(d = 12, h = 6);\n');
+assert.equal(await docCode(), 'cylinder(d = 12, h = 6);\n');
+await settled();
+// Not code on the clipboard: the code stays as it is
+await page.evaluate(() => navigator.clipboard.writeText('Sorry, no.'));
+await page.click('#btnPasteCode');
+await page.waitForFunction(() => /^The clipboard has no OpenSCAD code/.test(document.querySelector('#partToast').textContent));
+assert.equal(await page.inputValue('#code'), 'cylinder(d = 12, h = 6);\n');
+await page.click('#workMode [data-work=draw]');
+await page.waitForTimeout(300);
+
 // 5. A drawn model: Code shows its code; an edit makes it code, Draw's undo brings the sketches back
 await page.click('#btnStart');
 await page.click('#startExamples .example');

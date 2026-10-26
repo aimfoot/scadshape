@@ -40,6 +40,8 @@ export const en = {
   'code.runTitle': 'Render the code (Ctrl+Enter)',
   'ai.promptTitle': 'Copy a prompt for an AI chat that tells it what this app can run',
   'ai.paste': 'Paste code',
+  'ai.pasteShort': 'Paste',
+  'ai.pasteTitle': 'Replace the code with OpenSCAD code from the clipboard (e.g. an AI chat\'s answer)',
   'ai.promptCopied': 'Prompt copied – paste it into your AI chat and describe what you want at the end',
   'ai.pasted': 'Code pasted',
   'ai.pasteHere': 'Long-press in the code and choose Paste',

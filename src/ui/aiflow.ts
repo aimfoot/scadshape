@@ -1,5 +1,6 @@
 // Code from an AI chat: "Copy prompt" (on the start card and in Code's toolbar) gives the AI the app's
-// rules, and "Paste code" (on the start card) makes the code from the clipboard the model, in Code.
+// rules, "Paste code" on the start card makes the code from the clipboard the model, in Code, and
+// "Paste" in Code's toolbar puts it in place of the model's code (e.g. the AI's corrected file).
 // Pasting an answer with ``` fences into the code keeps only the code, and text shared from another
 // app (Android) opens as a model the same way.
 
@@ -48,6 +49,35 @@ async function pasteCode() {
   showToast(text === null ? t('ai.pasteHere') : t('ai.noCode'), text === null ? 'info' : 'error');
 }
 
+/** Code's "Paste": the clipboard's code in place of the editor's, as if typed (the code's undo has
+ * it), and into the model and rendered. */
+async function pasteOver() {
+  const text = await readClipboard();
+  const src = text === null ? null : codeFromChat(text);
+  if (src === null || !looksLikeScad(src)) {
+    // Nothing readable: paste by hand – the whole code is selected, so it is replaced.
+    if (text === null) {
+      code().focus();
+      code().select();
+    }
+    showToast(text === null ? t('ai.pasteHere') : t('ai.noCode'), text === null ? 'info' : 'error');
+    return;
+  }
+  const ta = code();
+  ta.focus({ preventScroll: true });
+  ta.select();
+  if (!document.execCommand('insertText', false, src)) {
+    ta.value = src;
+    ta.dispatchEvent(new Event('input'));
+  }
+  ta.setSelectionRange(0, 0);
+  ta.scrollTop = 0;
+  ta.blur(); // no keyboard over the new model
+  $('#btnRunCode').click();
+  showToast(t('ai.pasted'));
+  remoteLog('ai-code', { bytes: src.length, fenced: src !== `${text!.trim()}\n`, over: true });
+}
+
 export function initAiFlow() {
   // From the start card: copying the prompt goes on to Code, where the answer is pasted.
   $('#startPrompt').addEventListener('click', () => {
@@ -56,6 +86,7 @@ export function initAiFlow() {
   });
   $('#startPaste').addEventListener('click', () => void pasteCode());
   $('#btnPrompt').addEventListener('click', () => void copyPrompt());
+  $('#btnPasteCode').addEventListener('click', () => void pasteOver());
   // A whole chat answer pasted into the code: keep only the code block.
   code().addEventListener('paste', e => {
     const text = e.clipboardData?.getData('text/plain') ?? '';
